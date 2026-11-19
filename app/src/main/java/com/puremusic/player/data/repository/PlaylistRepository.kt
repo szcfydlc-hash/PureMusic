@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutMode
@@ -39,6 +40,7 @@ class PlaylistRepository(private val context: Context) {
         val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         val MIN_DURATION_FILTER = stringPreferencesKey("min_duration_filter")
+        val ACCENT_COLOR = stringPreferencesKey("accent_color")
         val SORT_ORDER = stringPreferencesKey("sort_order")
     }
 
@@ -92,6 +94,12 @@ class PlaylistRepository(private val context: Context) {
         prefs[Keys.MIN_DURATION_FILTER]?.let { name ->
             MinDurationFilter.entries.firstOrNull { it.name == name }
         } ?: MinDurationFilter.NONE
+    }
+
+    val accentColorFlow: Flow<AppAccentColor> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.ACCENT_COLOR]?.let { name ->
+            AppAccentColor.entries.firstOrNull { it.name == name }
+        } ?: AppAccentColor.FOREST_GREEN
     }
 
     val sortOrderFlow: Flow<SortOrder> = context.pureMusicDataStore.data.map { prefs ->
@@ -203,7 +211,12 @@ class PlaylistRepository(private val context: Context) {
             prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
             prefs[Keys.LAYOUT_MODE] = LayoutMode.AUTO.name
             prefs[Keys.LIQUID_GLASS_ENABLED] = true
+            prefs[Keys.ACCENT_COLOR] = AppAccentColor.FOREST_GREEN.name
         }
+    }
+
+    suspend fun setAccentColor(color: AppAccentColor) {
+        context.pureMusicDataStore.edit { it[Keys.ACCENT_COLOR] = color.name }
     }
 
     suspend fun setSortOrder(order: SortOrder) {

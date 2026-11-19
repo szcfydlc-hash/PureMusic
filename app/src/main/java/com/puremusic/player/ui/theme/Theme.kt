@@ -8,6 +8,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.PlayerTheme
@@ -18,15 +19,20 @@ val WarmWoodAccent = Color(0xFF2E5C45)
 val RetroRedAccent = Color(0xFFB7362A)
 
 val WarmPaperBg = Color(0xFFF5F1EB)
+val WarmPaperSidebar = Color(0xFFEFEAE1)
 val WarmPaperSurface = Color(0xFFFBF8F3)
 val WarmPaperSurfaceVariant = Color(0xFFEAE4DA)
 val InkCharcoal = Color(0xFF1C1B1A)
 val InkMuted = Color(0xFF6B665F)
 
+val DeepInkBg = Color(0xFF121417)
+val DeepInkSidebar = Color(0xFF1C1E22)
+
 @Composable
 fun PureMusicTheme(
     backgroundStyle: BackgroundStyle,
     playerTheme: PlayerTheme,
+    accentColor: AppAccentColor,
     fontStyle: AppFontStyle,
     content: @Composable () -> Unit,
 ) {
@@ -36,26 +42,21 @@ fun PureMusicTheme(
         BackgroundStyle.WARM_PAPER, BackgroundStyle.PURE_WHITE -> false
     }
 
-    val primaryAccent = when (playerTheme) {
-        PlayerTheme.VERMILION_CREAM -> VermilionAccent
-        PlayerTheme.WARM_WOOD -> WarmWoodAccent
-        PlayerTheme.POSTER_WALL -> ForestGreen
-        PlayerTheme.RETRO_DECK -> RetroRedAccent
-    }
+    val primaryAccent = Color(accentColor.colorHex)
 
     val colorScheme = if (useDark) {
         darkColorScheme(
-            primary = primaryAccent.copy(alpha = 0.95f),
+            primary = primaryAccent,
             onPrimary = Color.White,
-            primaryContainer = primaryAccent.copy(alpha = 0.25f),
-            onPrimaryContainer = Color(0xFFEAF3EE),
-            secondary = ForestGreen,
+            primaryContainer = primaryAccent.copy(alpha = 0.24f),
+            onPrimaryContainer = Color(0xFFEDEAE4),
+            secondary = primaryAccent.copy(alpha = 0.8f),
             onSecondary = Color.White,
-            background = Color(0xFF141517),
+            background = DeepInkBg,
             onBackground = Color(0xFFEDEAE4),
-            surface = Color(0xFF1B1D20),
+            surface = Color(0xFF1A1C20),
             onSurface = Color(0xFFEDEAE4),
-            surfaceVariant = Color(0xFF282A2E),
+            surfaceVariant = Color(0xFF272A30),
             onSurfaceVariant = Color(0xFFA6A198),
         )
     } else if (backgroundStyle == BackgroundStyle.PURE_WHITE) {
@@ -64,7 +65,7 @@ fun PureMusicTheme(
             onPrimary = Color.White,
             primaryContainer = primaryAccent.copy(alpha = 0.14f),
             onPrimaryContainer = primaryAccent,
-            secondary = ForestGreen,
+            secondary = primaryAccent.copy(alpha = 0.8f),
             onSecondary = Color.White,
             background = Color(0xFFFFFFFF),
             onBackground = InkCharcoal,
@@ -79,7 +80,7 @@ fun PureMusicTheme(
             onPrimary = Color.White,
             primaryContainer = primaryAccent.copy(alpha = 0.14f),
             onPrimaryContainer = primaryAccent,
-            secondary = ForestGreen,
+            secondary = primaryAccent.copy(alpha = 0.8f),
             onSecondary = Color.White,
             background = WarmPaperBg,
             onBackground = InkCharcoal,

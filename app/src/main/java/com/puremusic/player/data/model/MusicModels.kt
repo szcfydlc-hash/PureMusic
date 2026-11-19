@@ -140,3 +140,12 @@ data class PlayerUiState(
     val shuffleEnabled: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
 )
+
+enum class AppAccentColor(val label: String, val colorHex: Long) {
+    FOREST_GREEN("森林绿", 0xFF11553B),
+    VERMILION("活力橙", 0xFFD84315),
+    OCEAN_BLUE("深海蓝", 0xFF0277BD),
+    AMBER_GOLD("琥珀金", 0xFFD9820B),
+    ROSE_RED("绯红", 0xFFC2185B),
+    VIOLET("星河紫", 0xFF6A1B9A),
+}

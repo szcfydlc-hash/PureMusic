@@ -256,8 +256,7 @@ fun MiniPlayerBar(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .height(66.dp)
-            .shadow(14.dp, pillShape, ambientColor = Color.Black.copy(alpha = 0.2f))
-            .clip(pillShape)
+            .liquidGlass(enabled = liquidGlassEnabled, shape = pillShape, elevation = 14.dp)
             .clickable(onClick = onOpenNowPlaying),
     ) {
         if (liquidGlassEnabled) {
@@ -367,7 +366,7 @@ fun MiniPlayerBar(
                 onClick = onTogglePlayPause,
                 shape = CircleShape,
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = ForestGreen,
+                    containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color.White,
                 ),
                 modifier = Modifier

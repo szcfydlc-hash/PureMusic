@@ -83,6 +83,7 @@ private fun PureMusicApp(
     val lyricFontStyle by viewModel.lyricFontStyle.collectAsStateWithLifecycle()
     val backgroundStyle by viewModel.backgroundStyle.collectAsStateWithLifecycle()
     val layoutMode by viewModel.layoutMode.collectAsStateWithLifecycle()
+    val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
 
     val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -122,6 +123,7 @@ private fun PureMusicApp(
     PureMusicTheme(
         backgroundStyle = backgroundStyle,
         playerTheme = playerTheme,
+        accentColor = accentColor,
         fontStyle = fontStyle,
     ) {
         if (!hasAudioPermission) {
@@ -232,6 +234,10 @@ private fun PureMusicApp(
                     isFavorite = currentSong != null && currentSong.id in favoriteSongIds,
                     sleepTimerRemainingMs = sleepTimerRemainingMs,
                     onClose = { showNowPlaying = false },
+                    onSelectSongFromWall = { selectedSong ->
+                        val idx = allSongs.indexOfFirst { it.id == selectedSong.id }
+                        if (idx >= 0) viewModel.playSongs(allSongs, idx, false)
+                    },
                     onTogglePlayPause = viewModel::togglePlayPause,
                     onSkipPrevious = viewModel::skipPrevious,
                     onSkipNext = viewModel::skipNext,
@@ -263,6 +269,7 @@ private fun PureMusicApp(
                     layoutMode = layoutMode,
                     liquidGlassEnabled = liquidGlassEnabled,
                     playerTheme = playerTheme,
+                    accentColor = accentColor,
                     fontStyle = fontStyle,
                     lyricFontStyle = lyricFontStyle,
                     backgroundStyle = backgroundStyle,
@@ -270,6 +277,7 @@ private fun PureMusicApp(
                     onSelectLayoutMode = viewModel::setLayoutMode,
                     onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
                     onSelectPlayerTheme = viewModel::setPlayerTheme,
+                    onSelectAccentColor = viewModel::setAccentColor,
                     onSelectFontStyle = viewModel::setFontStyle,
                     onSelectLyricFontStyle = viewModel::setLyricFontStyle,
                     onSelectBackgroundStyle = viewModel::setBackgroundStyle,

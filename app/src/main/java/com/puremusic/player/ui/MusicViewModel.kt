@@ -12,6 +12,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.puremusic.player.data.model.Album
+import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.Artist
 import com.puremusic.player.data.model.BackgroundStyle
@@ -118,6 +119,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = LayoutMode.AUTO,
+    )
+
+    val accentColor: StateFlow<AppAccentColor> = playlistRepository.accentColorFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = AppAccentColor.FOREST_GREEN,
     )
 
     val liquidGlassEnabled: StateFlow<Boolean> = playlistRepository.liquidGlassEnabledFlow.stateIn(
@@ -450,6 +457,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setLayoutMode(mode: LayoutMode) {
         viewModelScope.launch { playlistRepository.setLayoutMode(mode) }
+    }
+
+    fun setAccentColor(color: AppAccentColor) {
+        viewModelScope.launch { playlistRepository.setAccentColor(color) }
     }
 
     fun setLiquidGlassEnabled(enabled: Boolean) {
