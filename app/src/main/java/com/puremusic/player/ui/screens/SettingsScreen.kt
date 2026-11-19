@@ -256,6 +256,7 @@ fun SettingsScreen(
                             onSelectAccentColor = onSelectAccentColor,
                             onOpenAppFontPicker = { showAppFontDialog = true },
                             onOpenLyricFontPicker = { showLyricFontDialog = true },
+                            onSelectBackgroundStyle = onSelectBackgroundStyle,
                             onOpenBackgroundPicker = { showBackgroundDialog = true },
                             onResetAppearance = onResetAppearance,
                         )
@@ -468,6 +469,7 @@ private fun AppearanceSettingsPane(
     onSelectAccentColor: (AppAccentColor) -> Unit,
     onOpenAppFontPicker: () -> Unit,
     onOpenLyricFontPicker: () -> Unit,
+    onSelectBackgroundStyle: (BackgroundStyle) -> Unit,
     onOpenBackgroundPicker: () -> Unit,
     onResetAppearance: () -> Unit,
 ) {
