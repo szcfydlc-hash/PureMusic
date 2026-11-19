@@ -249,9 +249,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "版本 1.0.0
-
-纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，无广告、无联网追踪。",
+                                text = "版本 2.0.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，无广告、无联网追踪。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

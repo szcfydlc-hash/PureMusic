@@ -463,8 +463,7 @@ fun LyricsBottomSheet(
             HorizontalDivider()
             if (lyrics.isEmpty()) {
                 Text(
-                    text = "未找到本地 .lrc 歌词文件。
-将与音频同名的 .lrc 歌词放入同一目录或 Music/Lyrics 文件夹即可自动同步显示。",
+                    text = "未找到本地 .lrc 歌词文件。\n将与音频同名的 .lrc 歌词放入同一目录或 Music/Lyrics 文件夹即可自动同步显示。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
