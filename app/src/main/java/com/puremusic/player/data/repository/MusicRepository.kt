@@ -34,11 +34,10 @@ class MusicRepository(private val context: Context) {
             add(MediaStore.Audio.Media.ALBUM_ID)
             add(MediaStore.Audio.Media.DURATION)
             add(MediaStore.Audio.Media.DATE_ADDED)
+            @Suppress("DEPRECATION")
+            add(MediaStore.Audio.Media.DATA)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 add(MediaStore.Audio.Media.RELATIVE_PATH)
-            } else {
-                @Suppress("DEPRECATION")
-                add(MediaStore.Audio.Media.DATA)
             }
         }.toTypedArray()
 
@@ -59,11 +58,12 @@ class MusicRepository(private val context: Context) {
             val albumIdCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val dateAddedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
-            val pathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            @Suppress("DEPRECATION")
+            val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+            val relPathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
             } else {
-                @Suppress("DEPRECATION")
-                cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                -1
             }
 
             while (cursor.moveToNext()) {
@@ -77,8 +77,9 @@ class MusicRepository(private val context: Context) {
                 val durationMs = cursor.getLong(durationCol)
                 val dateAddedSec = cursor.getLong(dateAddedCol)
 
-                val rawPath = if (pathCol >= 0) cursor.getString(pathCol).orEmpty() else ""
-                val (folderName, folderPath) = parseFolderInfo(rawPath)
+                val filePath = if (dataCol >= 0) cursor.getString(dataCol).orEmpty() else ""
+                val relPath = if (relPathCol >= 0) cursor.getString(relPathCol).orEmpty() else ""
+                val (folderName, folderPath) = parseFolderInfo(relPath.ifBlank { filePath }, useRelPath = relPath.isNotBlank())
 
                 val contentUri = ContentUris.withAppendedId(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -98,6 +99,7 @@ class MusicRepository(private val context: Context) {
                         albumArtUri = albumArtUri,
                         folderName = folderName,
                         folderPath = folderPath,
+                        filePath = filePath,
                         dateAddedSec = dateAddedSec,
                     ),
                 )
@@ -152,9 +154,9 @@ class MusicRepository(private val context: Context) {
         }
         .sortedBy { it.name.lowercase() }
 
-    private fun parseFolderInfo(rawPath: String): Pair<String, String> {
+    private fun parseFolderInfo(rawPath: String, useRelPath: Boolean): Pair<String, String> {
         if (rawPath.isBlank()) return "本地音乐" to "/"
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        return if (useRelPath) {
             val trimmed = rawPath.trimEnd('/')
             val name = trimmed.substringAfterLast('/', "本地音乐").ifBlank { "本地音乐" }
             name to trimmed.ifBlank { "/" }

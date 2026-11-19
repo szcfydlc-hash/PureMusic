@@ -11,17 +11,21 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
-import com.puremusic.player.data.model.AccentPalette
 import com.puremusic.player.data.model.Album
+import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.Artist
+import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.EqualizerState
+import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.MusicFolder
+import com.puremusic.player.data.model.PlayerTheme
 import com.puremusic.player.data.model.PlayerUiState
 import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.data.model.RepeatMode
 import com.puremusic.player.data.model.Song
 import com.puremusic.player.data.model.SortOrder
-import com.puremusic.player.data.model.ThemeMode
+import com.puremusic.player.data.repository.LyricsRepository
 import com.puremusic.player.data.repository.MusicRepository
 import com.puremusic.player.data.repository.PlaylistRepository
 import com.puremusic.player.service.AudioEqualizerManager
@@ -43,11 +47,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val musicRepository = MusicRepository(application)
     private val playlistRepository = PlaylistRepository(application)
+    private val lyricsRepository = LyricsRepository()
     private val sleepTimerManager = SleepTimerManager()
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? = null
     private var positionTickerJob: Job? = null
+    private var lyricsJob: Job? = null
+    private var lastLoadedLyricsSongId: Long? = null
 
     private val _rawSongs = MutableStateFlow<List<Song>>(emptyList())
     private val _isLoading = MutableStateFlow(false)
@@ -55,6 +62,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _currentLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
+    val currentLyrics: StateFlow<List<LyricLine>> = _currentLyrics.asStateFlow()
 
     val sortOrder: StateFlow<SortOrder> = playlistRepository.sortOrderFlow.stateIn(
         scope = viewModelScope,
@@ -74,16 +84,28 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptySet(),
     )
 
-    val themeMode: StateFlow<ThemeMode> = playlistRepository.themeModeFlow.stateIn(
+    val playerTheme: StateFlow<PlayerTheme> = playlistRepository.playerThemeFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ThemeMode.SYSTEM,
+        initialValue = PlayerTheme.POSTER_WALL,
     )
 
-    val accentPalette: StateFlow<AccentPalette> = playlistRepository.accentPaletteFlow.stateIn(
+    val fontStyle: StateFlow<AppFontStyle> = playlistRepository.fontStyleFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = AccentPalette.ORANGE,
+        initialValue = AppFontStyle.SANS,
+    )
+
+    val backgroundStyle: StateFlow<BackgroundStyle> = playlistRepository.backgroundStyleFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = BackgroundStyle.WARM_PAPER,
+    )
+
+    val layoutMode: StateFlow<LayoutMode> = playlistRepository.layoutModeFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = LayoutMode.AUTO,
     )
 
     val allSongs: StateFlow<List<Song>> = combine(_rawSongs, sortOrder) { songs, order ->
@@ -317,24 +339,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         sleepTimerManager.cancel()
     }
 
-    fun setEqualizerEnabled(enabled: Boolean) {
-        AudioEqualizerManager.setEnabled(enabled)
-    }
+    fun setEqualizerEnabled(enabled: Boolean) = AudioEqualizerManager.setEnabled(enabled)
 
-    fun setEqualizerBand(bandIndex: Int, levelMb: Int) {
-        AudioEqualizerManager.setBandLevel(bandIndex, levelMb)
-    }
+    fun setEqualizerBand(bandIndex: Int, levelMb: Int) = AudioEqualizerManager.setBandLevel(bandIndex, levelMb)
 
-    fun selectEqualizerPreset(presetIndex: Int) {
-        AudioEqualizerManager.selectPreset(presetIndex)
-    }
+    fun selectEqualizerPreset(presetIndex: Int) = AudioEqualizerManager.selectPreset(presetIndex)
 
     fun createPlaylist(name: String, initialSongIds: List<Long> = emptyList()) {
         viewModelScope.launch { playlistRepository.createPlaylist(name, initialSongIds) }
-    }
-
-    fun renamePlaylist(playlistId: String, newName: String) {
-        viewModelScope.launch { playlistRepository.renamePlaylist(playlistId, newName) }
     }
 
     fun deletePlaylist(playlistId: String) {
@@ -357,17 +369,43 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.setSortOrder(order) }
     }
 
-    fun setThemeMode(mode: ThemeMode) {
-        viewModelScope.launch { playlistRepository.setThemeMode(mode) }
+    fun setPlayerTheme(theme: PlayerTheme) {
+        viewModelScope.launch { playlistRepository.setPlayerTheme(theme) }
     }
 
-    fun setAccentPalette(palette: AccentPalette) {
-        viewModelScope.launch { playlistRepository.setAccentPalette(palette) }
+    fun setFontStyle(style: AppFontStyle) {
+        viewModelScope.launch { playlistRepository.setFontStyle(style) }
+    }
+
+    fun setBackgroundStyle(style: BackgroundStyle) {
+        viewModelScope.launch { playlistRepository.setBackgroundStyle(style) }
+    }
+
+    fun setLayoutMode(mode: LayoutMode) {
+        viewModelScope.launch { playlistRepository.setLayoutMode(mode) }
+    }
+
+    fun resetAppearance() {
+        viewModelScope.launch { playlistRepository.resetAppearance() }
     }
 
     fun resolveSongsByIds(ids: List<Long>): List<Song> {
         val lookup = _rawSongs.value.associateBy { it.id }
         return ids.mapNotNull { lookup[it] }
+    }
+
+    private fun refreshLyricsIfNeeded(song: Song?) {
+        if (song == null) {
+            lastLoadedLyricsSongId = null
+            _currentLyrics.value = emptyList()
+            return
+        }
+        if (song.id == lastLoadedLyricsSongId) return
+        lastLoadedLyricsSongId = song.id
+        lyricsJob?.cancel()
+        lyricsJob = viewModelScope.launch {
+            _currentLyrics.value = lyricsRepository.loadLyricsForSong(song)
+        }
     }
 
     private fun syncPlayerSnapshot() {
@@ -403,6 +441,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             shuffleEnabled = controller.shuffleModeEnabled,
             repeatMode = repeat,
         )
+        refreshLyricsIfNeeded(currentSong)
     }
 
     private fun startPositionTicker() {
@@ -415,7 +454,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     val dur = controller.duration.takeIf { it > 0L } ?: _playerState.value.durationMs
                     _playerState.update { it.copy(positionMs = pos, durationMs = dur) }
                 }
-                delay(500L)
+                delay(400L)
             }
         }
     }
@@ -427,6 +466,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         stopPositionTicker()
+        lyricsJob?.cancel()
         sleepTimerManager.cancel()
         mediaController?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }

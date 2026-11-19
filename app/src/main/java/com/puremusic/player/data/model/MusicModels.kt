@@ -13,6 +13,7 @@ data class Song(
     val albumArtUri: Uri,
     val folderName: String,
     val folderPath: String,
+    val filePath: String = "",
     val dateAddedSec: Long,
 )
 
@@ -42,6 +43,12 @@ data class Playlist(
     val songIds: List<Long>,
 )
 
+data class LyricLine(
+    val timeMs: Long,
+    val primaryText: String,
+    val secondaryText: String? = null,
+)
+
 enum class RepeatMode {
     OFF,
     ALL,
@@ -55,18 +62,30 @@ enum class SortOrder(val label: String) {
     DATE_ADDED("按添加时间"),
 }
 
-enum class ThemeMode(val label: String) {
-    SYSTEM("跟随系统"),
-    LIGHT("浅色模式"),
-    DARK("深色模式"),
+enum class PlayerTheme(val label: String) {
+    VERMILION_CREAM("朱橘奶油"),
+    WARM_WOOD("暖木唱片室"),
+    POSTER_WALL("唱片海报墙"),
+    RETRO_DECK("复古音响"),
 }
 
-enum class AccentPalette(val label: String, val seedColorHex: Long) {
-    ORANGE("活力橙", 0xFFE65100),
-    OCEAN("深海蓝", 0xFF0277BD),
-    EMERALD("翡翠绿", 0xFF2E7D32),
-    ROSE("绯红", 0xFFC2185B),
-    VIOLET("星河紫", 0xFF6A1B9A),
+enum class AppFontStyle(val label: String) {
+    SANS("清晰黑体"),
+    SERIF("优雅衬线"),
+    MONOSPACE("等宽体"),
+}
+
+enum class BackgroundStyle(val label: String) {
+    WARM_PAPER("暖纸"),
+    PURE_WHITE("纯白"),
+    DEEP_INK("深墨"),
+    SYSTEM("跟随系统"),
+}
+
+enum class LayoutMode(val label: String) {
+    AUTO("自动"),
+    PHONE("手机"),
+    TABLET("平板"),
 }
 
 enum class LibraryTab(val label: String) {

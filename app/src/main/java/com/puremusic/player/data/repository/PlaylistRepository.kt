@@ -7,10 +7,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.puremusic.player.data.model.AccentPalette
+import com.puremusic.player.data.model.AppFontStyle
+import com.puremusic.player.data.model.BackgroundStyle
+import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.PlayerTheme
 import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.data.model.SortOrder
-import com.puremusic.player.data.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
@@ -26,8 +28,10 @@ class PlaylistRepository(private val context: Context) {
     private object Keys {
         val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
         val FAVORITE_SONG_IDS = stringSetPreferencesKey("favorite_song_ids")
-        val THEME_MODE = stringPreferencesKey("theme_mode")
-        val ACCENT_PALETTE = stringPreferencesKey("accent_palette")
+        val PLAYER_THEME = stringPreferencesKey("player_theme")
+        val FONT_STYLE = stringPreferencesKey("font_style")
+        val BACKGROUND_STYLE = stringPreferencesKey("background_style")
+        val LAYOUT_MODE = stringPreferencesKey("layout_mode")
         val SORT_ORDER = stringPreferencesKey("sort_order")
     }
 
@@ -39,16 +43,28 @@ class PlaylistRepository(private val context: Context) {
         prefs[Keys.FAVORITE_SONG_IDS].orEmpty().mapNotNull { it.toLongOrNull() }.toSet()
     }
 
-    val themeModeFlow: Flow<ThemeMode> = context.pureMusicDataStore.data.map { prefs ->
-        prefs[Keys.THEME_MODE]?.let { name ->
-            ThemeMode.entries.firstOrNull { it.name == name }
-        } ?: ThemeMode.SYSTEM
+    val playerThemeFlow: Flow<PlayerTheme> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.PLAYER_THEME]?.let { name ->
+            PlayerTheme.entries.firstOrNull { it.name == name }
+        } ?: PlayerTheme.POSTER_WALL
     }
 
-    val accentPaletteFlow: Flow<AccentPalette> = context.pureMusicDataStore.data.map { prefs ->
-        prefs[Keys.ACCENT_PALETTE]?.let { name ->
-            AccentPalette.entries.firstOrNull { it.name == name }
-        } ?: AccentPalette.ORANGE
+    val fontStyleFlow: Flow<AppFontStyle> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.FONT_STYLE]?.let { name ->
+            AppFontStyle.entries.firstOrNull { it.name == name }
+        } ?: AppFontStyle.SANS
+    }
+
+    val backgroundStyleFlow: Flow<BackgroundStyle> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.BACKGROUND_STYLE]?.let { name ->
+            BackgroundStyle.entries.firstOrNull { it.name == name }
+        } ?: BackgroundStyle.WARM_PAPER
+    }
+
+    val layoutModeFlow: Flow<LayoutMode> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.LAYOUT_MODE]?.let { name ->
+            LayoutMode.entries.firstOrNull { it.name == name }
+        } ?: LayoutMode.AUTO
     }
 
     val sortOrderFlow: Flow<SortOrder> = context.pureMusicDataStore.data.map { prefs ->
@@ -70,17 +86,6 @@ class PlaylistRepository(private val context: Context) {
                 ),
             )
             prefs[Keys.PLAYLISTS_JSON] = encodePlaylists(current)
-        }
-    }
-
-    suspend fun renamePlaylist(playlistId: String, newName: String) {
-        val trimmed = newName.trim()
-        if (trimmed.isEmpty()) return
-        context.pureMusicDataStore.edit { prefs ->
-            val updated = decodePlaylists(prefs[Keys.PLAYLISTS_JSON].orEmpty()).map { playlist ->
-                if (playlist.id == playlistId) playlist.copy(name = trimmed) else playlist
-            }
-            prefs[Keys.PLAYLISTS_JSON] = encodePlaylists(updated)
         }
     }
 
@@ -127,12 +132,29 @@ class PlaylistRepository(private val context: Context) {
         }
     }
 
-    suspend fun setThemeMode(mode: ThemeMode) {
-        context.pureMusicDataStore.edit { it[Keys.THEME_MODE] = mode.name }
+    suspend fun setPlayerTheme(theme: PlayerTheme) {
+        context.pureMusicDataStore.edit { it[Keys.PLAYER_THEME] = theme.name }
     }
 
-    suspend fun setAccentPalette(palette: AccentPalette) {
-        context.pureMusicDataStore.edit { it[Keys.ACCENT_PALETTE] = palette.name }
+    suspend fun setFontStyle(style: AppFontStyle) {
+        context.pureMusicDataStore.edit { it[Keys.FONT_STYLE] = style.name }
+    }
+
+    suspend fun setBackgroundStyle(style: BackgroundStyle) {
+        context.pureMusicDataStore.edit { it[Keys.BACKGROUND_STYLE] = style.name }
+    }
+
+    suspend fun setLayoutMode(mode: LayoutMode) {
+        context.pureMusicDataStore.edit { it[Keys.LAYOUT_MODE] = mode.name }
+    }
+
+    suspend fun resetAppearance() {
+        context.pureMusicDataStore.edit { prefs ->
+            prefs[Keys.PLAYER_THEME] = PlayerTheme.POSTER_WALL.name
+            prefs[Keys.FONT_STYLE] = AppFontStyle.SANS.name
+            prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
+            prefs[Keys.LAYOUT_MODE] = LayoutMode.AUTO.name
+        }
     }
 
     suspend fun setSortOrder(order: SortOrder) {

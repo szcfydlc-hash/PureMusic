@@ -2,6 +2,7 @@ package com.puremusic.player.ui.components
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
@@ -27,8 +29,10 @@ import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,7 +45,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -59,7 +65,7 @@ fun formatDuration(durationMs: Long): String {
     return if (hours > 0L) {
         String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
     } else {
-        String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
     }
 }
 
@@ -75,7 +81,7 @@ fun AlbumArtwork(
     uri: Uri?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 10.dp,
+    cornerRadius: Dp = 8.dp,
     iconSize: Dp = 24.dp,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
@@ -98,13 +104,13 @@ private fun ArtworkPlaceholder(
         modifier = Modifier
             .fillMaxSize()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = Icons.Rounded.MusicNote,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
             modifier = Modifier.size(iconSize),
         )
     }
@@ -128,30 +134,30 @@ fun SongRowItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(48.dp)) {
+        Box(modifier = Modifier.size(46.dp)) {
             AlbumArtwork(
                 uri = song.albumArtUri,
                 contentDescription = song.album,
                 modifier = Modifier.fillMaxSize(),
-                cornerRadius = 10.dp,
-                iconSize = 22.dp,
+                cornerRadius = 6.dp,
+                iconSize = 20.dp,
             )
             if (isCurrent) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)),
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(22.dp),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -248,37 +254,54 @@ fun MiniPlayerBar(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+                shape = RoundedCornerShape(18.dp),
+            )
             .clickable(onClick = onOpenNowPlaying),
-        tonalElevation = 6.dp,
-        shadowElevation = 8.dp,
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 4.dp,
+        shadowElevation = 6.dp,
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.5.dp),
-            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                AlbumArtwork(
-                    uri = song.albumArtUri,
-                    contentDescription = song.album,
-                    modifier = Modifier.size(44.dp),
-                    cornerRadius = 8.dp,
-                    iconSize = 20.dp,
-                )
+                // Miniature vinyl-bordered circular cover
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF161616))
+                        .padding(5.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AlbumArtwork(
+                        uri = song.albumArtUri,
+                        contentDescription = song.album,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        cornerRadius = 22.dp,
+                        iconSize = 16.dp,
+                    )
+                }
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -290,21 +313,44 @@ fun MiniPlayerBar(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                IconButton(onClick = onTogglePlayPause) {
+
+                FilledIconButton(
+                    onClick = onTogglePlayPause,
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White,
+                    ),
+                    modifier = Modifier.size(38.dp),
+                ) {
                     Icon(
                         imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(22.dp),
                     )
                 }
-                IconButton(onClick = onSkipNext) {
+
+                IconButton(
+                    onClick = onSkipNext,
+                    modifier = Modifier.size(36.dp),
+                ) {
                     Icon(
                         imageVector = Icons.Rounded.SkipNext,
                         contentDescription = "下一首",
-                        modifier = Modifier.size(26.dp),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f),
+            )
         }
     }
 }
