@@ -439,6 +439,8 @@ fun LyricsBottomSheet(
     songTitle: String,
     lyrics: List<LyricLine>,
     positionMs: Long,
+    lyricFontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+    lyricItalic: Boolean = true,
     onDismiss: () -> Unit,
     onSeekTo: (Long) -> Unit,
 ) {
@@ -484,7 +486,10 @@ fun LyricsBottomSheet(
                         ) {
                             Text(
                                 text = line.primaryText,
-                                style = if (isActive) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                                style = (if (isActive) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium).copy(
+                                    fontFamily = lyricFontFamily,
+                                    fontStyle = if (lyricItalic) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
+                                ),
                                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,

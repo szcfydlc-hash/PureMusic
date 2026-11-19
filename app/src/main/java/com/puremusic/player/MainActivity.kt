@@ -15,7 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -40,12 +40,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.Song
 import com.puremusic.player.ui.MusicViewModel
 import com.puremusic.player.ui.components.AddToPlaylistDialog
@@ -77,8 +80,10 @@ private fun PureMusicApp(
     val context = LocalContext.current
     val playerTheme by viewModel.playerTheme.collectAsStateWithLifecycle()
     val fontStyle by viewModel.fontStyle.collectAsStateWithLifecycle()
+    val lyricFontStyle by viewModel.lyricFontStyle.collectAsStateWithLifecycle()
     val backgroundStyle by viewModel.backgroundStyle.collectAsStateWithLifecycle()
     val layoutMode by viewModel.layoutMode.collectAsStateWithLifecycle()
+    val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
 
     val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -131,6 +136,10 @@ private fun PureMusicApp(
         val albums by viewModel.albums.collectAsStateWithLifecycle()
         val artists by viewModel.artists.collectAsStateWithLifecycle()
         val folders by viewModel.folders.collectAsStateWithLifecycle()
+        val allDiscoveredFolders by viewModel.allDiscoveredFolders.collectAsStateWithLifecycle()
+        val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
+        val minDurationFilter by viewModel.minDurationFilter.collectAsStateWithLifecycle()
+        val scanStatus by viewModel.scanStatus.collectAsStateWithLifecycle()
         val playlists by viewModel.playlists.collectAsStateWithLifecycle()
         val favoriteSongIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle()
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -150,9 +159,14 @@ private fun PureMusicApp(
         var showCreatePlaylist by remember { mutableStateOf(false) }
         var pendingPlaylistSong by remember { mutableStateOf<Song?>(null) }
 
-        val miniPlayerVisible = playerState.currentSong != null
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isTabletLayout = when (layoutMode) {
+                LayoutMode.TABLET -> true
+                LayoutMode.PHONE -> false
+                LayoutMode.AUTO -> maxWidth >= 600.dp
+            }
+            val miniPlayerVisible = playerState.currentSong != null && !isTabletLayout
 
-        Box(modifier = Modifier.fillMaxSize()) {
             LibraryScreen(
                 songs = songs,
                 allSongs = allSongs,
@@ -166,10 +180,16 @@ private fun PureMusicApp(
                 sortOrder = sortOrder,
                 playerState = playerState,
                 sleepTimerRemainingMs = sleepTimerRemainingMs,
+                liquidGlassEnabled = liquidGlassEnabled,
+                isTabletLayout = isTabletLayout,
                 onSearchQueryChange = viewModel::updateSearchQuery,
                 onSelectSortOrder = viewModel::setSortOrder,
-                onRefreshLibrary = viewModel::loadLibrary,
+                onRefreshLibrary = viewModel::rescanLibraryWithFeedback,
                 onPlaySongs = viewModel::playSongs,
+                onTogglePlayPause = viewModel::togglePlayPause,
+                onSkipPrevious = viewModel::skipPrevious,
+                onSkipNext = viewModel::skipNext,
+                onOpenNowPlaying = { showNowPlaying = true },
                 onToggleFavorite = viewModel::toggleFavorite,
                 onRequestAddToPlaylist = { pendingPlaylistSong = it },
                 onRequestCreatePlaylist = { showCreatePlaylist = true },
@@ -179,12 +199,13 @@ private fun PureMusicApp(
                 onOpenSleepTimer = { showSleepTimer = true },
                 onOpenThemeSettings = { showSettings = true },
                 resolveSongsByIds = viewModel::resolveSongsByIds,
-                bottomContentPadding = PaddingValues(bottom = if (miniPlayerVisible) 80.dp else 16.dp),
+                bottomContentPadding = PaddingValues(bottom = if (miniPlayerVisible) 88.dp else 16.dp),
             )
 
             if (miniPlayerVisible) {
                 MiniPlayerBar(
                     playerState = playerState,
+                    liquidGlassEnabled = liquidGlassEnabled,
                     onOpenNowPlaying = { showNowPlaying = true },
                     onTogglePlayPause = viewModel::togglePlayPause,
                     onSkipNext = viewModel::skipNext,
@@ -205,6 +226,9 @@ private fun PureMusicApp(
                     allSongs = allSongs,
                     lyrics = currentLyrics,
                     playerTheme = playerTheme,
+                    lyricFontStyle = lyricFontStyle,
+                    liquidGlassEnabled = liquidGlassEnabled,
+                    isTabletLayout = isTabletLayout,
                     isFavorite = currentSong != null && currentSong.id in favoriteSongIds,
                     sleepTimerRemainingMs = sleepTimerRemainingMs,
                     onClose = { showNowPlaying = false },
@@ -232,18 +256,27 @@ private fun PureMusicApp(
                 SettingsScreen(
                     songCount = allSongs.size,
                     albumCount = albums.size,
-                    folderCount = folders.size,
+                    allFolders = allDiscoveredFolders,
+                    excludedFolders = excludedFolders,
+                    minDurationFilter = minDurationFilter,
+                    scanStatus = scanStatus,
                     layoutMode = layoutMode,
+                    liquidGlassEnabled = liquidGlassEnabled,
                     playerTheme = playerTheme,
                     fontStyle = fontStyle,
+                    lyricFontStyle = lyricFontStyle,
                     backgroundStyle = backgroundStyle,
                     onClose = { showSettings = false },
                     onSelectLayoutMode = viewModel::setLayoutMode,
+                    onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
                     onSelectPlayerTheme = viewModel::setPlayerTheme,
                     onSelectFontStyle = viewModel::setFontStyle,
+                    onSelectLyricFontStyle = viewModel::setLyricFontStyle,
                     onSelectBackgroundStyle = viewModel::setBackgroundStyle,
                     onResetAppearance = viewModel::resetAppearance,
-                    onRescanLibrary = viewModel::loadLibrary,
+                    onRescanLibrary = viewModel::rescanLibraryWithFeedback,
+                    onToggleFolderExcluded = viewModel::toggleFolderExcluded,
+                    onSelectMinDurationFilter = viewModel::setMinDurationFilter,
                     onOpenEqualizer = { showEqualizer = true },
                     onOpenSleepTimer = { showSleepTimer = true },
                 )
@@ -297,10 +330,17 @@ private fun PureMusicApp(
         }
 
         if (showLyrics) {
+            val lyricFamily = when (lyricFontStyle) {
+                LyricFontStyle.SERIF_ITALIC, LyricFontStyle.SERIF -> FontFamily.Serif
+                LyricFontStyle.SANS -> FontFamily.SansSerif
+                LyricFontStyle.MONOSPACE -> FontFamily.Monospace
+            }
             LyricsBottomSheet(
                 songTitle = playerState.currentSong?.title.orEmpty(),
                 lyrics = currentLyrics,
                 positionMs = playerState.positionMs,
+                lyricFontFamily = lyricFamily,
+                lyricItalic = lyricFontStyle == LyricFontStyle.SERIF_ITALIC,
                 onDismiss = { showLyrics = false },
                 onSeekTo = viewModel::seekTo,
             )

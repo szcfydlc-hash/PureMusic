@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -27,16 +29,21 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -51,11 +58,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.LyricFontStyle
+import com.puremusic.player.data.model.MinDurationFilter
+import com.puremusic.player.data.model.MusicFolder
 import com.puremusic.player.data.model.PlayerTheme
+import com.puremusic.player.data.model.ScanStatus
 import com.puremusic.player.ui.theme.ForestGreen
 import com.puremusic.player.ui.theme.VermilionAccent
 
@@ -67,29 +79,40 @@ private enum class SettingsSection(val label: String) {
     ABOUT("关于"),
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     songCount: Int,
     albumCount: Int,
-    folderCount: Int,
+    allFolders: List<MusicFolder>,
+    excludedFolders: Set<String>,
+    minDurationFilter: MinDurationFilter,
+    scanStatus: ScanStatus,
     layoutMode: LayoutMode,
+    liquidGlassEnabled: Boolean,
     playerTheme: PlayerTheme,
     fontStyle: AppFontStyle,
+    lyricFontStyle: LyricFontStyle,
     backgroundStyle: BackgroundStyle,
     onClose: () -> Unit,
     onSelectLayoutMode: (LayoutMode) -> Unit,
+    onToggleLiquidGlass: (Boolean) -> Unit,
     onSelectPlayerTheme: (PlayerTheme) -> Unit,
     onSelectFontStyle: (AppFontStyle) -> Unit,
+    onSelectLyricFontStyle: (LyricFontStyle) -> Unit,
     onSelectBackgroundStyle: (BackgroundStyle) -> Unit,
     onResetAppearance: () -> Unit,
     onRescanLibrary: () -> Unit,
+    onToggleFolderExcluded: (String) -> Unit,
+    onSelectMinDurationFilter: (MinDurationFilter) -> Unit,
     onOpenEqualizer: () -> Unit,
     onOpenSleepTimer: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
 
     var activeSection by remember { mutableStateOf(SettingsSection.APPEARANCE) }
-    var showFontDialog by remember { mutableStateOf(false) }
+    var showAppFontDialog by remember { mutableStateOf(false) }
+    var showLyricFontDialog by remember { mutableStateOf(false) }
     var showBackgroundDialog by remember { mutableStateOf(false) }
 
     Surface(
@@ -102,7 +125,6 @@ fun SettingsScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding(),
         ) {
-            // Header: "设置" + Close icon
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -123,12 +145,11 @@ fun SettingsScreen(
                 }
             }
 
-            // Two-Pane Split Content
             Row(modifier = Modifier.fillMaxSize()) {
-                // Left Navigation Rail
+                // Left Sidebar
                 Column(
                     modifier = Modifier
-                        .width(126.dp)
+                        .width(122.dp)
                         .fillMaxHeight()
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -180,36 +201,144 @@ fun SettingsScreen(
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     when (activeSection) {
                         SettingsSection.APPEARANCE -> AppearanceSettingsPane(
                             layoutMode = layoutMode,
+                            liquidGlassEnabled = liquidGlassEnabled,
                             playerTheme = playerTheme,
                             fontStyle = fontStyle,
+                            lyricFontStyle = lyricFontStyle,
                             backgroundStyle = backgroundStyle,
                             onSelectLayoutMode = onSelectLayoutMode,
+                            onToggleLiquidGlass = onToggleLiquidGlass,
                             onSelectPlayerTheme = onSelectPlayerTheme,
-                            onOpenFontPicker = { showFontDialog = true },
+                            onOpenAppFontPicker = { showAppFontDialog = true },
+                            onOpenLyricFontPicker = { showLyricFontDialog = true },
                             onOpenBackgroundPicker = { showBackgroundDialog = true },
                             onResetAppearance = onResetAppearance,
                         )
 
                         SettingsSection.LIBRARY -> {
                             Text(
-                                text = "本地曲库概览",
+                                text = "曲库管理与扫描",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "已索引 $songCount 首歌曲 · $albumCount 张专辑 · $folderCount 个文件夹",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = "当前曲库显示 $songCount 首歌曲 · $albumCount 张专辑 · 共发现 ${allFolders.size} 个音频目录",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            FilledTonalButton(onClick = onRescanLibrary) {
-                                Icon(Icons.Rounded.Refresh, contentDescription = null)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("重新扫描本地音频")
+
+                            FilledTonalButton(
+                                onClick = onRescanLibrary,
+                                enabled = !scanStatus.isScanning,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                if (scanStatus.isScanning) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("正在扫描本地目录...")
+                                } else {
+                                    Icon(Icons.Rounded.Refresh, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("立即重新扫描本地音频")
+                                }
+                            }
+
+                            if (!scanStatus.message.isNullOrBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer)
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                ) {
+                                    Text(
+                                        text = scanStatus.message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f))
+
+                            Text(
+                                text = "短音频过滤（隐藏提示音/语音）",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                MinDurationFilter.entries.forEach { filter ->
+                                    FilterChip(
+                                        selected = minDurationFilter == filter,
+                                        onClick = { onSelectMinDurationFilter(filter) },
+                                        label = { Text(filter.label) },
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f))
+
+                            Text(
+                                text = "勾选要纳入曲库的文件夹",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            if (allFolders.isEmpty()) {
+                                Text(
+                                    text = "暂未发现音频文件夹，请点击上方“立即重新扫描”。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    allFolders.forEach { folder ->
+                                        val included = folder.path !in excludedFolders
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable { onToggleFolderExcluded(folder.path) }
+                                                .padding(vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Checkbox(
+                                                checked = included,
+                                                onCheckedChange = { onToggleFolderExcluded(folder.path) },
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Rounded.Folder,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "${folder.name} (${folder.songs.size}首)",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Text(
+                                                    text = folder.path,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -249,7 +378,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "版本 2.2.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，无广告、无联网追踪。",
+                                text = "版本 3.0.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，支持液态玻璃质感、平板分栏布局与动态海报墙，无广告、无联网追踪。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -260,16 +389,29 @@ fun SettingsScreen(
         }
     }
 
-    if (showFontDialog) {
+    if (showAppFontDialog) {
         OptionPickerDialog(
-            title = "选择字体",
+            title = "选择软件字体",
             options = AppFontStyle.entries.map { it to it.label },
             selected = fontStyle,
             onSelect = {
                 onSelectFontStyle(it)
-                showFontDialog = false
+                showAppFontDialog = false
             },
-            onDismiss = { showFontDialog = false },
+            onDismiss = { showAppFontDialog = false },
+        )
+    }
+
+    if (showLyricFontDialog) {
+        OptionPickerDialog(
+            title = "选择歌词字体",
+            options = LyricFontStyle.entries.map { it to it.label },
+            selected = lyricFontStyle,
+            onSelect = {
+                onSelectLyricFontStyle(it)
+                showLyricFontDialog = false
+            },
+            onDismiss = { showLyricFontDialog = false },
         )
     }
 
@@ -290,16 +432,19 @@ fun SettingsScreen(
 @Composable
 private fun AppearanceSettingsPane(
     layoutMode: LayoutMode,
+    liquidGlassEnabled: Boolean,
     playerTheme: PlayerTheme,
     fontStyle: AppFontStyle,
+    lyricFontStyle: LyricFontStyle,
     backgroundStyle: BackgroundStyle,
     onSelectLayoutMode: (LayoutMode) -> Unit,
+    onToggleLiquidGlass: (Boolean) -> Unit,
     onSelectPlayerTheme: (PlayerTheme) -> Unit,
-    onOpenFontPicker: () -> Unit,
+    onOpenAppFontPicker: () -> Unit,
+    onOpenLyricFontPicker: () -> Unit,
     onOpenBackgroundPicker: () -> Unit,
     onResetAppearance: () -> Unit,
 ) {
-    // 1. Layout Segmented Control
     Text(
         text = "布局",
         style = MaterialTheme.typography.bodyMedium,
@@ -332,13 +477,34 @@ private fun AppearanceSettingsPane(
         }
     }
 
-    // 2. Theme 2x2 Visual Preview Cards
+    // Liquid Glass Toggle
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("液态玻璃效果", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "搜索栏、播放条与控制坞启用通透高光玻璃质感",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = liquidGlassEnabled,
+            onCheckedChange = onToggleLiquidGlass,
+        )
+    }
+
     Text(
         text = "主题",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -377,11 +543,15 @@ private fun AppearanceSettingsPane(
 
     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f))
 
-    // 3. Font & Background Selector Rows
     SettingsValueRow(
-        label = "字体",
+        label = "软件字体",
         value = fontStyle.label,
-        onClick = onOpenFontPicker,
+        onClick = onOpenAppFontPicker,
+    )
+    SettingsValueRow(
+        label = "歌词字体",
+        value = lyricFontStyle.label,
+        onClick = onOpenLyricFontPicker,
     )
     SettingsValueRow(
         label = "背景",
@@ -389,9 +559,8 @@ private fun AppearanceSettingsPane(
         onClick = onOpenBackgroundPicker,
     )
 
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(6.dp))
 
-    // 4. Reset Theme Button
     TextButton(
         onClick = onResetAppearance,
         modifier = Modifier.fillMaxWidth(),
@@ -425,7 +594,7 @@ private fun ThemePreviewCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(62.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(
                     when (theme) {
@@ -437,7 +606,6 @@ private fun ThemePreviewCard(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            // Minimalist miniature preview illustration
             when (theme) {
                 PlayerTheme.VERMILION_CREAM -> {
                     Row(
@@ -446,21 +614,21 @@ private fun ThemePreviewCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(Color(0xFF1A1A1A)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(14.dp)
+                                    .size(13.dp)
                                     .clip(CircleShape)
                                     .background(VermilionAccent),
                             )
                         }
                         Box(
                             modifier = Modifier
-                                .size(16.dp)
+                                .size(15.dp)
                                 .clip(CircleShape)
                                 .background(Color.White),
                         )
@@ -472,14 +640,14 @@ private fun ThemePreviewCard(
                         Box(
                             modifier = Modifier
                                 .size(34.dp)
-                                .clip(RoundedCornerShape(5.dp))
+                                .clip(RoundedCornerShape(4.dp))
                                 .background(Color(0xFF8C3B28)),
                         )
                         Box(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF1F1F1F)),
+                                .background(Color(0xFF1A1A1A)),
                         )
                     }
                 }
@@ -489,19 +657,19 @@ private fun ThemePreviewCard(
                         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                             Box(
                                 modifier = Modifier
-                                    .size(22.dp)
+                                    .size(21.dp)
                                     .clip(RoundedCornerShape(3.dp))
                                     .background(Color(0xFF3A5A8C)),
                             )
                             Box(
                                 modifier = Modifier
-                                    .size(22.dp)
+                                    .size(21.dp)
                                     .clip(RoundedCornerShape(3.dp))
                                     .background(Color(0xFF8B5E3C)),
                             )
                             Box(
                                 modifier = Modifier
-                                    .size(22.dp)
+                                    .size(21.dp)
                                     .clip(RoundedCornerShape(3.dp))
                                     .background(Color(0xFF4A6B5D)),
                             )
@@ -515,7 +683,7 @@ private fun ThemePreviewCard(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(10.dp)
+                                    .size(9.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFFD84315)),
                             )
@@ -534,7 +702,7 @@ private fun ThemePreviewCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(18.dp)
+                                .size(17.dp)
                                 .clip(RoundedCornerShape(3.dp))
                                 .background(Color(0xFFD84315)),
                         )

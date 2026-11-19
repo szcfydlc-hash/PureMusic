@@ -17,12 +17,15 @@ import com.puremusic.player.data.model.Artist
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.EqualizerState
 import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
+import com.puremusic.player.data.model.MinDurationFilter
 import com.puremusic.player.data.model.MusicFolder
 import com.puremusic.player.data.model.PlayerTheme
 import com.puremusic.player.data.model.PlayerUiState
 import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.data.model.RepeatMode
+import com.puremusic.player.data.model.ScanStatus
 import com.puremusic.player.data.model.Song
 import com.puremusic.player.data.model.SortOrder
 import com.puremusic.player.data.repository.LyricsRepository
@@ -60,6 +63,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _scanStatus = MutableStateFlow(ScanStatus())
+    val scanStatus: StateFlow<ScanStatus> = _scanStatus.asStateFlow()
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -96,6 +102,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = AppFontStyle.SANS,
     )
 
+    val lyricFontStyle: StateFlow<LyricFontStyle> = playlistRepository.lyricFontStyleFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = LyricFontStyle.SERIF_ITALIC,
+    )
+
     val backgroundStyle: StateFlow<BackgroundStyle> = playlistRepository.backgroundStyleFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -108,8 +120,44 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = LayoutMode.AUTO,
     )
 
-    val allSongs: StateFlow<List<Song>> = combine(_rawSongs, sortOrder) { songs, order ->
-        musicRepository.sortSongs(songs, order)
+    val liquidGlassEnabled: StateFlow<Boolean> = playlistRepository.liquidGlassEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
+    val excludedFolders: StateFlow<Set<String>> = playlistRepository.excludedFoldersFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptySet(),
+    )
+
+    val minDurationFilter: StateFlow<MinDurationFilter> = playlistRepository.minDurationFilterFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = MinDurationFilter.NONE,
+    )
+
+    // All discovered folders (unfiltered) for Library Management checklist
+    val allDiscoveredFolders: StateFlow<List<MusicFolder>> = _rawSongs.combine(sortOrder) { songs, _ ->
+        musicRepository.groupByFolders(songs)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList(),
+    )
+
+    // Active songs after applying folder exclusions + short-audio duration filter + sort
+    val allSongs: StateFlow<List<Song>> = combine(
+        _rawSongs,
+        excludedFolders,
+        minDurationFilter,
+        sortOrder,
+    ) { songs, excluded, minDur, order ->
+        val filtered = songs.filter { song ->
+            song.folderPath !in excluded && song.durationMs >= minDur.minMs
+        }
+        musicRepository.sortSongs(filtered, order)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -231,6 +279,23 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun rescanLibraryWithFeedback() {
+        if (_scanStatus.value.isScanning) return
+        viewModelScope.launch {
+            _scanStatus.value = ScanStatus(isScanning = true, message = "正在扫描本地音频目录...")
+            val loaded = runCatching { musicRepository.triggerMediaScanAndLoad() }.getOrDefault(emptyList())
+            _rawSongs.value = loaded
+            val visibleCount = loaded.count {
+                it.folderPath !in excludedFolders.value && it.durationMs >= minDurationFilter.value.minMs
+            }
+            _scanStatus.value = ScanStatus(
+                isScanning = false,
+                message = "扫描完成：共索引 ${loaded.size} 首音频，当前曲库显示 $visibleCount 首",
+            )
+            syncPlayerSnapshot()
+        }
+    }
+
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
     }
@@ -335,9 +400,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun cancelSleepTimer() {
-        sleepTimerManager.cancel()
-    }
+    fun cancelSleepTimer() = sleepTimerManager.cancel()
 
     fun setEqualizerEnabled(enabled: Boolean) = AudioEqualizerManager.setEnabled(enabled)
 
@@ -377,12 +440,28 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.setFontStyle(style) }
     }
 
+    fun setLyricFontStyle(style: LyricFontStyle) {
+        viewModelScope.launch { playlistRepository.setLyricFontStyle(style) }
+    }
+
     fun setBackgroundStyle(style: BackgroundStyle) {
         viewModelScope.launch { playlistRepository.setBackgroundStyle(style) }
     }
 
     fun setLayoutMode(mode: LayoutMode) {
         viewModelScope.launch { playlistRepository.setLayoutMode(mode) }
+    }
+
+    fun setLiquidGlassEnabled(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setLiquidGlassEnabled(enabled) }
+    }
+
+    fun toggleFolderExcluded(folderPath: String) {
+        viewModelScope.launch { playlistRepository.toggleFolderExcluded(folderPath) }
+    }
+
+    fun setMinDurationFilter(filter: MinDurationFilter) {
+        viewModelScope.launch { playlistRepository.setMinDurationFilter(filter) }
     }
 
     fun resetAppearance() {

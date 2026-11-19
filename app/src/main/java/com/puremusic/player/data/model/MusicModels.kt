@@ -49,6 +49,11 @@ data class LyricLine(
     val secondaryText: String? = null,
 )
 
+data class ScanStatus(
+    val isScanning: Boolean = false,
+    val message: String? = null,
+)
+
 enum class RepeatMode {
     OFF,
     ALL,
@@ -75,6 +80,13 @@ enum class AppFontStyle(val label: String) {
     MONOSPACE("等宽体"),
 }
 
+enum class LyricFontStyle(val label: String) {
+    SERIF_ITALIC("优雅斜体衬线"),
+    SERIF("经典衬线"),
+    SANS("清晰黑体"),
+    MONOSPACE("等宽体"),
+}
+
 enum class BackgroundStyle(val label: String) {
     WARM_PAPER("暖纸"),
     PURE_WHITE("纯白"),
@@ -86,6 +98,12 @@ enum class LayoutMode(val label: String) {
     AUTO("自动"),
     PHONE("手机"),
     TABLET("平板"),
+}
+
+enum class MinDurationFilter(val label: String, val minMs: Long) {
+    NONE("不过滤", 0L),
+    SEC_30("过滤 <30秒", 30_000L),
+    SEC_60("过滤 <60秒", 60_000L),
 }
 
 enum class LibraryTab(val label: String) {

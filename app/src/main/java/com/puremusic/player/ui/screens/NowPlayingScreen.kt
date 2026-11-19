@@ -84,6 +84,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
+import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.PlayerTheme
 import com.puremusic.player.data.model.PlayerUiState
@@ -92,6 +93,7 @@ import com.puremusic.player.data.model.Song
 import com.puremusic.player.ui.components.AlbumArtwork
 import com.puremusic.player.ui.components.formatCountdown
 import com.puremusic.player.ui.components.formatDuration
+import com.puremusic.player.ui.components.liquidGlass
 import com.puremusic.player.ui.theme.VermilionAccent
 import kotlinx.coroutines.isActive
 
@@ -101,6 +103,9 @@ fun NowPlayingScreen(
     allSongs: List<Song>,
     lyrics: List<LyricLine>,
     playerTheme: PlayerTheme,
+    lyricFontStyle: LyricFontStyle,
+    liquidGlassEnabled: Boolean,
+    isTabletLayout: Boolean,
     isFavorite: Boolean,
     sleepTimerRemainingMs: Long?,
     onClose: () -> Unit,
@@ -128,8 +133,9 @@ fun NowPlayingScreen(
         lyrics.lastOrNull { it.timeMs <= playerState.positionMs }
     }
 
-    // Smooth continuous rotation that preserves exact angle on pause
+    // Smooth continuous rotation + poster wall glide that preserve exact phase on pause
     val vinylAngle = remember { Animatable(0f) }
+    val wallGlideFraction = remember { Animatable(0f) }
     LaunchedEffect(playerState.isPlaying) {
         if (playerState.isPlaying) {
             while (isActive) {
@@ -142,6 +148,25 @@ fun NowPlayingScreen(
             }
         }
     }
+    LaunchedEffect(playerState.isPlaying) {
+        if (playerState.isPlaying) {
+            while (isActive) {
+                val start = wallGlideFraction.value % 1f
+                wallGlideFraction.snapTo(start)
+                wallGlideFraction.animateTo(
+                    targetValue = start + 1f,
+                    animationSpec = tween(durationMillis = 28_000, easing = LinearEasing),
+                )
+            }
+        }
+    }
+
+    val lyricFamily = when (lyricFontStyle) {
+        LyricFontStyle.SERIF_ITALIC, LyricFontStyle.SERIF -> FontFamily.Serif
+        LyricFontStyle.SANS -> FontFamily.SansSerif
+        LyricFontStyle.MONOSPACE -> FontFamily.Monospace
+    }
+    val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -201,6 +226,7 @@ fun NowPlayingScreen(
                         currentSong = song,
                         allSongs = allSongs,
                         vinylRotation = vinylAngle.value,
+                        glideFraction = wallGlideFraction.value,
                         modifier = Modifier.fillMaxSize(),
                     )
 
@@ -268,8 +294,8 @@ fun NowPlayingScreen(
                     Text(
                         text = activeLyric.primaryText,
                         style = MaterialTheme.typography.bodyLarge.copy(
-                            fontFamily = FontFamily.Serif,
-                            fontStyle = FontStyle.Italic,
+                            fontFamily = lyricFamily,
+                            fontStyle = lyricStyleItalic,
                             fontWeight = FontWeight.SemiBold,
                         ),
                         color = MaterialTheme.colorScheme.onBackground,
@@ -281,7 +307,7 @@ fun NowPlayingScreen(
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = activeLyric.secondaryText,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = lyricFamily),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -339,9 +365,19 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 6. Primary Transport Controls
+            // 6. Primary Transport Controls (Liquid Glass Control Dock when enabled)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (liquidGlassEnabled) {
+                            Modifier
+                                .liquidGlass(enabled = true, shape = RoundedCornerShape(36.dp), elevation = 10.dp)
+                                .padding(vertical = 8.dp, horizontal = 12.dp)
+                        } else {
+                            Modifier
+                        },
+                    ),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -519,16 +555,16 @@ private fun PosterWallVinylHero(
     currentSong: Song,
     allSongs: List<Song>,
     vinylRotation: Float,
+    glideFraction: Float,
     modifier: Modifier = Modifier,
 ) {
-    val wallUris = remember(allSongs, currentSong.id) {
+    val wallRows = remember(allSongs, currentSong.id) {
         val distinctAlbums = allSongs.distinctBy { it.albumId }.map { it.albumArtUri }
         val pool = if (distinctAlbums.isNotEmpty()) distinctAlbums else listOf(currentSong.albumArtUri)
-        // Stagger indices so identical covers avoid sitting adjacent to each other
-        List(30) { index ->
-            val row = index / 5
-            val col = index % 5
-            pool[(row * 7 + col * 3) % pool.size]
+        List(6) { row ->
+            val baseFive = List(5) { col -> pool[(row * 7 + col * 3) % pool.size] }
+            // Duplicate sequence for seamless infinite horizontal gliding
+            baseFive + baseFive
         }
     }
 
@@ -536,39 +572,55 @@ private fun PosterWallVinylHero(
         modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
-        // Fit 5x6 poster wall strictly inside available height & width
         val targetRatio = 5f / 6f
         val wallWidth = min(maxWidth, maxHeight * targetRatio)
         val wallHeight = wallWidth / targetRatio
         val discSize = min(wallWidth * 0.64f, 224.dp)
+        val gap = 5.dp
+        val tileSize = (wallWidth - gap * 4) / 5f
+        val cycleWidth = (tileSize + gap) * 5f
 
         Box(
             modifier = Modifier.size(width = wallWidth, height = wallHeight),
             contentAlignment = Alignment.Center,
         ) {
             Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds(),
+                verticalArrangement = Arrangement.spacedBy(gap),
             ) {
                 for (row in 0 until 6) {
-                    Row(
+                    // Alternate direction per row: even rows glide left, odd rows glide right
+                    val shiftDp = if (row % 2 == 0) {
+                        -cycleWidth * glideFraction
+                    } else {
+                        -cycleWidth * (1f - glideFraction)
+                    }
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            .weight(1f)
+                            .clipToBounds(),
                     ) {
-                        for (col in 0 until 5) {
-                            val uri = wallUris[row * 5 + col]
-                            AlbumArtwork(
-                                uri = uri,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .shadow(1.5.dp, RoundedCornerShape(3.dp)),
-                                cornerRadius = 3.dp,
-                                iconSize = 14.dp,
-                            )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .offset(x = shiftDp),
+                            horizontalArrangement = Arrangement.spacedBy(gap),
+                        ) {
+                            wallRows[row].forEach { uri ->
+                                AlbumArtwork(
+                                    uri = uri,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .width(tileSize)
+                                        .fillMaxHeight()
+                                        .shadow(1.5.dp, RoundedCornerShape(3.dp)),
+                                    cornerRadius = 3.dp,
+                                    iconSize = 14.dp,
+                                )
+                            }
                         }
                     }
                 }

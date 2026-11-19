@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,7 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -35,12 +38,14 @@ import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MusicOff
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.QueueMusic
@@ -48,22 +53,27 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,10 +82,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.puremusic.player.data.model.Album
@@ -89,6 +101,7 @@ import com.puremusic.player.data.model.SortOrder
 import com.puremusic.player.ui.components.AlbumArtwork
 import com.puremusic.player.ui.components.SongRowItem
 import com.puremusic.player.ui.components.formatCountdown
+import com.puremusic.player.ui.components.liquidGlass
 
 sealed interface CollectionDetail {
     val title: String
@@ -134,10 +147,16 @@ fun LibraryScreen(
     sortOrder: SortOrder,
     playerState: PlayerUiState,
     sleepTimerRemainingMs: Long?,
+    liquidGlassEnabled: Boolean,
+    isTabletLayout: Boolean,
     onSearchQueryChange: (String) -> Unit,
     onSelectSortOrder: (SortOrder) -> Unit,
     onRefreshLibrary: () -> Unit,
     onPlaySongs: (List<Song>, Int, Boolean) -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSkipNext: () -> Unit,
+    onOpenNowPlaying: () -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onRequestAddToPlaylist: (Song) -> Unit,
     onRequestCreatePlaylist: () -> Unit,
@@ -209,26 +228,108 @@ fun LibraryScreen(
             }
         },
     ) { innerPadding ->
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .padding(bottom = innerPadding.calculateBottomPadding()),
         ) {
-            // 1. Minimalist Pill Search Bar + Settings Icon (matching poster wall preview)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
+            // REAL TABLET LEFT SIDEBAR (Active when Layout = TABLET or AUTO on wide screens)
+            if (isTabletLayout) {
+                TabletLeftSidebar(
+                    playerState = playerState,
+                    songCount = allSongs.size,
+                    albumCount = albums.size,
+                    liquidGlassEnabled = liquidGlassEnabled,
+                    onOpenNowPlaying = onOpenNowPlaying,
+                    onTogglePlayPause = onTogglePlayPause,
+                    onSkipPrevious = onSkipPrevious,
+                    onSkipNext = onSkipNext,
+                    onOpenEqualizer = onOpenEqualizer,
+                    onOpenSleepTimer = onOpenSleepTimer,
+                    onOpenSettings = onOpenThemeSettings,
+                )
+                VerticalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f))
+            }
+
+            // MAIN EDITORIAL CONTENT PANE
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                // 1. Editorial Serif Header + Liquid Glass Settings Pill
                 Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(21.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column {
+                        Text(
+                            text = "简约音乐",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontFamily = FontFamily.Serif,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Text(
+                            text = "${allSongs.size} 首本地音乐 · ${albums.size} 张专辑",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (sleepTimerRemainingMs != null) {
+                            Box(
+                                modifier = Modifier
+                                    .liquidGlass(enabled = liquidGlassEnabled, shape = RoundedCornerShape(16.dp), elevation = 4.dp)
+                                    .clickable(onClick = onOpenSleepTimer)
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Timer,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(15.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = formatCountdown(sleepTimerRemainingMs),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .liquidGlass(enabled = liquidGlassEnabled, shape = CircleShape, elevation = 6.dp)
+                                .clickable(onClick = onOpenThemeSettings),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = "设置与外观",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+
+                // 2. Liquid Glass Search Pill
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .height(44.dp)
+                        .liquidGlass(enabled = liquidGlassEnabled, shape = RoundedCornerShape(22.dp), elevation = 5.dp)
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -275,228 +376,320 @@ fun LibraryScreen(
                     }
                 }
 
-                if (sleepTimerRemainingMs != null) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .clickable(onClick = onOpenSleepTimer)
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Rounded.Timer,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = formatCountdown(sleepTimerRemainingMs),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(10.dp))
 
-                IconButton(
-                    onClick = onOpenThemeSettings,
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = "设置与外观",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-
-            // 2. Clean Pill Category Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                LibraryTab.entries.forEach { tab ->
-                    val selected = selectedTab == tab
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                                },
-                            )
-                            .clickable { selectedTab = tab }
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                    ) {
-                        Text(
-                            text = tab.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    }
-                }
-            }
-
-            // 3. Sub-header count + Sort dropdown + Grid/List switch (for Songs tab)
-            if (selectedTab == LibraryTab.SONGS && !isLoading && songs.isNotEmpty()) {
-                Row(
+                // 3. Liquid Glass Segmented Category Bar
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .padding(horizontal = 16.dp)
+                        .liquidGlass(enabled = liquidGlassEnabled, shape = RoundedCornerShape(20.dp), elevation = 4.dp)
+                        .padding(horizontal = 6.dp, vertical = 5.dp),
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text(
-                            text = "${songs.size} 首",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { onPlaySongs(songs, 0, true) }
-                                .padding(horizontal = 6.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Shuffle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "随机播放",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box {
-                            Row(
+                        LibraryTab.entries.forEach { tab ->
+                            val selected = selectedTab == tab
+                            Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { sortMenuExpanded = true }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    )
+                                    .clickable { selectedTab = tab }
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
                             ) {
                                 Text(
-                                    text = sortOrder.label,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Icon(
-                                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                                    contentDescription = "排序方式",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp),
+                                    text = tab.label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 )
                             }
-                            DropdownMenu(
-                                expanded = sortMenuExpanded,
-                                onDismissRequest = { sortMenuExpanded = false },
+                        }
+                    }
+                }
+
+                // 4. Sub-header Action Bar (Songs Tab)
+                if (selectedTab == LibraryTab.SONGS && !isLoading && songs.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                text = "全部曲目 (${songs.size})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onPlaySongs(songs, 0, true) }
+                                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                SortOrder.entries.forEach { order ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = if (order == sortOrder) "✓ ${order.label}" else order.label,
-                                                fontWeight = if (order == sortOrder) FontWeight.SemiBold else FontWeight.Normal,
-                                            )
-                                        },
-                                        onClick = {
-                                            sortMenuExpanded = false
-                                            onSelectSortOrder(order)
-                                        },
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Rounded.Shuffle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(15.dp),
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "随机",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
                             }
                         }
 
-                        IconButton(
-                            onClick = { usePosterGrid = !usePosterGrid },
-                            modifier = Modifier.size(34.dp),
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { sortMenuExpanded = true }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = sortOrder.label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                                        contentDescription = "排序",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = sortMenuExpanded,
+                                    onDismissRequest = { sortMenuExpanded = false },
+                                ) {
+                                    SortOrder.entries.forEach { order ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = if (order == sortOrder) "✓ ${order.label}" else order.label,
+                                                    fontWeight = if (order == sortOrder) FontWeight.SemiBold else FontWeight.Normal,
+                                                )
+                                            },
+                                            onClick = {
+                                                sortMenuExpanded = false
+                                                onSelectSortOrder(order)
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { usePosterGrid = !usePosterGrid },
+                                modifier = Modifier.size(34.dp),
+                            ) {
+                                Icon(
+                                    imageVector = if (usePosterGrid) {
+                                        Icons.AutoMirrored.Rounded.ViewList
+                                    } else {
+                                        Icons.Rounded.GridView
+                                    },
+                                    contentDescription = "切换视图",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(19.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (isLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else {
+                    val gridColumns = if (isTabletLayout) 4 else 3
+                    when (selectedTab) {
+                        LibraryTab.SONGS -> SongsTabContent(
+                            songs = songs,
+                            featuredAlbums = if (searchQuery.isBlank()) albums.take(8) else emptyList(),
+                            usePosterGrid = usePosterGrid,
+                            gridColumns = gridColumns,
+                            liquidGlassEnabled = liquidGlassEnabled,
+                            favoriteSongIds = favoriteSongIds,
+                            playerState = playerState,
+                            onPlaySongs = onPlaySongs,
+                            onSelectFeaturedAlbum = { activeDetail = CollectionDetail.AlbumDetail(it) },
+                            onToggleFavorite = onToggleFavorite,
+                            onRequestAddToPlaylist = onRequestAddToPlaylist,
+                            onRefresh = onRefreshLibrary,
+                            bottomPadding = bottomContentPadding,
+                        )
+
+                        LibraryTab.ALBUMS -> AlbumsTabContent(
+                            albums = albums,
+                            gridColumns = gridColumns,
+                            onSelectAlbum = { activeDetail = CollectionDetail.AlbumDetail(it) },
+                            bottomPadding = bottomContentPadding,
+                        )
+
+                        LibraryTab.ARTISTS -> ArtistsTabContent(
+                            artists = artists,
+                            onSelectArtist = { activeDetail = CollectionDetail.ArtistDetail(it) },
+                            bottomPadding = bottomContentPadding,
+                        )
+
+                        LibraryTab.FOLDERS -> FoldersTabContent(
+                            folders = folders,
+                            onSelectFolder = { activeDetail = CollectionDetail.FolderDetail(it) },
+                            bottomPadding = bottomContentPadding,
+                        )
+
+                        LibraryTab.PLAYLISTS -> PlaylistsTabContent(
+                            playlists = playlists,
+                            favoriteCount = favoriteSongIds.size,
+                            onOpenFavorites = { activeDetail = CollectionDetail.FavoritesDetail },
+                            onOpenPlaylist = {
+                                activeDetail = CollectionDetail.PlaylistDetail(it.id, it.name)
+                            },
+                            onDeletePlaylist = onDeletePlaylist,
+                            bottomPadding = bottomContentPadding,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabletLeftSidebar(
+    playerState: PlayerUiState,
+    songCount: Int,
+    albumCount: Int,
+    liquidGlassEnabled: Boolean,
+    onOpenNowPlaying: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSkipNext: () -> Unit,
+    onOpenEqualizer: () -> Unit,
+    onOpenSleepTimer: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(260.dp)
+            .fillMaxHeight()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "平板唱片台",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+            )
+
+            val song = playerState.currentSong
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(enabled = liquidGlassEnabled, shape = RoundedCornerShape(20.dp), elevation = 8.dp)
+                    .clickable(enabled = song != null, onClick = onOpenNowPlaying)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    SpinningVinylDisc(
+                        albumArtUri = song?.albumArtUri,
+                        rotationDegrees = 0f,
+                        discSize = 144.dp,
+                    )
+                    Text(
+                        text = song?.title ?: "暂未播放",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = song?.artist ?: "$songCount 首歌曲 · $albumCount 张专辑",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = onSkipPrevious) {
+                            Icon(Icons.Rounded.SkipPrevious, contentDescription = "上一首")
+                        }
+                        FilledIconButton(
+                            onClick = onTogglePlayPause,
+                            shape = CircleShape,
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(46.dp),
                         ) {
                             Icon(
-                                imageVector = if (usePosterGrid) {
-                                    Icons.AutoMirrored.Rounded.ViewList
-                                } else {
-                                    Icons.Rounded.GridView
-                                },
-                                contentDescription = "切换视图",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(19.dp),
+                                imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                contentDescription = "播放/暂停",
                             )
+                        }
+                        IconButton(onClick = onSkipNext) {
+                            Icon(Icons.Rounded.SkipNext, contentDescription = "下一首")
                         }
                     }
                 }
             }
+        }
 
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            } else {
-                when (selectedTab) {
-                    LibraryTab.SONGS -> SongsTabContent(
-                        songs = songs,
-                        usePosterGrid = usePosterGrid,
-                        favoriteSongIds = favoriteSongIds,
-                        playerState = playerState,
-                        onPlaySongs = onPlaySongs,
-                        onToggleFavorite = onToggleFavorite,
-                        onRequestAddToPlaylist = onRequestAddToPlaylist,
-                        onRefresh = onRefreshLibrary,
-                        bottomPadding = bottomContentPadding,
-                    )
-
-                    LibraryTab.ALBUMS -> AlbumsTabContent(
-                        albums = albums,
-                        onSelectAlbum = { activeDetail = CollectionDetail.AlbumDetail(it) },
-                        bottomPadding = bottomContentPadding,
-                    )
-
-                    LibraryTab.ARTISTS -> ArtistsTabContent(
-                        artists = artists,
-                        onSelectArtist = { activeDetail = CollectionDetail.ArtistDetail(it) },
-                        bottomPadding = bottomContentPadding,
-                    )
-
-                    LibraryTab.FOLDERS -> FoldersTabContent(
-                        folders = folders,
-                        onSelectFolder = { activeDetail = CollectionDetail.FolderDetail(it) },
-                        bottomPadding = bottomContentPadding,
-                    )
-
-                    LibraryTab.PLAYLISTS -> PlaylistsTabContent(
-                        playlists = playlists,
-                        favoriteCount = favoriteSongIds.size,
-                        onOpenFavorites = { activeDetail = CollectionDetail.FavoritesDetail },
-                        onOpenPlaylist = {
-                            activeDetail = CollectionDetail.PlaylistDetail(it.id, it.name)
-                        },
-                        onDeletePlaylist = onDeletePlaylist,
-                        bottomPadding = bottomContentPadding,
-                    )
-                }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilledTonalButton(onClick = onOpenEqualizer, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.Equalizer, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("均衡器")
+            }
+            FilledTonalButton(onClick = onOpenSleepTimer, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("定时关闭")
+            }
+            FilledTonalButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("外观与曲库设置")
             }
         }
     }
@@ -505,10 +698,14 @@ fun LibraryScreen(
 @Composable
 private fun SongsTabContent(
     songs: List<Song>,
+    featuredAlbums: List<Album>,
     usePosterGrid: Boolean,
+    gridColumns: Int,
+    liquidGlassEnabled: Boolean,
     favoriteSongIds: Set<Long>,
     playerState: PlayerUiState,
     onPlaySongs: (List<Song>, Int, Boolean) -> Unit,
+    onSelectFeaturedAlbum: (Album) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onRequestAddToPlaylist: (Song) -> Unit,
     onRefresh: () -> Unit,
@@ -521,16 +718,92 @@ private fun SongsTabContent(
 
     if (usePosterGrid) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+            columns = GridCells.Fixed(gridColumns),
             contentPadding = PaddingValues(
-                start = 14.dp,
-                end = 14.dp,
-                top = 6.dp,
-                bottom = 16.dp + bottomPadding.calculateBottomPadding(),
+                start = 16.dp,
+                end = 16.dp,
+                top = 4.dp,
+                bottom = 20.dp + bottomPadding.calculateBottomPadding(),
             ),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            // Featured Horizontal Vinyl Albums Carousel
+            if (featuredAlbums.size >= 2) {
+                item(span = { GridItemSpan(gridColumns) }) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "精选唱片",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontFamily = FontFamily.Serif,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(featuredAlbums, key = { "feat_${it.id}" }) { album ->
+                                Column(
+                                    modifier = Modifier
+                                        .width(136.dp)
+                                        .clickable { onSelectFeaturedAlbum(album) },
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(136.dp)
+                                            .shadow(8.dp, RoundedCornerShape(14.dp)),
+                                    ) {
+                                        AlbumArtwork(
+                                            uri = album.albumArtUri,
+                                            contentDescription = album.name,
+                                            modifier = Modifier.fillMaxSize(),
+                                            cornerRadius = 14.dp,
+                                            iconSize = 36.dp,
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(8.dp)
+                                                .size(30.dp)
+                                                .liquidGlass(
+                                                    enabled = liquidGlassEnabled,
+                                                    shape = CircleShape,
+                                                    elevation = 4.dp,
+                                                ),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.PlayArrow,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = album.name,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = FontFamily.Serif,
+                                            fontWeight = FontWeight.Medium,
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = album.artist,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            }
+
             itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
                 val isCurrent = playerState.currentSong?.id == song.id
                 Column(
@@ -541,13 +814,14 @@ private fun SongsTabContent(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(1f),
+                            .aspectRatio(1f)
+                            .shadow(3.dp, RoundedCornerShape(8.dp)),
                     ) {
                         AlbumArtwork(
                             uri = song.albumArtUri,
                             contentDescription = song.album,
                             modifier = Modifier.fillMaxSize(),
-                            cornerRadius = 6.dp,
+                            cornerRadius = 8.dp,
                             iconSize = 28.dp,
                         )
                         if (isCurrent) {
@@ -610,6 +884,7 @@ private fun SongsTabContent(
 @Composable
 private fun AlbumsTabContent(
     albums: List<Album>,
+    gridColumns: Int,
     onSelectAlbum: (Album) -> Unit,
     bottomPadding: PaddingValues,
 ) {
@@ -621,10 +896,10 @@ private fun AlbumsTabContent(
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+        columns = GridCells.Fixed(gridColumns),
         contentPadding = PaddingValues(
-            start = 14.dp,
-            end = 14.dp,
+            start = 16.dp,
+            end = 16.dp,
             top = 10.dp,
             bottom = 16.dp + bottomPadding.calculateBottomPadding(),
         ),
@@ -642,8 +917,9 @@ private fun AlbumsTabContent(
                     contentDescription = album.name,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1f),
-                    cornerRadius = 6.dp,
+                        .aspectRatio(1f)
+                        .shadow(3.dp, RoundedCornerShape(8.dp)),
+                    cornerRadius = 8.dp,
                     iconSize = 30.dp,
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -988,6 +1264,7 @@ private fun EmptyLibraryPlaceholder(onRefresh: () -> Unit) {
             text = "将 MP3 / FLAC / WAV 等音乐文件放入手机 Music 目录后点击重新扫描。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(16.dp))
         FilledTonalButton(onClick = onRefresh) {

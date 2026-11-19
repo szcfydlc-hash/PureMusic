@@ -2,21 +2,67 @@ package com.puremusic.player.data.repository
 
 import android.content.ContentUris
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import com.puremusic.player.data.model.Album
 import com.puremusic.player.data.model.Artist
 import com.puremusic.player.data.model.MusicFolder
 import com.puremusic.player.data.model.Song
 import com.puremusic.player.data.model.SortOrder
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 class MusicRepository(private val context: Context) {
 
     private val albumArtBaseUri: Uri = Uri.parse("content://media/external/audio/albumart")
+    private val audioExtensions = setOf("mp3", "flac", "wav", "m4a", "aac", "ogg", "opus", "wma", "ape")
+
+    suspend fun triggerMediaScanAndLoad(): List<Song> = withContext(Dispatchers.IO) {
+        val roots = listOf(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+        ).filter { it != null && it.exists() && it.isDirectory }
+
+        val pathsToScan = buildList {
+            for (dir in roots) {
+                runCatching {
+                    dir.walkTopDown()
+                        .maxDepth(4)
+                        .filter { it.isFile && it.extension.lowercase() in audioExtensions }
+                        .take(150)
+                        .forEach { add(it.absolutePath) }
+                }
+            }
+        }
+
+        if (pathsToScan.isNotEmpty()) {
+            val done = CompletableDeferred<Unit>()
+            val remaining = AtomicInteger(pathsToScan.size)
+            runCatching {
+                MediaScannerConnection.scanFile(
+                    context,
+                    pathsToScan.toTypedArray(),
+                    null,
+                ) { _, _ ->
+                    if (remaining.decrementAndGet() <= 0 && !done.isCompleted) {
+                        done.complete(Unit)
+                    }
+                }
+            }.onFailure {
+                if (!done.isCompleted) done.complete(Unit)
+            }
+            withTimeoutOrNull(2_500L) { done.await() }
+        }
+
+        loadLocalSongs()
+    }
 
     suspend fun loadLocalSongs(): List<Song> = withContext(Dispatchers.IO) {
         val songs = mutableListOf<Song>()

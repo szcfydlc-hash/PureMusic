@@ -3,6 +3,7 @@ package com.puremusic.player.data.repository
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -10,6 +11,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.LyricFontStyle
+import com.puremusic.player.data.model.MinDurationFilter
 import com.puremusic.player.data.model.PlayerTheme
 import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.data.model.SortOrder
@@ -30,8 +33,12 @@ class PlaylistRepository(private val context: Context) {
         val FAVORITE_SONG_IDS = stringSetPreferencesKey("favorite_song_ids")
         val PLAYER_THEME = stringPreferencesKey("player_theme")
         val FONT_STYLE = stringPreferencesKey("font_style")
+        val LYRIC_FONT_STYLE = stringPreferencesKey("lyric_font_style")
         val BACKGROUND_STYLE = stringPreferencesKey("background_style")
         val LAYOUT_MODE = stringPreferencesKey("layout_mode")
+        val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
+        val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
+        val MIN_DURATION_FILTER = stringPreferencesKey("min_duration_filter")
         val SORT_ORDER = stringPreferencesKey("sort_order")
     }
 
@@ -55,6 +62,12 @@ class PlaylistRepository(private val context: Context) {
         } ?: AppFontStyle.SANS
     }
 
+    val lyricFontStyleFlow: Flow<LyricFontStyle> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.LYRIC_FONT_STYLE]?.let { name ->
+            LyricFontStyle.entries.firstOrNull { it.name == name }
+        } ?: LyricFontStyle.SERIF_ITALIC
+    }
+
     val backgroundStyleFlow: Flow<BackgroundStyle> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.BACKGROUND_STYLE]?.let { name ->
             BackgroundStyle.entries.firstOrNull { it.name == name }
@@ -65,6 +78,20 @@ class PlaylistRepository(private val context: Context) {
         prefs[Keys.LAYOUT_MODE]?.let { name ->
             LayoutMode.entries.firstOrNull { it.name == name }
         } ?: LayoutMode.AUTO
+    }
+
+    val liquidGlassEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.LIQUID_GLASS_ENABLED] ?: true
+    }
+
+    val excludedFoldersFlow: Flow<Set<String>> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.EXCLUDED_FOLDERS].orEmpty()
+    }
+
+    val minDurationFilterFlow: Flow<MinDurationFilter> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.MIN_DURATION_FILTER]?.let { name ->
+            MinDurationFilter.entries.firstOrNull { it.name == name }
+        } ?: MinDurationFilter.NONE
     }
 
     val sortOrderFlow: Flow<SortOrder> = context.pureMusicDataStore.data.map { prefs ->
@@ -140,6 +167,10 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { it[Keys.FONT_STYLE] = style.name }
     }
 
+    suspend fun setLyricFontStyle(style: LyricFontStyle) {
+        context.pureMusicDataStore.edit { it[Keys.LYRIC_FONT_STYLE] = style.name }
+    }
+
     suspend fun setBackgroundStyle(style: BackgroundStyle) {
         context.pureMusicDataStore.edit { it[Keys.BACKGROUND_STYLE] = style.name }
     }
@@ -148,12 +179,30 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { it[Keys.LAYOUT_MODE] = mode.name }
     }
 
+    suspend fun setLiquidGlassEnabled(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.LIQUID_GLASS_ENABLED] = enabled }
+    }
+
+    suspend fun toggleFolderExcluded(folderPath: String) {
+        context.pureMusicDataStore.edit { prefs ->
+            val current = prefs[Keys.EXCLUDED_FOLDERS].orEmpty().toMutableSet()
+            if (folderPath in current) current.remove(folderPath) else current.add(folderPath)
+            prefs[Keys.EXCLUDED_FOLDERS] = current
+        }
+    }
+
+    suspend fun setMinDurationFilter(filter: MinDurationFilter) {
+        context.pureMusicDataStore.edit { it[Keys.MIN_DURATION_FILTER] = filter.name }
+    }
+
     suspend fun resetAppearance() {
         context.pureMusicDataStore.edit { prefs ->
             prefs[Keys.PLAYER_THEME] = PlayerTheme.POSTER_WALL.name
             prefs[Keys.FONT_STYLE] = AppFontStyle.SANS.name
+            prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SERIF_ITALIC.name
             prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
             prefs[Keys.LAYOUT_MODE] = LayoutMode.AUTO.name
+            prefs[Keys.LIQUID_GLASS_ENABLED] = true
         }
     }
 

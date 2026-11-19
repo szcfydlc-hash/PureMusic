@@ -2,7 +2,6 @@ package com.puremusic.player.ui.components
 
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +34,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -239,6 +237,7 @@ fun SongRowItem(
 @Composable
 fun MiniPlayerBar(
     playerState: PlayerUiState,
+    liquidGlassEnabled: Boolean,
     onOpenNowPlaying: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
@@ -251,21 +250,12 @@ fun MiniPlayerBar(
         0f
     }
 
-    Surface(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 10.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
-                shape = RoundedCornerShape(18.dp),
-            )
+            .liquidGlass(enabled = liquidGlassEnabled, shape = RoundedCornerShape(24.dp), elevation = 12.dp)
             .clickable(onClick = onOpenNowPlaying),
-        shape = RoundedCornerShape(18.dp),
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
-        color = MaterialTheme.colorScheme.surface,
     ) {
         Column {
             Row(
@@ -275,12 +265,11 @@ fun MiniPlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // Miniature vinyl-bordered circular cover
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF161616))
+                        .background(Color(0xFF141414))
                         .padding(5.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -321,7 +310,7 @@ fun MiniPlayerBar(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = Color.White,
                     ),
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
