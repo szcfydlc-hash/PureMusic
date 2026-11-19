@@ -18,48 +18,51 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun Modifier.liquidGlass(
     enabled: Boolean,
-    shape: Shape = RoundedCornerShape(22.dp),
-    elevation: Dp = 8.dp,
+    shape: Shape = RoundedCornerShape(24.dp),
+    elevation: Dp = 10.dp,
+    darkSurface: Boolean? = null,
 ): Modifier {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val isDark = darkSurface ?: (MaterialTheme.colorScheme.background.luminance() < 0.5f)
     return if (enabled) {
         val glassBrush = if (isDark) {
             Brush.verticalGradient(
                 colors = listOf(
-                    Color(0xFF33373D).copy(alpha = 0.72f),
-                    Color(0xFF1F2227).copy(alpha = 0.62f),
+                    Color.White.copy(alpha = 0.22f),
+                    Color.White.copy(alpha = 0.11f),
+                    Color.White.copy(alpha = 0.16f),
                 ),
             )
         } else {
             Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.78f),
-                    Color(0xFFF3EEE6).copy(alpha = 0.60f),
+                    Color.White.copy(alpha = 0.72f),
+                    Color(0xFFF3EFE8).copy(alpha = 0.46f),
+                    Color.White.copy(alpha = 0.58f),
                 ),
             )
         }
         val specularRim = if (isDark) {
             Brush.linearGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.34f),
-                    Color.White.copy(alpha = 0.08f),
-                    Color.White.copy(alpha = 0.22f),
+                    Color.White.copy(alpha = 0.55f),
+                    Color.White.copy(alpha = 0.14f),
+                    Color.White.copy(alpha = 0.36f),
                 ),
             )
         } else {
             Brush.linearGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.94f),
-                    Color.White.copy(alpha = 0.28f),
-                    Color.White.copy(alpha = 0.70f),
+                    Color.White.copy(alpha = 0.96f),
+                    Color.White.copy(alpha = 0.35f),
+                    Color.White.copy(alpha = 0.80f),
                 ),
             )
         }
         this
-            .shadow(elevation = elevation, shape = shape, ambientColor = Color.Black.copy(alpha = 0.16f))
+            .shadow(elevation = elevation, shape = shape, ambientColor = Color.Black.copy(alpha = 0.18f))
             .clip(shape)
             .background(glassBrush)
-            .border(width = 1.dp, brush = specularRim, shape = shape)
+            .border(width = 1.2.dp, brush = specularRim, shape = shape)
     } else {
         this
             .shadow(elevation = elevation / 2, shape = shape)

@@ -1,6 +1,7 @@
 package com.puremusic.player.ui.screens
 
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -53,7 +54,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
@@ -94,6 +95,7 @@ import com.puremusic.player.ui.components.AlbumArtwork
 import com.puremusic.player.ui.components.formatCountdown
 import com.puremusic.player.ui.components.formatDuration
 import com.puremusic.player.ui.components.liquidGlass
+import com.puremusic.player.ui.theme.ForestGreen
 import com.puremusic.player.ui.theme.VermilionAccent
 import kotlinx.coroutines.isActive
 
@@ -133,7 +135,6 @@ fun NowPlayingScreen(
         lyrics.lastOrNull { it.timeMs <= playerState.positionMs }
     }
 
-    // Smooth continuous rotation + poster wall glide that preserve exact phase on pause
     val vinylAngle = remember { Animatable(0f) }
     val wallGlideFraction = remember { Animatable(0f) }
     LaunchedEffect(playerState.isPlaying) {
@@ -168,56 +169,145 @@ fun NowPlayingScreen(
     }
     val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+    // Atmospheric deep forest-emerald backdrop for Poster Wall theme matching the v3.0 mockup
+    val useAtmosphericEmerald = playerTheme == PlayerTheme.POSTER_WALL
+    val primaryTextColor = if (useAtmosphericEmerald) Color(0xFFF6F3EE) else MaterialTheme.colorScheme.onBackground
+    val secondaryTextColor = if (useAtmosphericEmerald) Color(0xFFC8D3CC) else MaterialTheme.colorScheme.onSurfaceVariant
+    val activeAccent = if (useAtmosphericEmerald) Color(0xFF28895E) else MaterialTheme.colorScheme.primary
+
+    val bgModifier = if (useAtmosphericEmerald) {
+        Modifier.background(
+            Brush.verticalGradient(
+                0.00f to Color(0xFF0E3B2A),
+                0.45f to Color(0xFF17382A),
+                0.78f to Color(0xFF232C25),
+                1.00f to Color(0xFF2B2722),
+            ),
+        )
+    } else {
+        Modifier.background(MaterialTheme.colorScheme.background)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(bgModifier),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 1. Clean Dedicated Header Row (never overlapped)
+            // 1. Clean Top Bar with Back + Subtle Utility Icons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp),
+                    .height(44.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier.size(36.dp),
-                ) {
+                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                        contentDescription = "返回曲库",
-                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                        contentDescription = "返回",
+                        tint = primaryTextColor.copy(alpha = 0.9f),
                         modifier = Modifier.size(26.dp),
                     )
                 }
+
                 if (sleepTimerRemainingMs != null) {
                     Text(
-                        text = "定时关闭 · ${formatCountdown(sleepTimerRemainingMs)}",
+                        text = "定时 · ${formatCountdown(sleepTimerRemainingMs)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = activeAccent,
                     )
-                } else {
-                    Spacer(modifier = Modifier.width(1.dp))
                 }
-                Spacer(modifier = Modifier.size(36.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { onToggleFavorite(song) }, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            contentDescription = "喜欢",
+                            tint = if (isFavorite) Color(0xFFFF6E6E) else primaryTextColor.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    IconButton(onClick = onOpenLyrics, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lyrics,
+                            contentDescription = "歌词",
+                            tint = primaryTextColor.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    IconButton(onClick = onOpenQueue, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            imageVector = Icons.Rounded.QueueMusic,
+                            contentDescription = "播放队列",
+                            tint = primaryTextColor.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    Box {
+                        IconButton(onClick = { moreMenuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreHoriz,
+                                contentDescription = "更多",
+                                tint = primaryTextColor.copy(alpha = 0.8f),
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = moreMenuExpanded,
+                            onDismissRequest = { moreMenuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("添加到歌单") },
+                                leadingIcon = { Icon(Icons.Rounded.PlaylistAdd, contentDescription = null) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    onAddToPlaylist(song)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("音频均衡器") },
+                                leadingIcon = { Icon(Icons.Rounded.Equalizer, contentDescription = null) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    onOpenEqualizer()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("定时关闭") },
+                                leadingIcon = { Icon(Icons.Rounded.Timer, contentDescription = null) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    onOpenSleepTimer()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("外观与主题设置") },
+                                leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    onOpenSettings()
+                                },
+                            )
+                        }
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // 2. Strictly Bounded Hero Area (zero overflow into header or title)
+            // 2. Hero Area (Strictly Bounded, Zero Overlap)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .weight(1.1f)
                     .clipToBounds(),
                 contentAlignment = Alignment.Center,
             ) {
@@ -252,37 +342,34 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // 3. Editorial Centered Track Title & Artist
+            // 3. Centered Editorial Title & Artist
             Text(
                 text = song.title,
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.2.sp,
+                    letterSpacing = 0.5.sp,
                 ),
-                color = MaterialTheme.colorScheme.onBackground,
+                color = primaryTextColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp),
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = song.artist,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontFamily = FontFamily.Serif,
-                    fontWeight = FontWeight.Normal,
                 ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = secondaryTextColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 12.dp),
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 4. Synced Bilingual Lyrics Preview (graceful spacing if no .lrc)
+            // 4. Independent-Font Synced Bilingual Lyrics
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -296,9 +383,9 @@ fun NowPlayingScreen(
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontFamily = lyricFamily,
                             fontStyle = lyricStyleItalic,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Medium,
                         ),
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = primaryTextColor.copy(alpha = 0.94f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
@@ -307,26 +394,29 @@ fun NowPlayingScreen(
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = activeLyric.secondaryText,
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = lyricFamily),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = lyricFamily,
+                                fontStyle = FontStyle.Italic,
+                            ),
+                            color = secondaryTextColor.copy(alpha = 0.82f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center,
                         )
                     }
                 } else {
-                    val subtleSubtitle = if (song.album.equals(song.title, ignoreCase = true)) {
-                        "本地离线曲库 · ${song.folderName}"
+                    val subtleAlbum = if (song.album.equals(song.title, ignoreCase = true)) {
+                        "PureMusic · ${song.folderName}"
                     } else {
                         song.album
                     }
                     Text(
-                        text = subtleSubtitle,
+                        text = subtleAlbum,
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Serif,
-                            fontStyle = FontStyle.Italic,
+                            fontFamily = lyricFamily,
+                            fontStyle = lyricStyleItalic,
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        color = secondaryTextColor.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
@@ -334,17 +424,17 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // 5. Sleek Ultra-Thin Progress Bar
             ThinSeekBar(
                 positionMs = playerState.positionMs,
                 durationMs = durationMs,
-                accentColor = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                activeLineColor = if (useAtmosphericEmerald) Color(0xFF3E9A6E) else Color(0xFF2A2927),
+                accentColor = activeAccent,
+                trackColor = secondaryTextColor.copy(alpha = 0.28f),
                 onSeekTo = onSeekTo,
             )
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -354,42 +444,47 @@ fun NowPlayingScreen(
                 Text(
                     text = formatDuration(playerState.positionMs),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = secondaryTextColor.copy(alpha = 0.85f),
                 )
                 Text(
                     text = formatDuration(playerState.durationMs),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = secondaryTextColor.copy(alpha = 0.85f),
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            // 6. Primary Transport Controls (Liquid Glass Control Dock when enabled)
+            // 6. Unified 5-Button Liquid Glass Control Dock (exact match to v3.0 mockup!)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(
-                        if (liquidGlassEnabled) {
-                            Modifier
-                                .liquidGlass(enabled = true, shape = RoundedCornerShape(36.dp), elevation = 10.dp)
-                                .padding(vertical = 8.dp, horizontal = 12.dp)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .padding(bottom = 20.dp)
+                    .liquidGlass(
+                        enabled = liquidGlassEnabled,
+                        shape = RoundedCornerShape(40.dp),
+                        elevation = 14.dp,
+                        darkSurface = useAtmosphericEmerald,
+                    )
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(
-                    onClick = onSkipPrevious,
-                    modifier = Modifier.size(48.dp),
-                ) {
+                IconButton(onClick = onToggleShuffle) {
+                    Icon(
+                        imageVector = Icons.Rounded.Shuffle,
+                        contentDescription = "随机播放",
+                        tint = if (playerState.shuffleEnabled) activeAccent else primaryTextColor.copy(alpha = 0.85f),
+                        modifier = Modifier.size(21.dp),
+                    )
+                }
+
+                IconButton(onClick = onSkipPrevious) {
                     Icon(
                         imageVector = Icons.Rounded.SkipPrevious,
                         contentDescription = "上一首",
-                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
-                        modifier = Modifier.size(30.dp),
+                        tint = primaryTextColor,
+                        modifier = Modifier.size(28.dp),
                     )
                 }
 
@@ -397,53 +492,26 @@ fun NowPlayingScreen(
                     onClick = onTogglePlayPause,
                     shape = CircleShape,
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
+                        containerColor = ForestGreen,
                         contentColor = Color.White,
                     ),
                     modifier = Modifier
-                        .size(66.dp)
+                        .size(62.dp)
                         .shadow(10.dp, CircleShape),
                 ) {
                     Icon(
                         imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.size(32.dp),
                     )
                 }
 
-                IconButton(
-                    onClick = onSkipNext,
-                    modifier = Modifier.size(48.dp),
-                ) {
+                IconButton(onClick = onSkipNext) {
                     Icon(
                         imageVector = Icons.Rounded.SkipNext,
                         contentDescription = "下一首",
-                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
-                        modifier = Modifier.size(30.dp),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // 7. Bottom 6-Icon Minimalist Action Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onToggleShuffle) {
-                    Icon(
-                        imageVector = Icons.Rounded.Shuffle,
-                        contentDescription = "随机播放",
-                        tint = if (playerState.shuffleEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
-                        },
-                        modifier = Modifier.size(21.dp),
+                        tint = primaryTextColor,
+                        modifier = Modifier.size(28.dp),
                     )
                 }
 
@@ -454,96 +522,9 @@ fun NowPlayingScreen(
                             else -> Icons.Rounded.Repeat
                         },
                         contentDescription = "循环模式",
-                        tint = if (playerState.repeatMode != RepeatMode.OFF) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
-                        },
+                        tint = if (playerState.repeatMode != RepeatMode.OFF) activeAccent else primaryTextColor.copy(alpha = 0.85f),
                         modifier = Modifier.size(21.dp),
                     )
-                }
-
-                IconButton(onClick = { onToggleFavorite(song) }) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = "喜欢",
-                        tint = if (isFavorite) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
-                        },
-                        modifier = Modifier.size(21.dp),
-                    )
-                }
-
-                IconButton(onClick = onOpenLyrics) {
-                    Icon(
-                        imageVector = Icons.Rounded.Lyrics,
-                        contentDescription = "歌词",
-                        tint = if (lyrics.isNotEmpty()) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
-                        },
-                        modifier = Modifier.size(21.dp),
-                    )
-                }
-
-                IconButton(onClick = onOpenQueue) {
-                    Icon(
-                        imageVector = Icons.Rounded.QueueMusic,
-                        contentDescription = "播放队列",
-                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
-                        modifier = Modifier.size(21.dp),
-                    )
-                }
-
-                Box {
-                    IconButton(onClick = { moreMenuExpanded = true }) {
-                        Icon(
-                            imageVector = Icons.Rounded.MoreHoriz,
-                            contentDescription = "更多",
-                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
-                            modifier = Modifier.size(21.dp),
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = moreMenuExpanded,
-                        onDismissRequest = { moreMenuExpanded = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("添加到歌单") },
-                            leadingIcon = { Icon(Icons.Rounded.PlaylistAdd, contentDescription = null) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                onAddToPlaylist(song)
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("音频均衡器") },
-                            leadingIcon = { Icon(Icons.Rounded.Equalizer, contentDescription = null) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                onOpenEqualizer()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("定时关闭") },
-                            leadingIcon = { Icon(Icons.Rounded.Timer, contentDescription = null) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                onOpenSleepTimer()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("外观与主题设置") },
-                            leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                onOpenSettings()
-                            },
-                        )
-                    }
                 }
             }
         }
@@ -563,7 +544,6 @@ private fun PosterWallVinylHero(
         val pool = if (distinctAlbums.isNotEmpty()) distinctAlbums else listOf(currentSong.albumArtUri)
         List(6) { row ->
             val baseFive = List(5) { col -> pool[(row * 7 + col * 3) % pool.size] }
-            // Duplicate sequence for seamless infinite horizontal gliding
             baseFive + baseFive
         }
     }
@@ -575,23 +555,29 @@ private fun PosterWallVinylHero(
         val targetRatio = 5f / 6f
         val wallWidth = min(maxWidth, maxHeight * targetRatio)
         val wallHeight = wallWidth / targetRatio
-        val discSize = min(wallWidth * 0.64f, 224.dp)
-        val gap = 5.dp
+        val discSize = min(wallWidth * 0.72f, 240.dp)
+        val gap = 6.dp
         val tileSize = (wallWidth - gap * 4) / 5f
         val cycleWidth = (tileSize + gap) * 5f
+        val softBlurMod = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Modifier.blur(4.5.dp)
+        } else {
+            Modifier
+        }
 
         Box(
             modifier = Modifier.size(width = wallWidth, height = wallHeight),
             contentAlignment = Alignment.Center,
         ) {
+            // Softly blurred gliding 5x6 album wall
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clipToBounds(),
+                    .clipToBounds()
+                    .then(softBlurMod),
                 verticalArrangement = Arrangement.spacedBy(gap),
             ) {
                 for (row in 0 until 6) {
-                    // Alternate direction per row: even rows glide left, odd rows glide right
                     val shiftDp = if (row % 2 == 0) {
                         -cycleWidth * glideFraction
                     } else {
@@ -615,9 +601,8 @@ private fun PosterWallVinylHero(
                                     contentDescription = null,
                                     modifier = Modifier
                                         .width(tileSize)
-                                        .fillMaxHeight()
-                                        .shadow(1.5.dp, RoundedCornerShape(3.dp)),
-                                    cornerRadius = 3.dp,
+                                        .fillMaxHeight(),
+                                    cornerRadius = 5.dp,
                                     iconSize = 14.dp,
                                 )
                             }
@@ -626,6 +611,21 @@ private fun PosterWallVinylHero(
                 }
             }
 
+            // Atmospheric emerald vignette blending edges seamlessly into background
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.00f to Color(0xFF0E3B2A).copy(alpha = 0.55f),
+                            0.20f to Color.Transparent,
+                            0.78f to Color.Transparent,
+                            1.00f to Color(0xFF17382A).copy(alpha = 0.92f),
+                        ),
+                    ),
+            )
+
+            // Crisp giant glossy 12-inch LP floating sharply in center
             SpinningVinylDisc(
                 albumArtUri = currentSong.albumArtUri,
                 rotationDegrees = vinylRotation,
@@ -680,7 +680,6 @@ private fun WarmWoodStudioHero(
         modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
-        // Large square sleeve (~67% width) + 94% height glossy LP peeking out to the right
         val sleeveSize = min(maxHeight * 0.84f, maxWidth * 0.67f)
         val discSize = sleeveSize * 0.94f
         val totalWidth = sleeveSize + discSize * 0.42f
@@ -690,11 +689,7 @@ private fun WarmWoodStudioHero(
                 .size(width = min(totalWidth, maxWidth), height = sleeveSize + 16.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            // Glossy 12-inch LP peeking ~40% past the right edge of the sleeve
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd),
-            ) {
+            Box(modifier = Modifier.align(Alignment.CenterEnd)) {
                 SpinningVinylDisc(
                     albumArtUri = currentSong.albumArtUri,
                     rotationDegrees = vinylRotation,
@@ -702,7 +697,6 @@ private fun WarmWoodStudioHero(
                 )
             }
 
-            // Crisp square cardboard album sleeve with subtle right-edge highlight & drop shadow
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -716,7 +710,6 @@ private fun WarmWoodStudioHero(
                     cornerRadius = 4.dp,
                     iconSize = 56.dp,
                 )
-                // Paper sleeve opening edge highlight on right side
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
@@ -824,23 +817,21 @@ fun SpinningVinylDisc(
     Box(
         modifier = Modifier
             .size(discSize)
-            .shadow(22.dp, CircleShape)
+            .shadow(24.dp, CircleShape)
             .clip(CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        // Photorealistic 12-inch glossy acetate LP shader with fixed studio hourglass sheen
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            // 1. Rich obsidian vinyl base with subtle radial depth
             drawCircle(
                 brush = Brush.radialGradient(
                     0.00f to Color(0xFF121212),
-                    0.42f to Color(0xFF0A0A0A),
+                    0.42f to Color(0xFF090909),
                     0.75f to Color(0xFF161616),
-                    0.95f to Color(0xFF0B0B0B),
-                    1.00f to Color(0xFF222222),
+                    0.95f to Color(0xFF0A0A0A),
+                    1.00f to Color(0xFF242424),
                     center = center,
                     radius = radius,
                 ),
@@ -848,19 +839,18 @@ fun SpinningVinylDisc(
                 center = center,
             )
 
-            // 2. Dual bright hourglass studio reflections (upper-right / lower-left satin sheen)
             drawCircle(
                 brush = Brush.sweepGradient(
                     0.00f to Color.Transparent,
                     0.12f to Color.Transparent,
-                    0.20f to Color.White.copy(alpha = 0.14f),
-                    0.24f to Color.White.copy(alpha = 0.34f),
-                    0.28f to Color.White.copy(alpha = 0.12f),
+                    0.20f to Color.White.copy(alpha = 0.16f),
+                    0.24f to Color.White.copy(alpha = 0.38f),
+                    0.28f to Color.White.copy(alpha = 0.14f),
                     0.36f to Color.Transparent,
                     0.62f to Color.Transparent,
-                    0.70f to Color.White.copy(alpha = 0.14f),
-                    0.74f to Color.White.copy(alpha = 0.36f),
-                    0.78f to Color.White.copy(alpha = 0.12f),
+                    0.70f to Color.White.copy(alpha = 0.16f),
+                    0.74f to Color.White.copy(alpha = 0.40f),
+                    0.78f to Color.White.copy(alpha = 0.14f),
                     0.86f to Color.Transparent,
                     1.00f to Color.Transparent,
                     center = center,
@@ -869,12 +859,11 @@ fun SpinningVinylDisc(
                 center = center,
             )
 
-            // 3. Dense fine satin micro-grooves across playable vinyl surface
             for (i in 0..22) {
                 val factor = 0.43f + i * 0.023f
                 val isTrackGap = i == 7 || i == 15
                 val alpha = when {
-                    isTrackGap -> 0.16f
+                    isTrackGap -> 0.17f
                     i % 2 == 0 -> 0.09f
                     else -> 0.04f
                 }
@@ -886,17 +875,14 @@ fun SpinningVinylDisc(
                 )
             }
 
-            // 4. Glossy inner run-out border around center label
             drawCircle(
                 color = Color.White.copy(alpha = 0.14f),
                 radius = radius * 0.405f,
                 center = center,
                 style = Stroke(width = 1.6f),
             )
-
-            // 5. Crisp metallic outer rim bevel
             drawCircle(
-                color = Color.White.copy(alpha = 0.24f),
+                color = Color.White.copy(alpha = 0.28f),
                 radius = radius - 1.5f,
                 center = center,
                 style = Stroke(width = 2.4f),
@@ -909,7 +895,6 @@ fun SpinningVinylDisc(
             )
         }
 
-        // Authentic 38% LP circular center album label
         AlbumArtwork(
             uri = albumArtUri,
             contentDescription = null,
@@ -922,13 +907,12 @@ fun SpinningVinylDisc(
             iconSize = 24.dp,
         )
 
-        // Realistic spindle center hole
         Box(
             modifier = Modifier
                 .size(9.dp)
                 .clip(CircleShape)
                 .background(Color(0xFF141414))
-                .border(1.2.dp, Color.White.copy(alpha = 0.38f), CircleShape),
+                .border(1.2.dp, Color.White.copy(alpha = 0.4f), CircleShape),
         )
     }
 }
@@ -937,6 +921,7 @@ fun SpinningVinylDisc(
 private fun ThinSeekBar(
     positionMs: Long,
     durationMs: Long,
+    activeLineColor: Color,
     accentColor: Color,
     trackColor: Color,
     onSeekTo: (Long) -> Unit,
@@ -997,7 +982,7 @@ private fun ThinSeekBar(
                 cap = StrokeCap.Round,
             )
             drawLine(
-                color = Color(0xFF2A2927),
+                color = activeLineColor,
                 start = Offset(0f, y),
                 end = Offset(activeX, y),
                 strokeWidth = 3.8f,
@@ -1005,7 +990,7 @@ private fun ThinSeekBar(
             )
             if (isDragging) {
                 drawCircle(
-                    color = accentColor.copy(alpha = 0.22f),
+                    color = accentColor.copy(alpha = 0.26f),
                     radius = 18f,
                     center = Offset(activeX, y),
                 )

@@ -728,78 +728,48 @@ private fun SongsTabContent(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Featured Horizontal Vinyl Albums Carousel
+            // Art-first Featured Vinyl Cards matching Left Phone mockup (clean rounded 16dp cards + glass play badge)
             if (featuredAlbums.size >= 2) {
                 item(span = { GridItemSpan(gridColumns) }) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "精选唱片",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontFamily = FontFamily.Serif,
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(featuredAlbums, key = { "feat_${it.id}" }) { album ->
-                                Column(
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    ) {
+                        items(featuredAlbums, key = { "feat_${it.id}" }) { album ->
+                            Box(
+                                modifier = Modifier
+                                    .size(156.dp)
+                                    .shadow(8.dp, RoundedCornerShape(16.dp))
+                                    .clickable { onSelectFeaturedAlbum(album) },
+                            ) {
+                                AlbumArtwork(
+                                    uri = album.albumArtUri,
+                                    contentDescription = album.name,
+                                    modifier = Modifier.fillMaxSize(),
+                                    cornerRadius = 16.dp,
+                                    iconSize = 40.dp,
+                                )
+                                Box(
                                     modifier = Modifier
-                                        .width(136.dp)
-                                        .clickable { onSelectFeaturedAlbum(album) },
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(136.dp)
-                                            .shadow(8.dp, RoundedCornerShape(14.dp)),
-                                    ) {
-                                        AlbumArtwork(
-                                            uri = album.albumArtUri,
-                                            contentDescription = album.name,
-                                            modifier = Modifier.fillMaxSize(),
-                                            cornerRadius = 14.dp,
-                                            iconSize = 36.dp,
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(8.dp)
-                                                .size(30.dp)
-                                                .liquidGlass(
-                                                    enabled = liquidGlassEnabled,
-                                                    shape = CircleShape,
-                                                    elevation = 4.dp,
-                                                ),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.PlayArrow,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(18.dp),
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = album.name,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontFamily = FontFamily.Serif,
-                                            fontWeight = FontWeight.Medium,
+                                        .align(Alignment.BottomEnd)
+                                        .padding(10.dp)
+                                        .size(32.dp)
+                                        .liquidGlass(
+                                            enabled = liquidGlassEnabled,
+                                            shape = CircleShape,
+                                            elevation = 4.dp,
                                         ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = album.artist,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.PlayArrow,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp),
                                     )
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }

@@ -1,7 +1,9 @@
 package com.puremusic.player.ui.components
 
 import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,14 +27,12 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlaylistAdd
-import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +42,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
@@ -53,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import com.puremusic.player.data.model.PlayerUiState
 import com.puremusic.player.data.model.Song
+import com.puremusic.player.ui.theme.ForestGreen
 import java.util.Locale
 
 fun formatDuration(durationMs: Long): String {
@@ -63,7 +68,7 @@ fun formatDuration(durationMs: Long): String {
     return if (hours > 0L) {
         String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
     } else {
-        String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
+        String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
     }
 }
 
@@ -140,14 +145,14 @@ fun SongRowItem(
                 uri = song.albumArtUri,
                 contentDescription = song.album,
                 modifier = Modifier.fillMaxSize(),
-                cornerRadius = 6.dp,
+                cornerRadius = 8.dp,
                 iconSize = 20.dp,
             )
             if (isCurrent) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -244,102 +249,137 @@ fun MiniPlayerBar(
     modifier: Modifier = Modifier,
 ) {
     val song = playerState.currentSong ?: return
-    val progress = if (playerState.durationMs > 0L) {
-        (playerState.positionMs.toFloat() / playerState.durationMs.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    val pillShape = RoundedCornerShape(34.dp)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-            .liquidGlass(enabled = liquidGlassEnabled, shape = RoundedCornerShape(24.dp), elevation = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .height(66.dp)
+            .shadow(14.dp, pillShape, ambientColor = Color.Black.copy(alpha = 0.2f))
+            .clip(pillShape)
             .clickable(onClick = onOpenNowPlaying),
     ) {
-        Column {
-            Row(
+        if (liquidGlassEnabled) {
+            // Refracted blurred album-art color layer inside the frosted glass capsule
+            val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Modifier.blur(26.dp)
+            } else {
+                Modifier
+            }
+            AlbumArtwork(
+                uri = song.albumArtUri,
+                contentDescription = null,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF141414))
-                        .padding(5.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AlbumArtwork(
-                        uri = song.albumArtUri,
-                        contentDescription = song.album,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape),
-                        cornerRadius = 22.dp,
-                        iconSize = 16.dp,
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song.title,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Serif,
-                            fontWeight = FontWeight.SemiBold,
+                    .fillMaxSize()
+                    .then(blurModifier)
+                    .alpha(0.45f),
+                cornerRadius = 34.dp,
+                iconSize = 18.dp,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.62f),
+                                Color(0xFFF6F2EB).copy(alpha = 0.44f),
+                                Color.White.copy(alpha = 0.58f),
+                            ),
                         ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        text = song.artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                FilledIconButton(
-                    onClick = onTogglePlayPause,
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White,
+                    .border(
+                        width = 1.4.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.95f),
+                                Color.White.copy(alpha = 0.32f),
+                                Color.White.copy(alpha = 0.85f),
+                            ),
+                        ),
+                        shape = pillShape,
                     ),
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+                        pillShape,
+                    ),
+            )
+        }
 
-                IconButton(
-                    onClick = onSkipNext,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.SkipNext,
-                        contentDescription = "下一首",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Miniature glossy black vinyl disc
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .shadow(6.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(Color(0xFF111111))
+                    .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
+                    .padding(11.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                AlbumArtwork(
+                    uri = song.albumArtUri,
+                    contentDescription = song.album,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                    cornerRadius = 20.dp,
+                    iconSize = 12.dp,
+                )
             }
 
-            LinearProgressIndicator(
-                progress = { progress },
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = Color(0xFF1A1918),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF4F4C47),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            FilledIconButton(
+                onClick = onTogglePlayPause,
+                shape = CircleShape,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = ForestGreen,
+                    contentColor = Color.White,
+                ),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f),
-            )
+                    .size(44.dp)
+                    .shadow(6.dp, CircleShape),
+            ) {
+                Icon(
+                    imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
     }
 }

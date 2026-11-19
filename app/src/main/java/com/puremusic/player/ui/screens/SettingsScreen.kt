@@ -146,26 +146,23 @@ fun SettingsScreen(
             }
 
             Row(modifier = Modifier.fillMaxSize()) {
-                // Left Sidebar
+                // Solid Deep Forest-Green Left Sidebar matching v3.0 mockup
                 Column(
                     modifier = Modifier
-                        .width(122.dp)
+                        .width(126.dp)
                         .fillMaxHeight()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                        .background(Color(0xFF114B34))
+                        .padding(vertical = 14.dp, horizontal = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     SettingsSection.entries.forEach { section ->
                         val selected = section == activeSection
-                        Box(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                    } else {
-                                        Color.Transparent
-                                    },
+                                    if (selected) Color.White.copy(alpha = 0.14f) else Color.Transparent,
                                 )
                                 .clickable {
                                     if (section == SettingsSection.ALL_SONGS) {
@@ -174,17 +171,22 @@ fun SettingsScreen(
                                         activeSection = section
                                     }
                                 }
-                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                                .padding(horizontal = 8.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .height(16.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(if (selected) Color.White else Color.Transparent),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = section.label,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (selected) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
+                                color = if (selected) Color.White else Color.White.copy(alpha = 0.72f),
                             )
                         }
                     }
@@ -378,7 +380,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "版本 3.0.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，支持液态玻璃质感、平板分栏布局与动态海报墙，无广告、无联网追踪。",
+                                text = "版本 3.1.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，支持液态玻璃质感、平板分栏布局与动态海报墙，无广告、无联网追踪。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -748,26 +750,34 @@ private fun SettingsValueRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
+            Spacer(modifier = Modifier.width(4.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(16.dp),
             )
         }
     }
