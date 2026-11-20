@@ -88,7 +88,7 @@ class PlaylistRepository(private val context: Context) {
     val backgroundStyleFlow: Flow<BackgroundStyle> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.BACKGROUND_STYLE]?.let { name ->
             BackgroundStyle.entries.firstOrNull { it.name == name }
-        } ?: BackgroundStyle.WARM_PAPER
+        } ?: BackgroundStyle.PURE_WHITE
     }
 
     val layoutDensityFlow: Flow<LayoutDensity> = context.pureMusicDataStore.data.map { prefs ->
@@ -124,7 +124,7 @@ class PlaylistRepository(private val context: Context) {
     val accentColorFlow: Flow<AppAccentColor> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.ACCENT_COLOR]?.let { name ->
             AppAccentColor.entries.firstOrNull { it.name == name }
-        } ?: AppAccentColor.FOREST_GREEN
+        } ?: AppAccentColor.BERRY_RED
     }
 
     val sortOrderFlow: Flow<SortOrder> = context.pureMusicDataStore.data.map { prefs ->
@@ -241,12 +241,12 @@ class PlaylistRepository(private val context: Context) {
             prefs[Keys.PLAYER_THEME] = PlayerTheme.POSTER_WALL.name
             prefs[Keys.FONT_STYLE] = AppFontStyle.SANS.name
             prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SERIF_ITALIC.name
-            prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
+            prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.PURE_WHITE.name
             prefs[Keys.LAYOUT_MODE] = LayoutMode.AUTO.name
             prefs[Keys.LAYOUT_DENSITY] = LayoutDensity.STANDARD.name
             prefs[Keys.FONT_SCALE] = 1.0f
             prefs[Keys.LIQUID_GLASS_ENABLED] = true
-            prefs[Keys.ACCENT_COLOR] = AppAccentColor.FOREST_GREEN.name
+            prefs[Keys.ACCENT_COLOR] = AppAccentColor.BERRY_RED.name
         }
     }
 

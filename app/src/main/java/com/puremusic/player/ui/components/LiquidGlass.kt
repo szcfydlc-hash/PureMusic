@@ -25,26 +25,21 @@ fun Modifier.liquidGlass(
     if (!enabled) {
         return this
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f),
-                shape = shape,
-            )
+            .background(MaterialTheme.colorScheme.surfaceVariant)
     }
 
     val glassBrush = if (isDark) {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0xFF2B2F36).copy(alpha = 0.88f),
-                Color(0xFF1D2026).copy(alpha = 0.82f),
+                Color(0xFF21252E).copy(alpha = 0.88f),
+                Color(0xFF171A21).copy(alpha = 0.84f),
             ),
         )
     } else {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0xFFFCFBF9).copy(alpha = 0.92f),
-                Color(0xFFF0EAE0).copy(alpha = 0.86f),
+                Color(0xFFF7F8FB).copy(alpha = 0.94f),
+                Color(0xFFEDEFF4).copy(alpha = 0.90f),
             ),
         )
     }
@@ -52,17 +47,17 @@ fun Modifier.liquidGlass(
     val specularRim = if (isDark) {
         Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.28f),
-                Color.White.copy(alpha = 0.08f),
                 Color.White.copy(alpha = 0.18f),
+                Color.White.copy(alpha = 0.05f),
+                Color.White.copy(alpha = 0.12f),
             ),
         )
     } else {
         Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.96f),
-                Color(0xFFD8D0C5).copy(alpha = 0.50f),
-                Color.White.copy(alpha = 0.86f),
+                Color.White.copy(alpha = 0.98f),
+                Color(0xFFE0E4EC).copy(alpha = 0.70f),
+                Color.White.copy(alpha = 0.90f),
             ),
         )
     }
@@ -70,5 +65,5 @@ fun Modifier.liquidGlass(
     return this
         .clip(shape)
         .background(glassBrush)
-        .border(width = 1.dp, brush = specularRim, shape = shape)
+        .border(width = 0.8.dp, brush = specularRim, shape = shape)
 }

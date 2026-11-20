@@ -166,7 +166,7 @@ fun SongRowItem(
                 uri = song.albumArtUri,
                 contentDescription = song.album,
                 modifier = Modifier.fillMaxSize(),
-                cornerRadius = 5.dp,
+                cornerRadius = 10.dp,
                 iconSize = 20.dp,
             )
             if (isCurrent) {
@@ -192,7 +192,7 @@ fun SongRowItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
-                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Serif),
+                style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
                 color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -328,7 +328,7 @@ fun MiniPlayerBar(
                             Brush.horizontalGradient(
                                 colors = listOf(
                                     Color.White.copy(alpha = 0.76f),
-                                    Color(0xFFF6F2EB).copy(alpha = 0.60f),
+                                    Color(0xFFF4F6FA).copy(alpha = 0.60f),
                                     Color.White.copy(alpha = 0.74f),
                                 ),
                             )
@@ -346,7 +346,7 @@ fun MiniPlayerBar(
                             } else {
                                 listOf(
                                     Color.White.copy(alpha = 0.96f),
-                                    Color(0xFFD6CFC4).copy(alpha = 0.45f),
+                                    Color(0xFFDCE0EA).copy(alpha = 0.45f),
                                     Color.White.copy(alpha = 0.88f),
                                 )
                             },
@@ -412,7 +412,6 @@ fun MiniPlayerBar(
                         Text(
                             text = current.title,
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.SemiBold,
                             ),
                             color = MaterialTheme.colorScheme.onSurface,

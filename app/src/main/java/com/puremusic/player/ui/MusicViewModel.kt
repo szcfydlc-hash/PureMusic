@@ -113,7 +113,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val backgroundStyle: StateFlow<BackgroundStyle> = playlistRepository.backgroundStyleFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = BackgroundStyle.WARM_PAPER,
+        initialValue = BackgroundStyle.PURE_WHITE,
     )
 
     val layoutDensity: StateFlow<LayoutDensity> = playlistRepository.layoutDensityFlow.stateIn(
@@ -137,7 +137,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val accentColor: StateFlow<AppAccentColor> = playlistRepository.accentColorFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = AppAccentColor.FOREST_GREEN,
+        initialValue = AppAccentColor.BERRY_RED,
     )
 
     val liquidGlassEnabled: StateFlow<Boolean> = playlistRepository.liquidGlassEnabledFlow.stateIn(

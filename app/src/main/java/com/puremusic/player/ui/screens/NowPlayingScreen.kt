@@ -145,10 +145,11 @@ fun NowPlayingScreen(
     }
 
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val animatedBg by animateColorAsState(
-        targetValue = if (isDarkTheme) extractedPalette.backgroundDark else extractedPalette.backgroundLight,
+    val baseCanvas = MaterialTheme.colorScheme.background
+    val animatedGlow by animateColorAsState(
+        targetValue = extractedPalette.glowColor,
         animationSpec = tween(durationMillis = 550),
-        label = "dynamicBg",
+        label = "ambientGlow",
     )
     val animatedAccent by animateColorAsState(
         targetValue = extractedPalette.accent,
@@ -156,8 +157,8 @@ fun NowPlayingScreen(
         label = "dynamicAccent",
     )
 
-    val primaryTextColor = if (isDarkTheme) Color(0xFFF4F1EC) else Color(0xFF1D1B1A)
-    val secondaryTextColor = if (isDarkTheme) Color(0xFFB5AFA8) else Color(0xFF6B655F)
+    val primaryTextColor = MaterialTheme.colorScheme.onBackground
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     val activeLyric = remember(lyrics, playerState.positionMs) {
         lyrics.lastOrNull { it.timeMs <= playerState.positionMs }
@@ -187,7 +188,16 @@ fun NowPlayingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(animatedBg),
+            .background(baseCanvas)
+            .background(
+                Brush.radialGradient(
+                    0.00f to animatedGlow.copy(alpha = if (isDarkTheme) 0.26f else 0.16f),
+                    0.55f to animatedGlow.copy(alpha = if (isDarkTheme) 0.08f else 0.04f),
+                    1.00f to Color.Transparent,
+                    center = Offset(540f, 520f),
+                    radius = 950f,
+                ),
+            ),
     ) {
         Column(
             modifier = Modifier
@@ -200,7 +210,7 @@ fun NowPlayingScreen(
                 currentSong = song,
                 allSongs = allSongs,
                 vinylRotation = vinylAngle.value,
-                backButtonBg = animatedBg.copy(alpha = 0.92f),
+                backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
                 backIconTint = primaryTextColor,
                 sleepTimerRemainingMs = sleepTimerRemainingMs,
                 accentColor = animatedAccent,
@@ -253,9 +263,8 @@ fun NowPlayingScreen(
                         Text(
                             text = title,
                             style = MaterialTheme.typography.headlineSmall.copy(
-                                fontFamily = FontFamily.Serif,
-                                fontWeight = FontWeight.Medium,
-                                letterSpacing = 0.3.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.3).sp,
                             ),
                             color = primaryTextColor,
                             maxLines = 1,
@@ -265,9 +274,7 @@ fun NowPlayingScreen(
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = artist,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontFamily = FontFamily.Serif,
-                            ),
+                            style = MaterialTheme.typography.bodyLarge,
                             color = secondaryTextColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -518,8 +525,8 @@ private fun InteractivePosterWallHeader(
                     .height(gridHeight)
                     .align(Alignment.TopCenter),
                 contentPadding = PaddingValues(horizontal = 3.dp, vertical = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(3.5.dp),
-                verticalArrangement = Arrangement.spacedBy(3.5.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 items(wallSongs.size) { index ->
                     val tileSong = wallSongs[index]
@@ -615,7 +622,7 @@ private fun PosterWallTile(
         modifier = Modifier
             .fillMaxHeight()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(3.dp))
+            .clip(RoundedCornerShape(6.dp))
             .clickable(onClick = onClick),
     ) {
         SubcomposeAsyncImage(
@@ -630,7 +637,7 @@ private fun PosterWallTile(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(3.dp)),
+                    .border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(6.dp)),
             )
         }
     }

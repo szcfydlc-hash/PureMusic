@@ -405,7 +405,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "版本 5.4.0\n\n专注极致体验的本地离线音乐播放器，围绕「唱片海报墙」与封面动态取色打造，采用 Kotlin + Jetpack Compose + Media3 独立编写，无广告、无联网追踪。",
+                                text = "版本 6.0.0\n\n专注极致体验的本地离线音乐播放器，围绕「唱片海报墙」与封面动态取色打造，采用 Kotlin + Jetpack Compose + Media3 独立编写，无广告、无联网追踪。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -505,7 +505,7 @@ private fun AppearanceSettingsPane(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "春日序曲",
-                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif),
+                style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
             )
@@ -602,13 +602,13 @@ private fun AppearanceSettingsPane(
             .padding(3.dp),
     ) {
         val quickModes = listOf(
-            BackgroundStyle.WARM_PAPER to "浅色",
+            BackgroundStyle.PURE_WHITE to "浅色",
             BackgroundStyle.DEEP_INK to "深色",
             BackgroundStyle.SYSTEM to "跟随系统",
         )
         quickModes.forEach { (style, label) ->
             val selected = backgroundStyle == style ||
-                (style == BackgroundStyle.WARM_PAPER && backgroundStyle == BackgroundStyle.PURE_WHITE)
+                (style == BackgroundStyle.PURE_WHITE && backgroundStyle == BackgroundStyle.WARM_PAPER)
             Box(
                 modifier = Modifier
                     .weight(1f)

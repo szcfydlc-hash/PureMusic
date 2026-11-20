@@ -6,14 +6,12 @@ import android.graphics.BitmapFactory
 import android.graphics.Color as AndroidColor
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 data class DynamicSongPalette(
-    val backgroundLight: Color = WarmPaperBg,
-    val backgroundDark: Color = Color(0xFF16181A),
-    val accent: Color = ForestGreen,
+    val glowColor: Color = BerryRed,
+    val accent: Color = BerryRed,
 )
 
 object DynamicColorExtractor {
@@ -44,13 +42,8 @@ object DynamicColorExtractor {
     }.getOrNull()
 
     private fun analyzeBitmap(bitmap: Bitmap): DynamicSongPalette {
-        var rSum = 0L
-        var gSum = 0L
-        var bSum = 0L
-        var count = 0L
-
-        var bestSatScore = -1f
-        var bestAccentPixel = AndroidColor.rgb(17, 85, 59)
+        var bestScore = -1f
+        var bestPixel = AndroidColor.rgb(250, 45, 72)
 
         val hsv = FloatArray(3)
         for (y in 0 until bitmap.height) {
@@ -59,51 +52,30 @@ object DynamicColorExtractor {
                 val r = AndroidColor.red(pixel)
                 val g = AndroidColor.green(pixel)
                 val b = AndroidColor.blue(pixel)
-                rSum += r
-                gSum += g
-                bSum += b
-                count++
-
                 AndroidColor.RGBToHSV(r, g, b, hsv)
                 val sat = hsv[1]
                 val value = hsv[2]
-                // Prefer rich, non-muddy colors for the Play button & seek dot
-                if (value in 0.22f..0.88f && sat > 0.22f) {
-                    val score = sat * 1.4f + (1f - kotlin.math.abs(value - 0.50f))
-                    if (score > bestSatScore) {
-                        bestSatScore = score
-                        bestAccentPixel = pixel
+                if (value in 0.25f..0.95f && sat > 0.25f) {
+                    val score = sat * 1.6f + (1f - kotlin.math.abs(value - 0.62f))
+                    if (score > bestScore) {
+                        bestScore = score
+                        bestPixel = pixel
                     }
                 }
             }
         }
 
-        if (count == 0L) return DynamicSongPalette()
+        if (bestScore <= 0f) return DynamicSongPalette()
 
-        val avgColor = Color(
-            red = (rSum / count).toInt() / 255f,
-            green = (gSum / count).toInt() / 255f,
-            blue = (bSum / count).toInt() / 255f,
-        )
+        // Vibrant contemporary accent (fresh, jewel-like, never muddy)
+        AndroidColor.colorToHSV(bestPixel, hsv)
+        hsv[1] = hsv[1].coerceIn(0.55f, 0.88f)
+        hsv[2] = hsv[2].coerceIn(0.55f, 0.88f)
+        val glow = Color(AndroidColor.HSVToColor(hsv))
 
-        // Ensure accent has rich, legible contrast with white play/pause icon
-        AndroidColor.colorToHSV(bestAccentPixel, hsv)
-        hsv[1] = hsv[1].coerceIn(0.38f, 0.78f)
-        hsv[2] = hsv[2].coerceIn(0.26f, 0.46f)
-        val refinedAccent = if (bestSatScore > 0f) {
-            Color(AndroidColor.HSVToColor(hsv))
-        } else {
-            ForestGreen
-        }
+        hsv[2] = hsv[2].coerceIn(0.45f, 0.72f)
+        val accent = Color(AndroidColor.HSVToColor(hsv))
 
-        // Gentle warm-paper wash tinted by album art dominant color
-        val bgLight = lerp(WarmPaperBg, avgColor, 0.14f)
-        val bgDark = lerp(Color(0xFF141517), avgColor, 0.22f)
-
-        return DynamicSongPalette(
-            backgroundLight = bgLight,
-            backgroundDark = bgDark,
-            accent = refinedAccent,
-        )
+        return DynamicSongPalette(glowColor = glow, accent = accent)
     }
 }

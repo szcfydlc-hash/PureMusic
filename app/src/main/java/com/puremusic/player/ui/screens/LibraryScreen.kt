@@ -286,8 +286,7 @@ fun LibraryScreen(
                     Column {
                         Text(
                             text = "简约音乐",
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontFamily = FontFamily.Serif,
+                            style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold,
                             ),
                             color = MaterialTheme.colorScheme.onBackground,
@@ -471,26 +470,21 @@ fun LibraryScreen(
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(18.dp))
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .border(
-                                        0.8.dp,
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
-                                        RoundedCornerShape(18.dp),
-                                    )
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .clickable { onPlaySongs(songs, 0, false) }
-                                    .padding(horizontal = 13.dp, vertical = 6.dp),
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.PlayArrow,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(16.dp),
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "播放全部 (${songs.size})",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Serif),
+                                    text = "播放全部",
+                                    style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Medium,
                                 )
@@ -499,21 +493,23 @@ fun LibraryScreen(
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(18.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .clickable { onPlaySongs(songs, 0, true) }
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Shuffle,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(15.dp),
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
                                     text = "随机",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Medium,
                                 )
                             }
                         }
@@ -827,7 +823,7 @@ private fun SongsTabContent(
                             uri = song.albumArtUri,
                             contentDescription = song.album,
                             modifier = Modifier.fillMaxSize(),
-                            cornerRadius = 5.dp,
+                            cornerRadius = 10.dp,
                             iconSize = 28.dp,
                         )
                         if (isCurrent) {
@@ -953,7 +949,7 @@ private fun AlbumsTabContent(
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .shadow(3.dp, RoundedCornerShape(8.dp)),
-                    cornerRadius = 5.dp,
+                    cornerRadius = 10.dp,
                     iconSize = 30.dp,
                 )
                 Spacer(modifier = Modifier.height(6.dp))

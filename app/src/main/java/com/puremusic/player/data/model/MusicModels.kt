@@ -85,10 +85,10 @@ enum class LyricFontStyle(val label: String) {
 }
 
 enum class BackgroundStyle(val label: String) {
-    WARM_PAPER("暖纸"),
-    PURE_WHITE("纯白"),
-    DEEP_INK("深墨"),
+    PURE_WHITE("极光白"),
+    DEEP_INK("曜石黑"),
     SYSTEM("跟随系统"),
+    WARM_PAPER("柔和暖纸"),
 }
 
 enum class LayoutMode(val label: String) {
@@ -139,12 +139,12 @@ data class PlayerUiState(
 )
 
 enum class AppAccentColor(val label: String, val colorHex: Long) {
-    FOREST_GREEN("森林绿", 0xFF11553B),
-    VERMILION("活力橙", 0xFFD84315),
-    OCEAN_BLUE("深海蓝", 0xFF0277BD),
-    AMBER_GOLD("琥珀金", 0xFFD9820B),
-    ROSE_RED("绯红", 0xFFC2185B),
-    VIOLET("星河紫", 0xFF6A1B9A),
+    BERRY_RED("极光莓红", 0xFFFA2D48),
+    COBALT_BLUE("电光钴蓝", 0xFF2563EB),
+    MINT_TEAL("薄荷青", 0xFF0D9488),
+    ELECTRIC_VIOLET("霓虹紫", 0xFF7C3AED),
+    VIBRANT_ORANGE("流光橘", 0xFFF97316),
+    MONOCHROME("极简曜石", 0xFF18181B),
 }
 
 enum class LayoutDensity(
