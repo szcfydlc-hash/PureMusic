@@ -109,7 +109,7 @@ fun AlbumArtwork(
         model = request,
         contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
-        modifier = modifier.clip(shape),
+        modifier = modifier.clip(shape).border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), shape),
         loading = { ArtworkPlaceholder(shape = shape, iconSize = iconSize) },
         error = { ArtworkPlaceholder(shape = shape, iconSize = iconSize) },
     )

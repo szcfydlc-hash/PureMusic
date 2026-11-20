@@ -1,51 +1,38 @@
 package com.puremusic.player.ui.theme
 
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
-import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
+import androidx.core.view.WindowCompat
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
-import com.puremusic.player.data.model.PlayerTheme
 
 val ForestGreen = Color(0xFF11553B)
-val VermilionAccent = Color(0xFFD9441E)
-val WarmWoodAccent = Color(0xFF2E5C45)
-val RetroRedAccent = Color(0xFFC93B2B)
 
-val WarmPaperBg = Color(0xFFF5F1EB)
-val WarmPaperSidebar = Color(0xFFEFEAE1)
-val WarmPaperSurface = Color(0xFFFBF8F3)
-val WarmPaperSurfaceVariant = Color(0xFFEAE4DA)
-val InkCharcoal = Color(0xFF1C1B1A)
-val InkMuted = Color(0xFF6B665F)
+val WarmPaperBg = Color(0xFFF6F2EC)
+val WarmPaperSidebar = Color(0xFFEEE8DF)
+val WarmPaperSurface = Color(0xFFFCF9F5)
+val WarmPaperSurfaceVariant = Color(0xFFEBE5DB)
+val InkCharcoal = Color(0xFF1B1A18)
+val InkMuted = Color(0xFF6E6860)
 
-val DeepInkBg = Color(0xFF121417)
-val DeepInkSidebar = Color(0xFF1C1E22)
+val DeepInkBg = Color(0xFF111316)
+val DeepInkSidebar = Color(0xFF1A1C20)
 
-fun sidebarColorFor(playerTheme: PlayerTheme, isDark: Boolean): Color {
-    if (isDark) return DeepInkSidebar
-    return when (playerTheme) {
-        PlayerTheme.VERMILION_CREAM -> Color(0xFFF6DEC9)
-        PlayerTheme.WARM_WOOD -> Color(0xFFEAE3D7)
-        PlayerTheme.RETRO_DECK -> Color(0xFFC9C5BD)
-        PlayerTheme.POSTER_WALL -> WarmPaperSidebar
-    }
-}
+fun sidebarColorFor(isDark: Boolean): Color = if (isDark) DeepInkSidebar else WarmPaperSidebar
 
 @Composable
 fun PureMusicTheme(
     backgroundStyle: BackgroundStyle,
-    playerTheme: PlayerTheme,
     accentColor: AppAccentColor,
     fontStyle: AppFontStyle,
     content: @Composable () -> Unit,
@@ -67,10 +54,10 @@ fun PureMusicTheme(
             secondary = primaryAccent.copy(alpha = 0.8f),
             onSecondary = Color.White,
             background = DeepInkBg,
-            onBackground = Color(0xFFEDEAE4),
-            surface = Color(0xFF1A1C20),
-            onSurface = Color(0xFFEDEAE4),
-            surfaceVariant = Color(0xFF272A30),
+            onBackground = Color(0xFFF0EDE8),
+            surface = Color(0xFF1A1C21),
+            onSurface = Color(0xFFF0EDE8),
+            surfaceVariant = Color(0xFF262930),
             onSurfaceVariant = Color(0xFFA6A198),
         )
     } else if (backgroundStyle == BackgroundStyle.PURE_WHITE) {
@@ -85,16 +72,10 @@ fun PureMusicTheme(
             onBackground = InkCharcoal,
             surface = Color(0xFFFAFAFA),
             onSurface = InkCharcoal,
-            surfaceVariant = Color(0xFFF0F0EE),
+            surfaceVariant = Color(0xFFF1F0EE),
             onSurfaceVariant = InkMuted,
         )
     } else {
-        val (bg, surface, variant) = when (playerTheme) {
-            PlayerTheme.VERMILION_CREAM -> Triple(Color(0xFFFAF3E8), Color(0xFFFFFAF2), Color(0xFFF1E5D6))
-            PlayerTheme.WARM_WOOD -> Triple(Color(0xFFF4EFE6), Color(0xFFFBF8F2), Color(0xFFE9E2D5))
-            PlayerTheme.RETRO_DECK -> Triple(Color(0xFFE6E2DA), Color(0xFFF0EDE6), Color(0xFFD6D1C7))
-            PlayerTheme.POSTER_WALL -> Triple(WarmPaperBg, WarmPaperSurface, WarmPaperSurfaceVariant)
-        }
         lightColorScheme(
             primary = primaryAccent,
             onPrimary = Color.White,
@@ -102,11 +83,11 @@ fun PureMusicTheme(
             onPrimaryContainer = primaryAccent,
             secondary = primaryAccent.copy(alpha = 0.8f),
             onSecondary = Color.White,
-            background = bg,
+            background = WarmPaperBg,
             onBackground = InkCharcoal,
-            surface = surface,
+            surface = WarmPaperSurface,
             onSurface = InkCharcoal,
-            surfaceVariant = variant,
+            surfaceVariant = WarmPaperSurfaceVariant,
             onSurfaceVariant = InkMuted,
         )
     }

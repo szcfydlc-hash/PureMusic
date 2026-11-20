@@ -68,10 +68,7 @@ enum class SortOrder(val label: String) {
 }
 
 enum class PlayerTheme(val label: String) {
-    VERMILION_CREAM("朱橘奶油"),
-    WARM_WOOD("黑胶唱片馆"),
     POSTER_WALL("唱片海报墙"),
-    RETRO_DECK("复古音响"),
 }
 
 enum class AppFontStyle(val label: String) {

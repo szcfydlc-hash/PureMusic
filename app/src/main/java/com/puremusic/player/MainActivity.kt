@@ -122,7 +122,6 @@ private fun PureMusicApp(
 
     PureMusicTheme(
         backgroundStyle = backgroundStyle,
-        playerTheme = playerTheme,
         accentColor = accentColor,
         fontStyle = fontStyle,
     ) {
@@ -228,7 +227,6 @@ private fun PureMusicApp(
                     playerState = playerState,
                     allSongs = allSongs,
                     lyrics = currentLyrics,
-                    playerTheme = playerTheme,
                     lyricFontStyle = lyricFontStyle,
                     liquidGlassEnabled = liquidGlassEnabled,
                     isTabletLayout = isTabletLayout,
@@ -269,7 +267,6 @@ private fun PureMusicApp(
                     scanStatus = scanStatus,
                     layoutMode = layoutMode,
                     liquidGlassEnabled = liquidGlassEnabled,
-                    playerTheme = playerTheme,
                     accentColor = accentColor,
                     fontStyle = fontStyle,
                     lyricFontStyle = lyricFontStyle,
@@ -277,7 +274,6 @@ private fun PureMusicApp(
                     onClose = { showSettings = false },
                     onSelectLayoutMode = viewModel::setLayoutMode,
                     onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
-                    onSelectPlayerTheme = viewModel::setPlayerTheme,
                     onSelectAccentColor = viewModel::setAccentColor,
                     onSelectFontStyle = viewModel::setFontStyle,
                     onSelectLyricFontStyle = viewModel::setLyricFontStyle,
