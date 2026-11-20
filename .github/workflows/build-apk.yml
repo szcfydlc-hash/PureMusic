@@ -24,12 +24,26 @@ jobs:
         with:
           gradle-version: 8.10.2
 
-      - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace
+      - name: Generate Release Signing Keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore /tmp/puremusic-release.jks \
+            -alias puremusic \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass puremusic123 -keypass puremusic123 \
+            -dname "CN=PureMusic, OU=Mobile, O=PureMusic, L=Local, S=Local, C=CN"
 
-      - name: Upload Debug APK
+      - name: Build Signed Release APK (R8 Optimized)
+        env:
+          KEYSTORE_PATH: /tmp/puremusic-release.jks
+          KEYSTORE_PASSWORD: puremusic123
+          KEY_ALIAS: puremusic
+          KEY_PASSWORD: puremusic123
+        run: gradle assembleRelease --stacktrace
+
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: PureMusic-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: PureMusic-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
