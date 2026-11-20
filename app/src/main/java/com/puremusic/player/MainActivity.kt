@@ -516,17 +516,19 @@ private fun PureMusicBottomNavBar(
         MainTab.PLAYLISTS to Icons.Rounded.QueueMusic,
         MainTab.SETTINGS to Icons.Rounded.Settings,
     )
-    val isFloatingCapsule = floating || liquidGlassEnabled
-    val barInteraction = remember { MutableInteractionSource() }
-    val barPressed by barInteraction.collectIsPressedAsState()
+    // Track press state across all 4 tabs so pressing any tab illuminates the capsule edge in FULL tier!
+    val tabInteractions = remember { List(4) { MutableInteractionSource() } }
+    val pressedStates = tabInteractions.map { it.collectIsPressedAsState().value }
+    val anyTabPressed = pressedStates.any { it }
 
-    if (isFloatingCapsule) {
-        val capsuleShape = RoundedCornerShape(28.dp)
+    if (floating) {
+        // Detached Centered Floating Pill Dock (strictly controlled by floatingControlsEnabled!)
+        val capsuleShape = RoundedCornerShape(32.dp)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 22.dp, vertical = 10.dp),
         ) {
             Row(
                 modifier = Modifier
@@ -535,31 +537,30 @@ private fun PureMusicBottomNavBar(
                     .liquidGlass(
                         enabled = liquidGlassEnabled,
                         shape = capsuleShape,
-                        isPressed = barPressed,
+                        isPressed = anyTabPressed,
                     )
                     .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceAround,
             ) {
-                items.forEach { (tab, icon) ->
+                items.forEachIndexed { idx, (tab, icon) ->
                     val selected = tab == activeTab
+                    val pressed = pressedStates[idx]
                     val tint = if (selected) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
                     }
-                    val tabInteraction = remember { MutableInteractionSource() }
-                    val tabPressed by tabInteraction.collectIsPressedAsState()
-                    val pillShape = RoundedCornerShape(20.dp)
+                    val pillShape = RoundedCornerShape(22.dp)
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .clip(pillShape)
                             .then(
-                                if (selected || tabPressed) {
+                                if (selected || pressed) {
                                     Modifier.background(
                                         MaterialTheme.colorScheme.primary.copy(
-                                            alpha = if (tabPressed) 0.16f else 0.10f,
+                                            alpha = if (pressed) 0.16f else 0.10f,
                                         ),
                                     )
                                 } else {
@@ -567,7 +568,7 @@ private fun PureMusicBottomNavBar(
                                 },
                             )
                             .clickable(
-                                interactionSource = tabInteraction,
+                                interactionSource = tabInteractions[idx],
                                 indication = null,
                                 onClick = { onSelectTab(tab) },
                             )
@@ -593,17 +594,30 @@ private fun PureMusicBottomNavBar(
             }
         }
     } else {
-        // Pure Flat Archival Book Footer with crisp hairline top rule
+        // Docked Edge-to-Edge Footer (supports both flat archival paper & docked translucent glass!)
+        val dockedShape = RoundedCornerShape(0.dp)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
+                .then(
+                    if (liquidGlassEnabled) {
+                        Modifier.liquidGlass(
+                            enabled = true,
+                            shape = dockedShape,
+                            isPressed = anyTabPressed,
+                        )
+                    } else {
+                        Modifier.background(MaterialTheme.colorScheme.surface)
+                    },
+                )
                 .navigationBarsPadding(),
         ) {
-            HorizontalDivider(
-                thickness = 0.75.dp,
-                color = MaterialTheme.colorScheme.outline,
-            )
+            if (!liquidGlassEnabled) {
+                HorizontalDivider(
+                    thickness = 0.75.dp,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -612,20 +626,19 @@ private fun PureMusicBottomNavBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceAround,
             ) {
-                items.forEach { (tab, icon) ->
+                items.forEachIndexed { idx, (tab, icon) ->
                     val selected = tab == activeTab
                     val tint = if (selected) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
                     }
-                    val interactionSource = remember { MutableInteractionSource() }
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
                             .clickable(
-                                interactionSource = interactionSource,
+                                interactionSource = tabInteractions[idx],
                                 indication = null,
                                 onClick = { onSelectTab(tab) },
                             )

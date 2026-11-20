@@ -6,6 +6,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -246,14 +248,94 @@ fun SettingsScreen(
                 }
             }
 
-            // Card 2: 悬浮与液态玻璃 (CoolApk-inspired 3-row precision control)
+            // Card 2: 悬浮与液态玻璃 (with live press-testable crystal glass preview!)
             SettingsSectionHeader("悬浮与液态玻璃")
             BookSettingsCard(
                 cardBg = cardBg,
                 outlineColor = outlineColor,
                 radius = cardRadius,
-                liquidGlassEnabled = liquidGlassEnabled,
+                liquidGlassEnabled = false,
             ) {
+                // Interactive Live Preview Stage showing exact translucency, floating shape & FULL press-glow
+                val previewInteraction = remember { MutableInteractionSource() }
+                val previewPressed by previewInteraction.collectIsPressedAsState()
+                val previewShape = RoundedCornerShape(if (floatingControlsEnabled) 26.dp else 8.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(74.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Subtle archival text stripes behind the preview capsule so translucency is unmistakably visible!
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = "曲库 · 宣纸排印底层透出预览 · 515 首音乐",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = "夜航星 · 光影之间 · 爱在深秋 · 180g 黑胶",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                            maxLines = 1,
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = if (floatingControlsEnabled) 18.dp else 6.dp)
+                            .height(46.dp)
+                            .liquidGlass(
+                                enabled = liquidGlassEnabled,
+                                shape = previewShape,
+                                isPressed = previewPressed,
+                                levelOverride = liquidGlassLevel,
+                            )
+                            .clickable(
+                                interactionSource = previewInteraction,
+                                indication = null,
+                                onClick = {},
+                            )
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = if (liquidGlassEnabled) {
+                                "液态玻璃 · ${liquidGlassLevel.label}"
+                            } else {
+                                "古典书页实底模式"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = if (liquidGlassEnabled && liquidGlassLevel == LiquidGlassLevel.FULL) {
+                                "按住测试微光"
+                            } else if (floatingControlsEnabled) {
+                                "悬浮胶囊"
+                            } else {
+                                "贴边排印"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -808,7 +890,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v8.2.0",
+                            text = "v8.3.1",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -1003,16 +1085,9 @@ private fun BookSettingsCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (liquidGlassEnabled) {
-                    Modifier.liquidGlass(enabled = true, shape = shape)
-                } else {
-                    Modifier
-                        .clip(shape)
-                        .background(cardBg)
-                        .border(0.75.dp, outlineColor, shape)
-                },
-            )
+            .clip(shape)
+            .background(cardBg)
+            .border(0.75.dp, outlineColor, shape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         content = content,
     )

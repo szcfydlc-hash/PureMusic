@@ -337,10 +337,8 @@ fun MiniPlayerBar(
     modifier: Modifier = Modifier,
 ) {
     val song = playerState.currentSong ?: return
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val glassLevel = LocalLiquidGlassLevel.current
-    val floating = LocalFloatingControls.current || liquidGlassEnabled
-    val barShape = RoundedCornerShape(if (floating) 24.dp else 8.dp)
+    val isFloating = LocalFloatingControls.current
+    val barShape = RoundedCornerShape(if (isFloating) 30.dp else 8.dp)
     val bookmarkColor = MaterialTheme.colorScheme.primary
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -348,17 +346,15 @@ fun MiniPlayerBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = if (floating) 16.dp else 14.dp, vertical = 6.dp)
-            .height(60.dp)
-            .then(
-                if (liquidGlassEnabled) {
-                    Modifier.clip(barShape)
-                } else {
-                    Modifier
-                        .clip(barShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(0.8.dp, MaterialTheme.colorScheme.outline, barShape)
-                },
+            .padding(
+                horizontal = if (isFloating) 20.dp else 12.dp,
+                vertical = if (isFloating) 6.dp else 5.dp,
+            )
+            .height(58.dp)
+            .liquidGlass(
+                enabled = liquidGlassEnabled,
+                shape = barShape,
+                isPressed = isPressed,
             )
             .clickable(
                 interactionSource = interactionSource,
@@ -366,33 +362,8 @@ fun MiniPlayerBar(
                 onClick = onOpenNowPlaying,
             ),
     ) {
-        if (liquidGlassEnabled) {
-            val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Modifier.blur(glassLevel.blurDp.dp)
-            } else {
-                Modifier
-            }
-            AlbumArtwork(
-                uri = song.albumArtUri,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(blurModifier)
-                    .alpha(if (isDark) 0.42f else 0.46f),
-                cornerRadius = 24.dp,
-                iconSize = 18.dp,
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .liquidGlass(
-                        enabled = true,
-                        shape = barShape,
-                        isPressed = isPressed,
-                    ),
-            )
-        } else {
-            // Classic Vintage Book Silk Ribbon Bookmark at top-left edge
+        if (!liquidGlassEnabled && !isFloating) {
+            // Classic Vintage Book Silk Ribbon Bookmark tucked at top-left edge
             Canvas(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -415,7 +386,7 @@ fun MiniPlayerBar(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    start = if (liquidGlassEnabled) 12.dp else 28.dp,
+                    start = if (!liquidGlassEnabled && !isFloating) 28.dp else 12.dp,
                     end = 10.dp,
                 ),
             verticalAlignment = Alignment.CenterVertically,
@@ -436,7 +407,7 @@ fun MiniPlayerBar(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(38.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF141312))
                             .border(0.8.dp, MaterialTheme.colorScheme.outline, CircleShape)
@@ -475,34 +446,16 @@ fun MiniPlayerBar(
                 }
             }
 
-            if (liquidGlassEnabled) {
-                FilledIconButton(
-                    onClick = onTogglePlayPause,
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            } else {
-                IconButton(
-                    onClick = onTogglePlayPause,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(23.dp),
-                    )
-                }
+            IconButton(
+                onClick = onTogglePlayPause,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                    tint = if (liquidGlassEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(23.dp),
+                )
             }
 
             IconButton(
