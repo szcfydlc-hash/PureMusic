@@ -29,7 +29,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Image
@@ -174,6 +176,7 @@ fun SongRowItem(
     onShowSongInfo: (() -> Unit)? = null,
     onReplaceCover: (() -> Unit)? = null,
     onMatchLyrics: (() -> Unit)? = null,
+    onDeleteSong: (() -> Unit)? = null,
     extraMenuActionLabel: String? = null,
     onExtraMenuAction: (() -> Unit)? = null,
 ) {
@@ -327,6 +330,22 @@ fun SongRowItem(
                             onClick = {
                                 menuExpanded = false
                                 onExtraMenuAction()
+                            },
+                        )
+                    }
+                    if (onDeleteSong != null) {
+                        DropdownMenuItem(
+                            text = { Text("删除本地文件", color = MaterialTheme.colorScheme.primary) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.DeleteOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDeleteSong()
                             },
                         )
                     }

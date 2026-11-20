@@ -8,6 +8,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import android.app.Activity
+import android.provider.MediaStore
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -75,6 +78,7 @@ import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.ui.components.AddToPlaylistDialog
 import com.puremusic.player.ui.components.BatchSongPickerSheet
 import com.puremusic.player.ui.components.ConfirmDeletePlaylistDialog
+import com.puremusic.player.ui.components.ConfirmDeleteSongDialog
 import com.puremusic.player.ui.components.RenamePlaylistDialog
 import com.puremusic.player.ui.components.CreatePlaylistDialog
 import com.puremusic.player.ui.components.EqualizerBottomSheet
@@ -194,6 +198,7 @@ private fun PureMusicApp(
         val isSearchingLyrics by viewModel.isSearchingLyrics.collectAsStateWithLifecycle()
         val lyricSearchError by viewModel.lyricSearchError.collectAsStateWithLifecycle()
         val isTranslatingLyrics by viewModel.isTranslatingLyrics.collectAsStateWithLifecycle()
+        val metaOverrides by viewModel.metaOverrides.collectAsStateWithLifecycle()
         val coverSearchResults by viewModel.coverSearchResults.collectAsStateWithLifecycle()
         val isSearchingCovers by viewModel.isSearchingCovers.collectAsStateWithLifecycle()
         val coverSearchError by viewModel.coverSearchError.collectAsStateWithLifecycle()
@@ -215,6 +220,32 @@ private fun PureMusicApp(
         var managingFavorites by remember { mutableStateOf(false) }
         var renamingPlaylist by remember { mutableStateOf<Playlist?>(null) }
         var deletingPlaylist by remember { mutableStateOf<Playlist?>(null) }
+        var pendingSystemDeleteSong by remember { mutableStateOf<Song?>(null) }
+        var legacyDeleteSong by remember { mutableStateOf<Song?>(null) }
+
+        val systemDeleteLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartIntentSenderForResult(),
+        ) { result ->
+            val target = pendingSystemDeleteSong
+            pendingSystemDeleteSong = null
+            if (result.resultCode == Activity.RESULT_OK && target != null) {
+                viewModel.onSongDeletedFromDevice(target)
+            }
+        }
+
+        val requestDeleteLocalSong: (Song) -> Unit = { song ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                runCatching {
+                    val pi = MediaStore.createDeleteRequest(context.contentResolver, listOf(song.contentUri))
+                    pendingSystemDeleteSong = song
+                    systemDeleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+                }.onFailure {
+                    legacyDeleteSong = song
+                }
+            } else {
+                legacyDeleteSong = song
+            }
+        }
 
         val galleryCoverLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetContent(),
@@ -331,6 +362,7 @@ private fun PureMusicApp(
                         onShowSongInfo = { infoDialogSong = it },
                         onReplaceCover = { coverSearchSong = it },
                         onMatchLyrics = { lyricsSearchSong = it },
+                        onDeleteSong = requestDeleteLocalSong,
                         onRequestCreatePlaylist = { showCreatePlaylist = true },
                         onRequestDeletePlaylist = { deletingPlaylist = it },
                         onRequestRenamePlaylist = { renamingPlaylist = it },
@@ -502,7 +534,19 @@ private fun PureMusicApp(
         infoDialogSong?.let { song ->
             SongInfoDialog(
                 song = song,
+                hasCustomMetadata = song.id in metaOverrides,
+                onSaveMetadata = { t, ar, al -> viewModel.saveSongMetadata(song.id, t, ar, al) },
+                onRestoreMetadata = { viewModel.clearSongMetadata(song.id) },
+                onReplaceCover = { coverSearchSong = song },
                 onDismiss = { infoDialogSong = null },
+            )
+        }
+
+        legacyDeleteSong?.let { song ->
+            ConfirmDeleteSongDialog(
+                song = song,
+                onDismiss = { legacyDeleteSong = null },
+                onConfirmDelete = { viewModel.deleteSongLegacy(song) },
             )
         }
 

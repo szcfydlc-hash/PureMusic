@@ -38,6 +38,7 @@ import android.net.Uri
 import com.puremusic.player.data.repository.OnlineCoverCandidate
 import com.puremusic.player.data.repository.OnlineLyricCandidate
 import com.puremusic.player.data.repository.OnlineMetadataRepository
+import com.puremusic.player.data.repository.SongMetaOverride
 import com.puremusic.player.data.repository.PlaylistRepository
 import com.puremusic.player.service.AudioEqualizerManager
 import com.puremusic.player.service.PlaybackService
@@ -82,6 +83,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val currentLyrics: StateFlow<List<LyricLine>> = _currentLyrics.asStateFlow()
 
     private val _customCovers = MutableStateFlow<Map<Long, Uri>>(emptyMap())
+    private val _metaOverrides = MutableStateFlow<Map<Long, SongMetaOverride>>(emptyMap())
+    val metaOverrides: StateFlow<Map<Long, SongMetaOverride>> = _metaOverrides.asStateFlow()
 
     private val _lyricSearchResults = MutableStateFlow<List<OnlineLyricCandidate>>(emptyList())
     val lyricSearchResults: StateFlow<List<OnlineLyricCandidate>> = _lyricSearchResults.asStateFlow()
@@ -217,19 +220,31 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList(),
     )
 
-    // Active songs after applying custom covers + folder exclusions + short-audio duration filter + sort
+    private fun applyOverrides(song: Song, coverMap: Map<Long, Uri>, metaMap: Map<Long, SongMetaOverride>): Song {
+        val customUri = coverMap[song.id]
+        val meta = metaMap[song.id]
+        var s = if (customUri != null) song.copy(albumArtUri = customUri) else song
+        if (meta != null) {
+            s = s.copy(
+                title = meta.title.ifBlank { s.title },
+                artist = meta.artist.ifBlank { s.artist },
+                album = meta.album.ifBlank { s.album },
+            )
+        }
+        return s
+    }
+
+    // Active songs after applying custom covers + metadata overrides + folder exclusions + short-audio filter + sort
     val allSongs: StateFlow<List<Song>> = combine(
-        _rawSongs,
-        _customCovers,
+        combine(_rawSongs, _customCovers, _metaOverrides) { songs, covers, metas ->
+            songs.map { applyOverrides(it, covers, metas) }
+        },
         excludedFolders,
         minDurationFilter,
         sortOrder,
-    ) { songs, coverMap, excluded, minDur, order ->
+    ) { songs, excluded, minDur, order ->
         val filtered = songs.filter { song ->
             song.folderPath !in excluded && song.durationMs >= minDur.minMs
-        }.map { song ->
-            val customUri = coverMap[song.id]
-            if (customUri != null) song.copy(albumArtUri = customUri) else song
         }
         musicRepository.sortSongs(filtered, order)
     }.stateIn(
@@ -331,6 +346,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             playlistRepository.ensureV8BookStyleEpoch()
             _customCovers.value = onlineMetadataRepository.loadAllCustomCovers()
+            _metaOverrides.value = onlineMetadataRepository.loadAllMetaOverrides()
             syncPlayerSnapshot()
         }
         connectMediaController()
@@ -646,7 +662,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resolveSongsByIds(ids: List<Long>): List<Song> {
         val coverMap = _customCovers.value
-        val lookup = _rawSongs.value.associate { s -> s.id to (coverMap[s.id]?.let { s.copy(albumArtUri = it) } ?: s) }
+        val metaMap = _metaOverrides.value
+        val lookup = _rawSongs.value.associate { s -> s.id to applyOverrides(s, coverMap, metaMap) }
         return ids.mapNotNull { lookup[it] }
     }
 
@@ -752,6 +769,65 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun saveSongMetadata(songId: Long, title: String, artist: String, album: String) {
+        val cleanTitle = title.trim()
+        val cleanArtist = artist.trim()
+        val cleanAlbum = album.trim()
+        if (cleanTitle.isEmpty()) return
+        val override = SongMetaOverride(
+            title = cleanTitle,
+            artist = cleanArtist.ifBlank { "未知歌手" },
+            album = cleanAlbum.ifBlank { cleanTitle },
+        )
+        viewModelScope.launch {
+            onlineMetadataRepository.saveMetaOverride(songId, override)
+            _metaOverrides.update { it + (songId to override) }
+            syncPlayerSnapshot()
+        }
+    }
+
+    fun clearSongMetadata(songId: Long) {
+        viewModelScope.launch {
+            onlineMetadataRepository.clearMetaOverride(songId)
+            _metaOverrides.update { it - songId }
+            syncPlayerSnapshot()
+        }
+    }
+
+    fun onSongDeletedFromDevice(song: Song) {
+        viewModelScope.launch {
+            onlineMetadataRepository.clearCustomCover(song.id)
+            onlineMetadataRepository.clearCustomLyrics(song.id)
+            onlineMetadataRepository.clearMetaOverride(song.id)
+            _customCovers.update { it - song.id }
+            _metaOverrides.update { it - song.id }
+            _rawSongs.update { list -> list.filterNot { it.id == song.id } }
+
+            // Remove from active MediaController queue safely
+            val controller = mediaController
+            if (controller != null) {
+                for (i in controller.mediaItemCount - 1 downTo 0) {
+                    if (controller.getMediaItemAt(i).mediaId.toLongOrNull() == song.id) {
+                        controller.removeMediaItem(i)
+                    }
+                }
+            }
+            activeQueueSongs = activeQueueSongs.filterNot { it.id == song.id }
+            syncPlayerSnapshot()
+        }
+    }
+
+    fun deleteSongLegacy(song: Song) {
+        viewModelScope.launch {
+            val deleted = runCatching {
+                getApplication<Application>().contentResolver.delete(song.contentUri, null, null) > 0
+            }.getOrDefault(false)
+            if (deleted) {
+                onSongDeletedFromDevice(song)
+            }
+        }
+    }
+
     fun clearCustomCover(song: Song) {
         viewModelScope.launch {
             onlineMetadataRepository.clearCustomCover(song.id)
@@ -777,7 +853,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun syncPlayerSnapshot() {
         val controller = mediaController ?: return
         val coverMap = _customCovers.value
-        val songLookup = _rawSongs.value.associate { s -> s.id to (coverMap[s.id]?.let { s.copy(albumArtUri = it) } ?: s) }
+        val metaMap = _metaOverrides.value
+        val songLookup = _rawSongs.value.associate { s -> s.id to applyOverrides(s, coverMap, metaMap) }
 
         val queue = buildList {
             for (i in 0 until controller.mediaItemCount) {

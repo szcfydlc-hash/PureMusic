@@ -188,6 +188,7 @@ fun LibraryScreen(
     onShowSongInfo: (Song) -> Unit,
     onReplaceCover: (Song) -> Unit,
     onMatchLyrics: (Song) -> Unit,
+    onDeleteSong: (Song) -> Unit,
     onRequestCreatePlaylist: () -> Unit,
     onRequestDeletePlaylist: (Playlist) -> Unit,
     onRequestRenamePlaylist: (Playlist) -> Unit,
@@ -254,6 +255,7 @@ fun LibraryScreen(
             onShowSongInfo = onShowSongInfo,
             onReplaceCover = onReplaceCover,
             onMatchLyrics = onMatchLyrics,
+            onDeleteSong = onDeleteSong,
             onManageSongs = when (detail) {
                 is CollectionDetail.PlaylistDetail -> livePlaylist?.let { pl -> { onRequestManagePlaylistSongs(pl) } }
                 CollectionDetail.FavoritesDetail -> onRequestManageFavorites
@@ -681,6 +683,7 @@ fun LibraryScreen(
                                     onShowSongInfo = onShowSongInfo,
             onReplaceCover = onReplaceCover,
             onMatchLyrics = onMatchLyrics,
+            onDeleteSong = onDeleteSong,
                                     onRefresh = onRefreshLibrary,
                                     bottomPadding = bottomContentPadding,
                                 )
@@ -963,6 +966,7 @@ private fun SongsTabContent(
     onShowSongInfo: (Song) -> Unit,
     onReplaceCover: (Song) -> Unit,
     onMatchLyrics: (Song) -> Unit,
+    onDeleteSong: (Song) -> Unit,
     onRefresh: () -> Unit,
     bottomPadding: PaddingValues,
 ) {
@@ -1063,8 +1067,12 @@ private fun SongsTabContent(
                             onClick = { itemMenuExpanded = false; onMatchLyrics(song) },
                         )
                         DropdownMenuItem(
-                            text = { Text("歌曲信息") },
+                            text = { Text("歌曲信息与编辑") },
                             onClick = { itemMenuExpanded = false; onShowSongInfo(song) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除本地文件", color = MaterialTheme.colorScheme.primary) },
+                            onClick = { itemMenuExpanded = false; onDeleteSong(song) },
                         )
                     }
                     }
@@ -1111,6 +1119,7 @@ private fun SongsTabContent(
                         onShowSongInfo = { onShowSongInfo(song) },
                         onReplaceCover = { onReplaceCover(song) },
                         onMatchLyrics = { onMatchLyrics(song) },
+                        onDeleteSong = { onDeleteSong(song) },
                     )
                 }
             }
@@ -1473,7 +1482,6 @@ private fun PlaylistsTabContent(
     onRequestDeletePlaylist: (Playlist) -> Unit,
     onRequestRenamePlaylist: (Playlist) -> Unit,
     onRequestManagePlaylistSongs: (Playlist) -> Unit,
-    onRequestManageFavorites: () -> Unit,
     bottomPadding: PaddingValues,
 ) {
     val cardShape = RoundedCornerShape(if (liquidGlassEnabled) 16.dp else 8.dp)
@@ -1651,6 +1659,7 @@ private fun CollectionDetailView(
     onShowSongInfo: (Song) -> Unit,
     onReplaceCover: (Song) -> Unit,
     onMatchLyrics: (Song) -> Unit,
+    onDeleteSong: (Song) -> Unit,
     onManageSongs: (() -> Unit)?,
     onRenamePlaylist: (() -> Unit)?,
     onRemoveFromPlaylist: ((Long) -> Unit)?,
@@ -1820,6 +1829,7 @@ private fun CollectionDetailView(
                         onShowSongInfo = { onShowSongInfo(song) },
                         onReplaceCover = { onReplaceCover(song) },
                         onMatchLyrics = { onMatchLyrics(song) },
+                        onDeleteSong = { onDeleteSong(song) },
                         extraMenuActionLabel = if (onRemoveFromPlaylist != null) "从歌单移除" else null,
                         onExtraMenuAction = onRemoveFromPlaylist?.let { callback -> { callback(song.id) } },
                     )

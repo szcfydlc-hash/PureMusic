@@ -892,52 +892,169 @@ fun LyricsBottomSheet(
 @Composable
 fun SongInfoDialog(
     song: Song,
+    hasCustomMetadata: Boolean,
+    onSaveMetadata: (title: String, artist: String, album: String) -> Unit,
+    onRestoreMetadata: () -> Unit,
+    onReplaceCover: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var title by remember(song.id, song.title) { mutableStateOf(song.title) }
+    var artist by remember(song.id, song.artist) { mutableStateOf(song.artist) }
+    var album by remember(song.id, song.album) { mutableStateOf(song.album) }
+
     val formatExt = song.filePath
         .substringAfterLast('.', "")
         .uppercase(Locale.getDefault())
-        .ifBlank { "LOCAL AUDIO" }
+        .ifBlank { "AUDIO" }
+    val outlineColor = MaterialTheme.colorScheme.outline
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         shape = RoundedCornerShape(12.dp),
-        title = { Text("歌曲信息", fontWeight = FontWeight.SemiBold) },
+        title = { Text("歌曲信息与编辑", fontWeight = FontWeight.SemiBold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoMetaRow("歌名", song.title)
-                InfoMetaRow("歌手", song.artist)
-                InfoMetaRow("专辑", song.album)
-                InfoMetaRow("时长", formatDuration(song.durationMs))
-                InfoMetaRow("格式", formatExt)
-                InfoMetaRow("文件夹", song.folderName)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AlbumArtwork(
+                        uri = song.albumArtUri,
+                        contentDescription = song.album,
+                        modifier = Modifier.size(52.dp),
+                        cornerRadius = 6.dp,
+                        iconSize = 20.dp,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(MaterialTheme.colorScheme.background)
+                            .border(0.75.dp, outlineColor, RoundedCornerShape(7.dp))
+                            .clickable {
+                                onDismiss()
+                                onReplaceCover()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    ) {
+                        Text(
+                            text = "更换封面",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("歌名") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = artist,
+                    onValueChange = { artist = it },
+                    label = { Text("歌手") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = album,
+                    onValueChange = { album = it },
+                    label = { Text("专辑") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+
+                Text(
+                    text = "时长 ${formatDuration(song.durationMs)} · 格式 $formatExt · 文件夹 ${song.folderName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (song.filePath.isNotBlank()) {
-                    InfoMetaRow("路径", song.filePath)
+                    Text(
+                        text = song.filePath,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (hasCustomMetadata) {
+                    TextButton(
+                        onClick = {
+                            onRestoreMetadata()
+                            onDismiss()
+                        },
+                        modifier = Modifier.align(Alignment.Start),
+                    ) {
+                        Text("恢复原标签", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("知道了") }
+            TextButton(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onSaveMetadata(title, artist, album)
+                        onDismiss()
+                    }
+                },
+                enabled = title.isNotBlank(),
+            ) {
+                Text("保存修改", fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
         },
     )
 }
 
 @Composable
-private fun InfoMetaRow(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
+fun ConfirmDeleteSongDialog(
+    song: Song,
+    onDismiss: () -> Unit,
+    onConfirmDelete: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(12.dp),
+        title = { Text("删除本地文件", fontWeight = FontWeight.SemiBold) },
+        text = {
+            Text(
+                text = "确定要从手机存储永久删除「${song.title}」吗？此操作无法撤销。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirmDelete()
+                    onDismiss()
+                },
+            ) {
+                Text("确认删除", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

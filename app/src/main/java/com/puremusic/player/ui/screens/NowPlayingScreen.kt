@@ -151,7 +151,6 @@ fun NowPlayingScreen(
     onOpenLyricsSearch: (Song) -> Unit,
     isTranslatingLyrics: Boolean = false,
     onTranslateLyrics: () -> Unit = {},
-    onAddToPlaylist: () -> Unit = {},
 ) {
     var showFullLyrics by remember { mutableStateOf(false) }
     BackHandler {

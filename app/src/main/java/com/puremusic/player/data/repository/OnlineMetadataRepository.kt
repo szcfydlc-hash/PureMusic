@@ -37,6 +37,12 @@ data class OnlineLyricCandidate(
             .joinToString("\n")
 }
 
+data class SongMetaOverride(
+    val title: String,
+    val artist: String,
+    val album: String,
+)
+
 data class OnlineCoverCandidate(
     val trackName: String,
     val artistName: String,
@@ -49,6 +55,9 @@ class OnlineMetadataRepository(private val context: Context) {
 
     private val coversDir: File
         get() = File(context.filesDir, "custom_covers").apply { if (!exists()) mkdirs() }
+
+    private val metaFile: File
+        get() = File(context.filesDir, "custom_metadata.json")
 
     private val lyricsDir: File
         get() = File(context.filesDir, "custom_lyrics").apply { if (!exists()) mkdirs() }
@@ -172,6 +181,52 @@ class OnlineMetadataRepository(private val context: Context) {
             File(lyricsDir, "song_${songId}.lrc").writeText(decoded.trim(), Charsets.UTF_8)
             true
         }.getOrDefault(false)
+    }
+
+    suspend fun loadAllMetaOverrides(): Map<Long, SongMetaOverride> = withContext(Dispatchers.IO) {
+        if (!metaFile.exists()) return@withContext emptyMap()
+        runCatching {
+            val root = JSONObject(metaFile.readText(Charsets.UTF_8))
+            val map = mutableMapOf<Long, SongMetaOverride>()
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val songId = key.toLongOrNull() ?: continue
+                val obj = root.optJSONObject(key) ?: continue
+                map[songId] = SongMetaOverride(
+                    title = obj.optString("title"),
+                    artist = obj.optString("artist"),
+                    album = obj.optString("album"),
+                )
+            }
+            map
+        }.getOrDefault(emptyMap())
+    }
+
+    suspend fun saveMetaOverride(songId: Long, override: SongMetaOverride) = withContext(Dispatchers.IO) {
+        runCatching {
+            val root = if (metaFile.exists()) {
+                runCatching { JSONObject(metaFile.readText(Charsets.UTF_8)) }.getOrDefault(JSONObject())
+            } else {
+                JSONObject()
+            }
+            val obj = JSONObject().apply {
+                put("title", override.title.trim())
+                put("artist", override.artist.trim())
+                put("album", override.album.trim())
+            }
+            root.put(songId.toString(), obj)
+            metaFile.writeText(root.toString(), Charsets.UTF_8)
+        }
+    }
+
+    suspend fun clearMetaOverride(songId: Long) = withContext(Dispatchers.IO) {
+        runCatching {
+            if (!metaFile.exists()) return@runCatching
+            val root = JSONObject(metaFile.readText(Charsets.UTF_8))
+            root.remove(songId.toString())
+            metaFile.writeText(root.toString(), Charsets.UTF_8)
+        }
     }
 
     suspend fun clearCustomLyrics(songId: Long) = withContext(Dispatchers.IO) {
