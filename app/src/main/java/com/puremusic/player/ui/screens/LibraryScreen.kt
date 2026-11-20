@@ -1503,6 +1503,7 @@ private fun FoldersTabContent(
 private fun PlaylistsTabContent(
     playlists: List<Playlist>,
     playlistCovers: Map<String, android.net.Uri>,
+    resolveSongsByIds: (List<Long>) -> List<Song>,
     favoriteCount: Int,
     recentCount: Int,
     mostPlayedCount: Int,

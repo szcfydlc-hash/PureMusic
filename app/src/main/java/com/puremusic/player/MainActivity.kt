@@ -542,7 +542,6 @@ private fun PureMusicApp(
             AddToPlaylistDialog(
                 song = song,
                 playlists = playlists,
-                        playlistCovers = playlistCovers,
                 onDismiss = { pendingPlaylistSong = null },
                 onSelectPlaylist = { playlistId -> viewModel.addSongToPlaylist(playlistId, song.id) },
                 onCreateAndAdd = { name -> viewModel.createPlaylist(name, listOf(song.id)) },
