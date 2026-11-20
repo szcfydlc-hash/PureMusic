@@ -157,3 +157,16 @@ enum class LayoutDensity(
     STANDARD("标准", 50, 9, 10),
     SPACIOUS("宽松", 58, 14, 14),
 }
+
+enum class MainTab(val label: String) {
+    LIBRARY("曲库"),
+    ALBUMS("专辑"),
+    PLAYLISTS("歌单"),
+    SETTINGS("设置"),
+}
+
+enum class LibrarySubTab(val label: String) {
+    SONGS("歌曲"),
+    ARTISTS("歌手"),
+    FOLDERS("文件夹"),
+}

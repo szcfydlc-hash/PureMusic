@@ -7,15 +7,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,21 +26,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.PlayCircleOutline
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,7 +61,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.puremusic.player.data.model.AppAccentColor
@@ -75,16 +72,6 @@ import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
 import com.puremusic.player.data.model.MusicFolder
 import com.puremusic.player.data.model.ScanStatus
-import com.puremusic.player.ui.components.liquidGlass
-import com.puremusic.player.ui.theme.sidebarColorFor
-
-private enum class SettingsSection(val label: String, val icon: ImageVector) {
-    ALL_SONGS("全部歌曲", Icons.Rounded.MusicNote),
-    LIBRARY("曲库管理", Icons.Rounded.Folder),
-    APPEARANCE("外观设置", Icons.Rounded.Palette),
-    PLAYBACK("播放设置", Icons.Rounded.PlayCircleOutline),
-    ABOUT("关于", Icons.Rounded.Info),
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -103,7 +90,9 @@ fun SettingsScreen(
     fontStyle: AppFontStyle,
     lyricFontStyle: LyricFontStyle,
     backgroundStyle: BackgroundStyle,
-    onClose: () -> Unit,
+    isTabletLayout: Boolean,
+    bottomContentPadding: PaddingValues,
+    onBackToLibrary: () -> Unit,
     onSelectLayoutMode: (LayoutMode) -> Unit,
     onSelectLayoutDensity: (LayoutDensity) -> Unit,
     onChangeFontScale: (Float) -> Unit,
@@ -119,299 +108,480 @@ fun SettingsScreen(
     onOpenEqualizer: () -> Unit,
     onOpenSleepTimer: () -> Unit,
 ) {
-    BackHandler(onBack = onClose)
+    BackHandler(onBack = onBackToLibrary)
 
-    var activeSection by remember { mutableStateOf(SettingsSection.APPEARANCE) }
     var showAppFontDialog by remember { mutableStateOf(false) }
     var showLyricFontDialog by remember { mutableStateOf(false) }
     var showBackgroundDialog by remember { mutableStateOf(false) }
+    var showFolderManagerDialog by remember { mutableStateOf(false) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val sidebarBg = sidebarColorFor(isDark)
+    val canvasBg = when {
+        isDark -> Color(0xFF0A0B0E)
+        backgroundStyle == BackgroundStyle.WARM_PAPER -> Color(0xFFF3EFE6)
+        else -> Color(0xFFF5F6FA)
+    }
+    val cardBg = when {
+        isDark -> Color(0xFF151820)
+        backgroundStyle == BackgroundStyle.WARM_PAPER -> Color(0xFFFCFBF7)
+        else -> Color(0xFFFFFFFF)
+    }
+    val dividerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.06f)
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+        color = canvasBg,
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .navigationBarsPadding(),
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 12.dp,
+                    bottom = 24.dp + bottomContentPadding.calculateBottomPadding(),
+                ),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Seamless Light/Dark Left Sidebar (zero white vertical line)
-            Column(
+            // Bold Editorial Page Header
+            Row(
                 modifier = Modifier
-                    .width(122.dp)
-                    .fillMaxHeight()
-                    .background(sidebarBg)
-                    .statusBarsPadding()
-                    .padding(horizontal = 10.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "设置",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                )
+                if (isTabletLayout) {
+                    IconButton(onClick = onBackToLibrary) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回曲库")
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Column {
+                    Text(
+                        text = "设置",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = "外观、曲库与播放偏好",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
-                SettingsSection.entries.forEach { section ->
-                    val selected = section == activeSection
-                    Row(
+            // Card 1: Live Typography & Density Preview Card
+            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = layoutDensity.rowVerticalPaddingDp.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                } else {
-                                    Color.Transparent
-                                },
-                            )
-                            .clickable {
-                                if (section == SettingsSection.ALL_SONGS) {
-                                    onClose()
-                                } else {
-                                    activeSection = section
-                                }
-                            }
-                            .padding(horizontal = 10.dp, vertical = 11.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .size(layoutDensity.artSizeDp.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            imageVector = section.icon,
+                            imageVector = Icons.Rounded.MusicNote,
                             contentDescription = null,
-                            tint = if (selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.size(17.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp),
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = section.label,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onBackground
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                            text = "光影之间",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "实时排版预览 · ${layoutDensity.label} · ${(fontScale * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
             }
 
-            // Right Content Pane
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .statusBarsPadding()
-                    .padding(horizontal = 18.dp),
-            ) {
+            // Card 2: 外观与排版
+            SettingsSectionHeader("外观与排版")
+            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+                // 外观模式
+                Text(
+                    text = "外观模式",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                val quickModes = listOf(
+                    BackgroundStyle.PURE_WHITE to "浅色",
+                    BackgroundStyle.DEEP_INK to "深色",
+                    BackgroundStyle.SYSTEM to "跟随系统",
+                )
+                SegmentedOptionBar(
+                    items = quickModes.map { it.second },
+                    selectedIndex = quickModes.indexOfFirst { (style, _) ->
+                        backgroundStyle == style ||
+                            (style == BackgroundStyle.PURE_WHITE && backgroundStyle == BackgroundStyle.WARM_PAPER)
+                    }.coerceAtLeast(0),
+                    onSelect = { idx -> onSelectBackgroundStyle(quickModes[idx].first) },
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 布局模式
+                Text(
+                    text = "屏幕布局",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SegmentedOptionBar(
+                    items = LayoutMode.entries.map { it.label },
+                    selectedIndex = LayoutMode.entries.indexOf(layoutMode),
+                    onSelect = { idx -> onSelectLayoutMode(LayoutMode.entries[idx]) },
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 自由配色
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "强调色",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = accentColor.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppAccentColor.entries.forEach { colorOption ->
+                        val selected = colorOption == accentColor
+                        val swatch = Color(colorOption.colorHex)
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .border(
+                                    width = if (selected) 2.5.dp else 0.dp,
+                                    color = if (selected) MaterialTheme.colorScheme.onBackground else Color.Transparent,
+                                    shape = CircleShape,
+                                )
+                                .padding(if (selected) 3.dp else 0.dp)
+                                .clip(CircleShape)
+                                .background(swatch)
+                                .clickable { onSelectAccentColor(colorOption) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (selected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = colorOption.label,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(15.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 排版密度
+                Text(
+                    text = "排版密度",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SegmentedOptionBar(
+                    items = LayoutDensity.entries.map { it.label },
+                    selectedIndex = LayoutDensity.entries.indexOf(layoutDensity),
+                    onSelect = { idx -> onSelectLayoutDensity(LayoutDensity.entries[idx]) },
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 全局字体大小
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "全局字体大小",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "${(fontScale * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("A-", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Slider(
+                        value = fontScale,
+                        onValueChange = onChangeFontScale,
+                        valueRange = 0.85f..1.25f,
+                        steps = 7,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text("A+", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 液态玻璃开关
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "液态玻璃与切页动效",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "通透毛玻璃迷你栏与柔和过渡",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = liquidGlassEnabled,
+                        onCheckedChange = onToggleLiquidGlass,
+                    )
+                }
+            }
+
+            // Card 3: 字体与纸色
+            SettingsSectionHeader("字体与纸色")
+            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+                SettingsListRow(
+                    label = "软件字体",
+                    value = fontStyle.label,
+                    onClick = { showAppFontDialog = true },
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                SettingsListRow(
+                    label = "歌词字体",
+                    value = lyricFontStyle.label,
+                    onClick = { showLyricFontDialog = true },
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                SettingsListRow(
+                    label = "背景纸色",
+                    value = backgroundStyle.label,
+                    onClick = { showBackgroundDialog = true },
+                )
+            }
+
+            // Card 4: 曲库管理
+            SettingsSectionHeader("曲库管理")
+            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+                Text(
+                    text = "当前显示 $songCount 首歌曲 · $albumCount 张专辑 · 已发现 ${allFolders.size} 个目录",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Primary Full-Width Scan Pill Button
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 10.dp, bottom = 10.dp),
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable(enabled = !scanStatus.isScanning, onClick = onRescanLibrary),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    if (scanStatus.isScanning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "正在扫描本地目录...",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "立即重新扫描本地音频",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+
+                if (!scanStatus.message.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    val emerald = Color(0xFF10B981)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(emerald.copy(alpha = if (isDark) 0.18f else 0.12f))
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                    ) {
+                        Text(
+                            text = scanStatus.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isDark) Color(0xFF34D399) else Color(0xFF059669),
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "短音频过滤",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    MinDurationFilter.entries.forEach { filter ->
+                        FilterChip(
+                            selected = minDurationFilter == filter,
+                            onClick = { onSelectMinDurationFilter(filter) },
+                            label = { Text(filter.label) },
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+
+                val enabledCount = (allFolders.size - excludedFolders.size).coerceAtLeast(0)
+                SettingsListRow(
+                    label = "管理扫描文件夹",
+                    value = "已启用 $enabledCount / ${allFolders.size}",
+                    onClick = { showFolderManagerDialog = true },
+                )
+            }
+
+            // Card 5: 播放与音效
+            SettingsSectionHeader("播放与音效")
+            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+                SettingsActionIconRow(
+                    icon = Icons.Rounded.Equalizer,
+                    label = "音频均衡器",
+                    subtitle = "5 段频响调节与预设音效",
+                    onClick = onOpenEqualizer,
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                SettingsActionIconRow(
+                    icon = Icons.Rounded.Timer,
+                    label = "睡眠定时关闭",
+                    subtitle = "倒计时结束后自动暂停播放",
+                    onClick = onOpenSleepTimer,
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                SettingsActionIconRow(
+                    icon = Icons.Rounded.RestartAlt,
+                    label = "恢复默认外观",
+                    subtitle = "重置配色、字体与排版设置",
+                    onClick = onResetAppearance,
+                )
+            }
+
+            // Card 6: 关于
+            SettingsSectionHeader("关于")
+            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = activeSection.label,
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "简约音乐 (PureMusic)",
+                        style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "关闭设置",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            text = "v7.0.0",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(bottom = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    when (activeSection) {
-                        SettingsSection.APPEARANCE -> AppearanceSettingsPane(
-                            layoutMode = layoutMode,
-                            layoutDensity = layoutDensity,
-                            fontScale = fontScale,
-                            liquidGlassEnabled = liquidGlassEnabled,
-                            accentColor = accentColor,
-                            fontStyle = fontStyle,
-                            lyricFontStyle = lyricFontStyle,
-                            backgroundStyle = backgroundStyle,
-                            onSelectLayoutMode = onSelectLayoutMode,
-                            onSelectLayoutDensity = onSelectLayoutDensity,
-                            onChangeFontScale = onChangeFontScale,
-                            onToggleLiquidGlass = onToggleLiquidGlass,
-                            onSelectAccentColor = onSelectAccentColor,
-                            onSelectBackgroundStyle = onSelectBackgroundStyle,
-                            onOpenAppFontPicker = { showAppFontDialog = true },
-                            onOpenLyricFontPicker = { showLyricFontDialog = true },
-                            onOpenBackgroundPicker = { showBackgroundDialog = true },
-                            onResetAppearance = onResetAppearance,
-                        )
-
-                        SettingsSection.LIBRARY -> {
-                            Text(
-                                text = "当前曲库显示 $songCount 首歌曲 · $albumCount 张专辑 · 共发现 ${allFolders.size} 个音频目录",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-
-                            FilledTonalButton(
-                                onClick = onRescanLibrary,
-                                enabled = !scanStatus.isScanning,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                if (scanStatus.isScanning) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("正在扫描本地目录...")
-                                } else {
-                                    Icon(Icons.Rounded.Refresh, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("立即重新扫描本地音频")
-                                }
-                            }
-
-                            if (!scanStatus.message.isNullOrBlank()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(MaterialTheme.colorScheme.primaryContainer)
-                                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                                ) {
-                                    Text(
-                                        text = scanStatus.message,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f))
-
-                            Text("短音频过滤", style = MaterialTheme.typography.titleSmall)
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                MinDurationFilter.entries.forEach { filter ->
-                                    FilterChip(
-                                        selected = minDurationFilter == filter,
-                                        onClick = { onSelectMinDurationFilter(filter) },
-                                        label = { Text(filter.label) },
-                                    )
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f))
-
-                            Text("勾选要纳入曲库的文件夹", style = MaterialTheme.typography.titleSmall)
-                            if (allFolders.isEmpty()) {
-                                Text(
-                                    text = "暂未发现音频文件夹，请点击上方“立即重新扫描”。",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            } else {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    allFolders.forEach { folder ->
-                                        val included = folder.path !in excludedFolders
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .clickable { onToggleFolderExcluded(folder.path) }
-                                                .padding(vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Checkbox(
-                                                checked = included,
-                                                onCheckedChange = { onToggleFolderExcluded(folder.path) },
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Rounded.Folder,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(19.dp),
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = "${folder.name} (${folder.songs.size}首)",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                                Text(
-                                                    text = folder.path,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        SettingsSection.PLAYBACK -> {
-                            FilledTonalButton(
-                                onClick = onOpenEqualizer,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Icon(Icons.Rounded.Equalizer, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("打开音频均衡器")
-                            }
-                            FilledTonalButton(
-                                onClick = onOpenSleepTimer,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Icon(Icons.Rounded.Timer, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("设置睡眠定时关闭")
-                            }
-                            Text(
-                                text = "已默认开启断点续播记忆、耳机拔出自动暂停与系统音频焦点管理。",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-
-                        SettingsSection.ABOUT, SettingsSection.ALL_SONGS -> {
-                            Text(
-                                text = "简约音乐 (PureMusic)",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                text = "版本 6.0.0\n\n专注极致体验的本地离线音乐播放器，围绕「唱片海报墙」与封面动态取色打造，采用 Kotlin + Jetpack Compose + Media3 独立编写，无广告、无联网追踪。",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "专注本地离线播放体验，无广告、无联网追踪。默认开启断点续播记忆、耳机拔出暂停与系统音频焦点管理。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -454,77 +624,55 @@ fun SettingsScreen(
             onDismiss = { showBackgroundDialog = false },
         )
     }
+
+    if (showFolderManagerDialog) {
+        FolderManagerDialog(
+            allFolders = allFolders,
+            excludedFolders = excludedFolders,
+            onToggleFolderExcluded = onToggleFolderExcluded,
+            onDismiss = { showFolderManagerDialog = false },
+        )
+    }
 }
 
 @Composable
-private fun AppearanceSettingsPane(
-    layoutMode: LayoutMode,
-    layoutDensity: LayoutDensity,
-    fontScale: Float,
-    liquidGlassEnabled: Boolean,
-    accentColor: AppAccentColor,
-    fontStyle: AppFontStyle,
-    lyricFontStyle: LyricFontStyle,
-    backgroundStyle: BackgroundStyle,
-    onSelectLayoutMode: (LayoutMode) -> Unit,
-    onSelectLayoutDensity: (LayoutDensity) -> Unit,
-    onChangeFontScale: (Float) -> Unit,
-    onToggleLiquidGlass: (Boolean) -> Unit,
-    onSelectAccentColor: (AppAccentColor) -> Unit,
-    onSelectBackgroundStyle: (BackgroundStyle) -> Unit,
-    onOpenAppFontPicker: () -> Unit,
-    onOpenLyricFontPicker: () -> Unit,
-    onOpenBackgroundPicker: () -> Unit,
-    onResetAppearance: () -> Unit,
+private fun SettingsSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 6.dp, top = 2.dp),
+    )
+}
+
+@Composable
+private fun GroupedSettingsCard(
+    cardBg: Color,
+    isDark: Boolean,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    // Live Preview Card reacting in real-time to LayoutDensity & FontScale
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(0.8.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 12.dp, vertical = layoutDensity.rowVerticalPaddingDp.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(layoutDensity.artSizeDp.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.MusicNote,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
+            .clip(RoundedCornerShape(18.dp))
+            .background(cardBg)
+            .border(
+                width = 0.5.dp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f),
+                shape = RoundedCornerShape(18.dp),
             )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "春日序曲",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-            )
-            Text(
-                text = "实时排版预览 · ${layoutDensity.label} · ${(fontScale * 100).toInt()}%",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-
-    // 排版密度 3 档：紧凑 / 标准 / 宽松
-    Text(
-        text = "排版密度",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        content = content,
     )
+}
+
+@Composable
+private fun SegmentedOptionBar(
+    items: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -532,89 +680,14 @@ private fun AppearanceSettingsPane(
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(3.dp),
     ) {
-        LayoutDensity.entries.forEach { density ->
-            val selected = density == layoutDensity
+        items.forEachIndexed { index, label ->
+            val selected = index == selectedIndex
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(9.dp))
                     .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                    .clickable { onSelectLayoutDensity(density) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = density.label,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-
-    // 全局字体大小滑块 (85% - 125%)
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "全局字体大小",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "${(fontScale * 100).toInt()}%",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("A-", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Slider(
-                value = fontScale,
-                onValueChange = onChangeFontScale,
-                valueRange = 0.85f..1.25f,
-                steps = 7,
-                modifier = Modifier.weight(1f),
-            )
-            Text("A+", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-
-    Text(
-        text = "外观模式",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(3.dp),
-    ) {
-        val quickModes = listOf(
-            BackgroundStyle.PURE_WHITE to "浅色",
-            BackgroundStyle.DEEP_INK to "深色",
-            BackgroundStyle.SYSTEM to "跟随系统",
-        )
-        quickModes.forEach { (style, label) ->
-            val selected = backgroundStyle == style ||
-                (style == BackgroundStyle.PURE_WHITE && backgroundStyle == BackgroundStyle.WARM_PAPER)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                    .clickable { onSelectBackgroundStyle(style) }
+                    .clickable { onSelect(index) }
                     .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -622,134 +695,16 @@ private fun AppearanceSettingsPane(
                     text = label,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
         }
-    }
-
-    Text(
-        text = "布局",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(3.dp),
-    ) {
-        LayoutMode.entries.forEach { mode ->
-            val selected = mode == layoutMode
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                    .clickable { onSelectLayoutMode(mode) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = mode.label,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-
-    Text(
-        text = "自由配色",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AppAccentColor.entries.forEach { colorOption ->
-            val selected = colorOption == accentColor
-            val swatch = Color(colorOption.colorHex)
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .border(
-                        width = if (selected) 2.5.dp else 0.dp,
-                        color = if (selected) MaterialTheme.colorScheme.onBackground else Color.Transparent,
-                        shape = CircleShape,
-                    )
-                    .padding(if (selected) 3.dp else 0.dp)
-                    .clip(CircleShape)
-                    .background(swatch)
-                    .clickable { onSelectAccentColor(colorOption) },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (selected) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = colorOption.label,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-            }
-        }
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .liquidGlass(enabled = liquidGlassEnabled, shape = RoundedCornerShape(16.dp), elevation = 4.dp)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "液态玻璃与切页动效",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = "通透玻璃质感与切换弹性过渡",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(
-            checked = liquidGlassEnabled,
-            onCheckedChange = onToggleLiquidGlass,
-        )
-    }
-
-    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f))
-
-    SettingsValueRow(label = "软件字体", value = fontStyle.label, onClick = onOpenAppFontPicker)
-    SettingsValueRow(label = "歌词字体", value = lyricFontStyle.label, onClick = onOpenLyricFontPicker)
-    SettingsValueRow(label = "背景纸色", value = backgroundStyle.label, onClick = onOpenBackgroundPicker)
-
-    Spacer(modifier = Modifier.height(4.dp))
-
-    TextButton(
-        onClick = onResetAppearance,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text = "重置外观设置",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
 @Composable
-private fun SettingsValueRow(
+private fun SettingsListRow(
     label: String,
     value: String,
     onClick: () -> Unit,
@@ -757,7 +712,8 @@ private fun SettingsValueRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp),
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -765,29 +721,148 @@ private fun SettingsValueRow(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.width(4.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(18.dp),
             )
         }
     }
+}
+
+@Composable
+private fun SettingsActionIconRow(
+    icon: ImageVector,
+    label: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun FolderManagerDialog(
+    allFolders: List<MusicFolder>,
+    excludedFolders: Set<String>,
+    onToggleFolderExcluded: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("管理扫描文件夹") },
+        text = {
+            if (allFolders.isEmpty()) {
+                Text(
+                    text = "暂未发现音频文件夹，请先点击“立即重新扫描本地音频”。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    allFolders.forEach { folder ->
+                        val included = folder.path !in excludedFolders
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onToggleFolderExcluded(folder.path) }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = included,
+                                onCheckedChange = { onToggleFolderExcluded(folder.path) },
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.Folder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${folder.name} (${folder.songs.size}首)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = folder.path,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("完成")
+            }
+        },
+    )
 }
 
 @Composable
@@ -802,27 +877,30 @@ private fun <T> OptionPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
-                options.forEach { (item, label) ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                options.forEach { (value, label) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(item) }
-                            .padding(vertical = 8.dp),
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onSelect(value) }
+                            .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
-                            selected = item == selected,
-                            onClick = { onSelect(item) },
+                            selected = value == selected,
+                            onClick = { onSelect(value) },
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                        Text(label, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
         },
     )
 }

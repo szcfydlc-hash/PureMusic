@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,11 +28,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
@@ -52,22 +53,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.puremusic.player.data.model.PlayerUiState
 import com.puremusic.player.data.model.Song
-import androidx.compose.material.icons.rounded.Info
-import com.puremusic.player.ui.theme.ForestGreen
 import com.puremusic.player.ui.theme.LocalLayoutDensity
 import java.util.Locale
 
@@ -111,7 +109,9 @@ fun AlbumArtwork(
         model = request,
         contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
-        modifier = modifier.clip(shape).border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), shape),
+        modifier = modifier
+            .clip(shape)
+            .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f), shape),
         loading = { ArtworkPlaceholder(shape = shape, iconSize = iconSize) },
         error = { ArtworkPlaceholder(shape = shape, iconSize = iconSize) },
     )
@@ -158,7 +158,7 @@ fun SongRowItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = density.rowVerticalPaddingDp.dp),
+            .padding(horizontal = 18.dp, vertical = density.rowVerticalPaddingDp.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.size(density.artSizeDp.dp)) {
@@ -173,7 +173,7 @@ fun SongRowItem(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -213,7 +213,7 @@ fun SongRowItem(
                 Icon(
                     imageVector = Icons.Rounded.MoreVert,
                     contentDescription = "更多操作",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 )
             }
             DropdownMenu(
@@ -285,14 +285,14 @@ fun MiniPlayerBar(
     modifier: Modifier = Modifier,
 ) {
     val song = playerState.currentSong ?: return
-    val pillShape = RoundedCornerShape(34.dp)
+    val pillShape = RoundedCornerShape(22.dp)
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .height(66.dp)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .height(62.dp)
             .clip(pillShape)
             .clickable(onClick = onOpenNowPlaying),
     ) {
@@ -308,8 +308,8 @@ fun MiniPlayerBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(blurModifier)
-                    .alpha(if (isDark) 0.34f else 0.42f),
-                cornerRadius = 34.dp,
+                    .alpha(if (isDark) 0.30f else 0.36f),
+                cornerRadius = 22.dp,
                 iconSize = 18.dp,
             )
             Box(
@@ -319,35 +319,35 @@ fun MiniPlayerBar(
                         if (isDark) {
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color(0xFF1D2025).copy(alpha = 0.84f),
-                                    Color(0xFF252930).copy(alpha = 0.74f),
-                                    Color(0xFF1D2025).copy(alpha = 0.84f),
+                                    Color(0xFF1A1D24).copy(alpha = 0.88f),
+                                    Color(0xFF222630).copy(alpha = 0.80f),
+                                    Color(0xFF1A1D24).copy(alpha = 0.88f),
                                 ),
                             )
                         } else {
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color.White.copy(alpha = 0.76f),
-                                    Color(0xFFF4F6FA).copy(alpha = 0.60f),
-                                    Color.White.copy(alpha = 0.74f),
+                                    Color.White.copy(alpha = 0.86f),
+                                    Color(0xFFF6F7FB).copy(alpha = 0.78f),
+                                    Color.White.copy(alpha = 0.86f),
                                 ),
                             )
                         },
                     )
                     .border(
-                        width = 1.dp,
+                        width = 0.8.dp,
                         brush = Brush.linearGradient(
                             colors = if (isDark) {
                                 listOf(
-                                    Color.White.copy(alpha = 0.28f),
-                                    Color.White.copy(alpha = 0.08f),
-                                    Color.White.copy(alpha = 0.20f),
+                                    Color.White.copy(alpha = 0.22f),
+                                    Color.White.copy(alpha = 0.06f),
+                                    Color.White.copy(alpha = 0.16f),
                                 )
                             } else {
                                 listOf(
                                     Color.White.copy(alpha = 0.96f),
-                                    Color(0xFFDCE0EA).copy(alpha = 0.45f),
-                                    Color.White.copy(alpha = 0.88f),
+                                    Color(0xFFD5DAE5).copy(alpha = 0.55f),
+                                    Color.White.copy(alpha = 0.90f),
                                 )
                             },
                         ),
@@ -358,10 +358,10 @@ fun MiniPlayerBar(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(if (isDark) Color(0xFF181B22) else Color.White)
                     .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+                        0.8.dp,
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f),
                         pillShape,
                     ),
             )
@@ -372,9 +372,8 @@ fun MiniPlayerBar(
                 .fillMaxSize()
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Smooth AnimatedContent transition when switching songs!
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
@@ -386,15 +385,15 @@ fun MiniPlayerBar(
             ) { current ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(46.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF111111))
-                            .border(1.dp, Color.White.copy(alpha = 0.24f), CircleShape)
-                            .padding(10.dp),
+                            .background(Color(0xFF121316))
+                            .border(1.dp, Color.White.copy(alpha = 0.22f), CircleShape)
+                            .padding(9.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         AlbumArtwork(
@@ -434,14 +433,26 @@ fun MiniPlayerBar(
                 shape = CircleShape,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(38.dp),
             ) {
                 Icon(
                     imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(21.dp),
+                )
+            }
+
+            IconButton(
+                onClick = onSkipNext,
+                modifier = Modifier.size(34.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.SkipNext,
+                    contentDescription = "下一首",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }

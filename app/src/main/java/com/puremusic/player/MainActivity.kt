@@ -9,24 +9,38 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,6 +53,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LyricFontStyle
+import com.puremusic.player.data.model.MainTab
 import com.puremusic.player.data.model.Song
 import com.puremusic.player.ui.MusicViewModel
 import com.puremusic.player.ui.components.AddToPlaylistDialog
@@ -156,8 +175,8 @@ private fun PureMusicApp(
         val equalizerState by viewModel.equalizerState.collectAsStateWithLifecycle()
         val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
 
+        var activeMainTab by remember { mutableStateOf(MainTab.LIBRARY) }
         var showNowPlaying by remember { mutableStateOf(false) }
-        var showSettings by remember { mutableStateOf(false) }
         var showEqualizer by remember { mutableStateOf(false) }
         var showSleepTimer by remember { mutableStateOf(false) }
         var showQueue by remember { mutableStateOf(false) }
@@ -173,55 +192,117 @@ private fun PureMusicApp(
                 LayoutMode.AUTO -> maxWidth >= 600.dp
             }
             val miniPlayerVisible = playerState.currentSong != null && !isTabletLayout
-
-            LibraryScreen(
-                songs = songs,
-                allSongs = allSongs,
-                albums = albums,
-                artists = artists,
-                folders = folders,
-                playlists = playlists,
-                favoriteSongIds = favoriteSongIds,
-                isLoading = isLoading,
-                searchQuery = searchQuery,
-                sortOrder = sortOrder,
-                playerState = playerState,
-                playerTheme = playerTheme,
-                sleepTimerRemainingMs = sleepTimerRemainingMs,
-                liquidGlassEnabled = liquidGlassEnabled,
-                isTabletLayout = isTabletLayout,
-                onSearchQueryChange = viewModel::updateSearchQuery,
-                onSelectSortOrder = viewModel::setSortOrder,
-                onRefreshLibrary = viewModel::rescanLibraryWithFeedback,
-                onPlaySongs = viewModel::playSongs,
-                onTogglePlayPause = viewModel::togglePlayPause,
-                onSkipPrevious = viewModel::skipPrevious,
-                onSkipNext = viewModel::skipNext,
-                onOpenNowPlaying = { showNowPlaying = true },
-                onToggleFavorite = viewModel::toggleFavorite,
-                onRequestAddToPlaylist = { pendingPlaylistSong = it },
-                onShowSongInfo = { infoDialogSong = it },
-                onRequestCreatePlaylist = { showCreatePlaylist = true },
-                onDeletePlaylist = viewModel::deletePlaylist,
-                onRemoveSongFromPlaylist = viewModel::removeSongFromPlaylist,
-                onOpenEqualizer = { showEqualizer = true },
-                onOpenSleepTimer = { showSleepTimer = true },
-                onOpenThemeSettings = { showSettings = true },
-                resolveSongsByIds = viewModel::resolveSongsByIds,
-                bottomContentPadding = PaddingValues(bottom = if (miniPlayerVisible) 88.dp else 16.dp),
+            val bottomContentPadding = PaddingValues(
+                bottom = when {
+                    isTabletLayout -> 24.dp
+                    miniPlayerVisible -> 156.dp
+                    else -> 86.dp
+                },
             )
 
-            if (miniPlayerVisible) {
-                MiniPlayerBar(
-                    playerState = playerState,
-                    liquidGlassEnabled = liquidGlassEnabled,
-                    onOpenNowPlaying = { showNowPlaying = true },
-                    onTogglePlayPause = viewModel::togglePlayPause,
-                    onSkipNext = viewModel::skipNext,
+            AnimatedContent(
+                targetState = activeMainTab == MainTab.SETTINGS,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "mainRootSwitch",
+                modifier = Modifier.fillMaxSize(),
+            ) { isSettingsTab ->
+                if (isSettingsTab) {
+                    SettingsScreen(
+                        songCount = allSongs.size,
+                        albumCount = albums.size,
+                        allFolders = allDiscoveredFolders,
+                        excludedFolders = excludedFolders,
+                        minDurationFilter = minDurationFilter,
+                        scanStatus = scanStatus,
+                        layoutMode = layoutMode,
+                        layoutDensity = layoutDensity,
+                        fontScale = fontScale,
+                        liquidGlassEnabled = liquidGlassEnabled,
+                        accentColor = accentColor,
+                        fontStyle = fontStyle,
+                        lyricFontStyle = lyricFontStyle,
+                        backgroundStyle = backgroundStyle,
+                        isTabletLayout = isTabletLayout,
+                        bottomContentPadding = bottomContentPadding,
+                        onBackToLibrary = { activeMainTab = MainTab.LIBRARY },
+                        onSelectLayoutMode = viewModel::setLayoutMode,
+                        onSelectLayoutDensity = viewModel::setLayoutDensity,
+                        onChangeFontScale = viewModel::setFontScale,
+                        onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
+                        onSelectAccentColor = viewModel::setAccentColor,
+                        onSelectFontStyle = viewModel::setFontStyle,
+                        onSelectLyricFontStyle = viewModel::setLyricFontStyle,
+                        onSelectBackgroundStyle = viewModel::setBackgroundStyle,
+                        onResetAppearance = viewModel::resetAppearance,
+                        onRescanLibrary = viewModel::rescanLibraryWithFeedback,
+                        onToggleFolderExcluded = viewModel::toggleFolderExcluded,
+                        onSelectMinDurationFilter = viewModel::setMinDurationFilter,
+                        onOpenEqualizer = { showEqualizer = true },
+                        onOpenSleepTimer = { showSleepTimer = true },
+                    )
+                } else {
+                    LibraryScreen(
+                        activeMainTab = activeMainTab,
+                        onSelectMainTab = { activeMainTab = it },
+                        songs = songs,
+                        allSongs = allSongs,
+                        albums = albums,
+                        artists = artists,
+                        folders = folders,
+                        playlists = playlists,
+                        favoriteSongIds = favoriteSongIds,
+                        isLoading = isLoading,
+                        searchQuery = searchQuery,
+                        sortOrder = sortOrder,
+                        playerState = playerState,
+                        playerTheme = playerTheme,
+                        sleepTimerRemainingMs = sleepTimerRemainingMs,
+                        liquidGlassEnabled = liquidGlassEnabled,
+                        isTabletLayout = isTabletLayout,
+                        onSearchQueryChange = viewModel::updateSearchQuery,
+                        onSelectSortOrder = viewModel::setSortOrder,
+                        onRefreshLibrary = viewModel::rescanLibraryWithFeedback,
+                        onPlaySongs = viewModel::playSongs,
+                        onTogglePlayPause = viewModel::togglePlayPause,
+                        onSkipPrevious = viewModel::skipPrevious,
+                        onSkipNext = viewModel::skipNext,
+                        onOpenNowPlaying = { showNowPlaying = true },
+                        onToggleFavorite = viewModel::toggleFavorite,
+                        onRequestAddToPlaylist = { pendingPlaylistSong = it },
+                        onShowSongInfo = { infoDialogSong = it },
+                        onRequestCreatePlaylist = { showCreatePlaylist = true },
+                        onDeletePlaylist = viewModel::deletePlaylist,
+                        onRemoveSongFromPlaylist = viewModel::removeSongFromPlaylist,
+                        onOpenEqualizer = { showEqualizer = true },
+                        onOpenSleepTimer = { showSleepTimer = true },
+                        onOpenThemeSettings = { activeMainTab = MainTab.SETTINGS },
+                        resolveSongsByIds = viewModel::resolveSongsByIds,
+                        bottomContentPadding = bottomContentPadding,
+                    )
+                }
+            }
+
+            // Bottom Floating Mini-Player + Sleek 4-Tab Navigation Bar (Phone mode)
+            if (!isTabletLayout) {
+                Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .navigationBarsPadding(),
-                )
+                        .fillMaxWidth(),
+                ) {
+                    if (miniPlayerVisible) {
+                        MiniPlayerBar(
+                            playerState = playerState,
+                            liquidGlassEnabled = liquidGlassEnabled,
+                            onOpenNowPlaying = { showNowPlaying = true },
+                            onTogglePlayPause = viewModel::togglePlayPause,
+                            onSkipNext = viewModel::skipNext,
+                        )
+                    }
+                    PureMusicBottomNavBar(
+                        activeTab = activeMainTab,
+                        onSelectTab = { activeMainTab = it },
+                    )
+                }
             }
 
             AnimatedVisibility(
@@ -255,46 +336,11 @@ private fun PureMusicApp(
                     onOpenLyrics = { showLyrics = true },
                     onOpenEqualizer = { showEqualizer = true },
                     onOpenSleepTimer = { showSleepTimer = true },
-                    onOpenSettings = { showSettings = true },
+                    onOpenSettings = {
+                        showNowPlaying = false
+                        activeMainTab = MainTab.SETTINGS
+                    },
                     onAddToPlaylist = { pendingPlaylistSong = it },
-                )
-            }
-
-            AnimatedVisibility(
-                visible = showSettings,
-                enter = fadeIn(),
-                exit = fadeOut(),
-            ) {
-                SettingsScreen(
-                    songCount = allSongs.size,
-                    albumCount = albums.size,
-                    allFolders = allDiscoveredFolders,
-                    excludedFolders = excludedFolders,
-                    minDurationFilter = minDurationFilter,
-                    scanStatus = scanStatus,
-                    layoutMode = layoutMode,
-                    layoutDensity = layoutDensity,
-                    fontScale = fontScale,
-                    liquidGlassEnabled = liquidGlassEnabled,
-                    accentColor = accentColor,
-                    fontStyle = fontStyle,
-                    lyricFontStyle = lyricFontStyle,
-                    backgroundStyle = backgroundStyle,
-                    onClose = { showSettings = false },
-                    onSelectLayoutMode = viewModel::setLayoutMode,
-                    onSelectLayoutDensity = viewModel::setLayoutDensity,
-                    onChangeFontScale = viewModel::setFontScale,
-                    onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
-                    onSelectAccentColor = viewModel::setAccentColor,
-                    onSelectFontStyle = viewModel::setFontStyle,
-                    onSelectLyricFontStyle = viewModel::setLyricFontStyle,
-                    onSelectBackgroundStyle = viewModel::setBackgroundStyle,
-                    onResetAppearance = viewModel::resetAppearance,
-                    onRescanLibrary = viewModel::rescanLibraryWithFeedback,
-                    onToggleFolderExcluded = viewModel::toggleFolderExcluded,
-                    onSelectMinDurationFilter = viewModel::setMinDurationFilter,
-                    onOpenEqualizer = { showEqualizer = true },
-                    onOpenSleepTimer = { showSleepTimer = true },
                 )
             }
         }
@@ -367,6 +413,82 @@ private fun PureMusicApp(
                 onDismiss = { showLyrics = false },
                 onSeekTo = viewModel::seekTo,
             )
+        }
+    }
+}
+
+@Composable
+private fun PureMusicBottomNavBar(
+    activeTab: MainTab,
+    onSelectTab: (MainTab) -> Unit,
+) {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val barBg = if (isDark) {
+        Color(0xFF0E1015).copy(alpha = 0.96f)
+    } else {
+        Color.White.copy(alpha = 0.96f)
+    }
+    val items: List<Pair<MainTab, ImageVector>> = listOf(
+        MainTab.LIBRARY to Icons.Rounded.LibraryMusic,
+        MainTab.ALBUMS to Icons.Rounded.Album,
+        MainTab.PLAYLISTS to Icons.Rounded.QueueMusic,
+        MainTab.SETTINGS to Icons.Rounded.Settings,
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(barBg)
+            .navigationBarsPadding(),
+    ) {
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.07f),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceAround,
+        ) {
+            items.forEach { (tab, icon) ->
+                val selected = tab == activeTab
+                val tint = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                }
+                val interactionSource = remember { MutableInteractionSource() }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = { onSelectTab(tab) },
+                        )
+                        .padding(vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = tab.label,
+                        tint = tint,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Text(
+                        text = tab.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = tint,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }
