@@ -402,7 +402,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "版本 5.0.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，支持自由配色、流光液态玻璃、封面动态取色与可滑动唱片海报墙。",
+                                text = "版本 5.1.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，支持自由配色、流光液态玻璃、封面动态取色与可滑动唱片海报墙。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
