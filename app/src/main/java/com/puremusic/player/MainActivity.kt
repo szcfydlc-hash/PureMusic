@@ -193,6 +193,7 @@ private fun PureMusicApp(
         val minDurationFilter by viewModel.minDurationFilter.collectAsStateWithLifecycle()
         val scanStatus by viewModel.scanStatus.collectAsStateWithLifecycle()
         val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+        val playlistCovers by viewModel.playlistCovers.collectAsStateWithLifecycle()
         val recentSongs by viewModel.recentSongs.collectAsStateWithLifecycle()
         val mostPlayedSongs by viewModel.mostPlayedSongs.collectAsStateWithLifecycle()
         val currentAudioSpec by viewModel.currentAudioSpec.collectAsStateWithLifecycle()
@@ -226,6 +227,17 @@ private fun PureMusicApp(
         var lyricsSearchSong by remember { mutableStateOf<Song?>(null) }
         var coverSearchSong by remember { mutableStateOf<Song?>(null) }
         var pendingGalleryCoverSong by remember { mutableStateOf<Song?>(null) }
+        var pendingGalleryCoverPlaylist by remember { mutableStateOf<Playlist?>(null) }
+
+        val playlistCoverLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent(),
+        ) { uri ->
+            val target = pendingGalleryCoverPlaylist
+            pendingGalleryCoverPlaylist = null
+            if (uri != null && target != null) {
+                viewModel.applyPlaylistCover(target.id, uri)
+            }
+        }
         var pendingLocalLrcSong by remember { mutableStateOf<Song?>(null) }
         var managingPlaylist by remember { mutableStateOf<Playlist?>(null) }
         var managingFavorites by remember { mutableStateOf(false) }
@@ -361,6 +373,7 @@ private fun PureMusicApp(
                         artists = artists,
                         folders = folders,
                         playlists = playlists,
+                        playlistCovers = playlistCovers,
                         recentSongs = recentSongs,
                         mostPlayedSongs = mostPlayedSongs,
                         favoriteSongIds = favoriteSongIds,
@@ -391,6 +404,11 @@ private fun PureMusicApp(
                         onRequestRenamePlaylist = { renamingPlaylist = it },
                         onRequestManagePlaylistSongs = { managingPlaylist = it },
                         onRequestManageFavorites = { managingFavorites = true },
+                        onRequestReplacePlaylistCover = { pl ->
+                            pendingGalleryCoverPlaylist = pl
+                            playlistCoverLauncher.launch("image/*")
+                        },
+                        onClearPlaylistCover = { pl -> viewModel.clearPlaylistCover(pl.id) },
                         onRemoveSongFromPlaylist = viewModel::removeSongFromPlaylist,
                         onOpenEqualizer = { showEqualizer = true },
                         onOpenSleepTimer = { showSleepTimer = true },
@@ -524,6 +542,7 @@ private fun PureMusicApp(
             AddToPlaylistDialog(
                 song = song,
                 playlists = playlists,
+                        playlistCovers = playlistCovers,
                 onDismiss = { pendingPlaylistSong = null },
                 onSelectPlaylist = { playlistId -> viewModel.addSongToPlaylist(playlistId, song.id) },
                 onCreateAndAdd = { name -> viewModel.createPlaylist(name, listOf(song.id)) },

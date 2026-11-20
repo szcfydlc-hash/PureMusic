@@ -29,9 +29,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Image
@@ -182,181 +186,221 @@ fun SongRowItem(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val density = LocalLayoutDensity.current
+    val ext = song.filePath.substringAfterLast('.', "").lowercase(Locale.US)
+    val isLossless = ext in setOf("flac", "wav", "alac", "ape", "dsd", "aiff")
+    val badgeText = if (isLossless) "SQ" else "HQ"
+    val badgeColor = if (isLossless) Color(0xFF0D9488) else Color(0xFFD97706)
+    val subLine = if (song.album.isNotBlank() && !song.album.equals(song.title, ignoreCase = true) && song.album != "未知专辑") {
+        "${song.artist} - ${song.album}"
+    } else {
+        "${song.artist} · ${formatDuration(song.durationMs)}"
+    }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 18.dp, vertical = density.rowVerticalPaddingDp.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(modifier = Modifier.size(density.artSizeDp.dp)) {
-                AlbumArtwork(
-                    uri = song.albumArtUri,
-                    contentDescription = song.album,
-                    modifier = Modifier.fillMaxSize(),
-                    cornerRadius = 5.dp,
-                    iconSize = 19.dp,
-                )
-                if (isCurrent) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.80f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 18.dp, end = 6.dp, top = density.rowVerticalPaddingDp.dp, bottom = density.rowVerticalPaddingDp.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(density.artSizeDp.dp)) {
+            AlbumArtwork(
+                uri = song.albumArtUri,
+                contentDescription = song.album,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = 6.dp,
+                iconSize = 19.dp,
+            )
+            if (isCurrent) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(badgeColor.copy(alpha = 0.14f))
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                ) {
+                    Text(
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 8.5.sp,
+                            lineHeight = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = badgeColor,
+                    )
+                }
                 Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${song.artist} · ${formatDuration(song.durationMs)}",
+                    text = subLine,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
 
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(
-                        imageVector = Icons.Rounded.MoreVert,
-                        contentDescription = "更多操作",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+        // Light quick-add '+' icon button (Salt Player style!)
+        IconButton(
+            onClick = onAddToPlaylist,
+            modifier = Modifier.size(34.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = "添加到歌单",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+
+        Box {
+            IconButton(
+                onClick = { menuExpanded = true },
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MoreVert,
+                    contentDescription = "更多操作",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+            ) {
+                DropdownMenuItem(
+                    text = { Text(if (isFavorite) "取消喜欢" else "添加到我喜欢") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onToggleFavorite()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("添加到歌单") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.PlaylistAdd,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onAddToPlaylist()
+                    },
+                )
+                if (onReplaceCover != null) {
+                    DropdownMenuItem(
+                        text = { Text("更换封面") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Image,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onReplaceCover()
+                        },
                     )
                 }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 0.dp,
-                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
-                ) {
+                if (onMatchLyrics != null) {
                     DropdownMenuItem(
-                        text = { Text(if (isFavorite) "取消喜欢" else "添加到我喜欢") },
+                        text = { Text("匹配 / 导入歌词") },
                         leadingIcon = {
                             Icon(
-                                imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                imageVector = Icons.Rounded.Lyrics,
                                 contentDescription = null,
                             )
                         },
                         onClick = {
                             menuExpanded = false
-                            onToggleFavorite()
+                            onMatchLyrics()
                         },
                     )
+                }
+                if (onShowSongInfo != null) {
                     DropdownMenuItem(
-                        text = { Text("添加到歌单") },
+                        text = { Text("歌曲信息与编辑") },
                         leadingIcon = {
                             Icon(
-                                imageVector = Icons.Rounded.PlaylistAdd,
+                                imageVector = Icons.Rounded.Info,
                                 contentDescription = null,
                             )
                         },
                         onClick = {
                             menuExpanded = false
-                            onAddToPlaylist()
+                            onShowSongInfo()
                         },
                     )
-                    if (onReplaceCover != null) {
-                        DropdownMenuItem(
-                            text = { Text("更换封面") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Image,
-                                    contentDescription = null,
-                                )
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onReplaceCover()
-                            },
-                        )
-                    }
-                    if (onMatchLyrics != null) {
-                        DropdownMenuItem(
-                            text = { Text("匹配 / 导入歌词") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Lyrics,
-                                    contentDescription = null,
-                                )
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onMatchLyrics()
-                            },
-                        )
-                    }
-                    if (onShowSongInfo != null) {
-                        DropdownMenuItem(
-                            text = { Text("歌曲信息") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Info,
-                                    contentDescription = null,
-                                )
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onShowSongInfo()
-                            },
-                        )
-                    }
-                    if (extraMenuActionLabel != null && onExtraMenuAction != null) {
-                        DropdownMenuItem(
-                            text = { Text(extraMenuActionLabel) },
-                            onClick = {
-                                menuExpanded = false
-                                onExtraMenuAction()
-                            },
-                        )
-                    }
-                    if (onDeleteSong != null) {
-                        DropdownMenuItem(
-                            text = { Text("删除本地文件", color = MaterialTheme.colorScheme.primary) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.DeleteOutline,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onDeleteSong()
-                            },
-                        )
-                    }
+                }
+                if (extraMenuActionLabel != null && onExtraMenuAction != null) {
+                    DropdownMenuItem(
+                        text = { Text(extraMenuActionLabel) },
+                        onClick = {
+                            menuExpanded = false
+                            onExtraMenuAction()
+                        },
+                    )
+                }
+                if (onDeleteSong != null) {
+                    DropdownMenuItem(
+                        text = { Text("删除本地文件", color = MaterialTheme.colorScheme.primary) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.DeleteOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onDeleteSong()
+                        },
+                    )
                 }
             }
         }
-        HorizontalDivider(
-            modifier = Modifier.padding(start = 18.dp + density.artSizeDp.dp + 12.dp, end = 18.dp),
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
-        )
     }
 }
 

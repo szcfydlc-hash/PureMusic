@@ -146,6 +146,56 @@ class OnlineMetadataRepository(private val context: Context) {
         }
     }
 
+    suspend fun savePlaylistCoverFromUri(playlistId: String, sourceUri: Uri): Uri? = withContext(Dispatchers.IO) {
+        runCatching {
+            val bytes = context.contentResolver.openInputStream(sourceUri)?.use { it.readBytes() }
+                ?: return@runCatching null
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching null
+            val maxDim = 800
+            val scaled = if (decoded.width > maxDim || decoded.height > maxDim) {
+                val ratio = minOf(maxDim.toFloat() / decoded.width, maxDim.toFloat() / decoded.height)
+                val w = (decoded.width * ratio).toInt().coerceAtLeast(1)
+                val h = (decoded.height * ratio).toInt().coerceAtLeast(1)
+                Bitmap.createScaledBitmap(decoded, w, h, true).also {
+                    if (it != decoded) decoded.recycle()
+                }
+            } else {
+                decoded
+            }
+            val safePrefix = "playlist_${playlistId}_"
+            coversDir.listFiles()?.forEach { f ->
+                if (f.name.startsWith(safePrefix)) runCatching { f.delete() }
+            }
+            val outFile = File(coversDir, "${safePrefix}${System.currentTimeMillis()}.jpg")
+            FileOutputStream(outFile).use { fos ->
+                scaled.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+            }
+            scaled.recycle()
+            Uri.fromFile(outFile)
+        }.getOrNull()
+    }
+
+    suspend fun clearPlaylistCover(playlistId: String) = withContext(Dispatchers.IO) {
+        val safePrefix = "playlist_${playlistId}_"
+        coversDir.listFiles()?.forEach { f ->
+            if (f.name.startsWith(safePrefix)) runCatching { f.delete() }
+        }
+    }
+
+    suspend fun loadAllPlaylistCovers(): Map<String, Uri> = withContext(Dispatchers.IO) {
+        val result = mutableMapOf<String, Uri>()
+        val files = coversDir.listFiles()?.sortedBy { it.lastModified() } ?: return@withContext result
+        for (file in files) {
+            if (!file.isFile || !file.name.startsWith("playlist_")) continue
+            val rest = file.name.removePrefix("playlist_")
+            val playlistId = rest.substringBeforeLast("_")
+            if (playlistId.isNotBlank()) {
+                result[playlistId] = Uri.fromFile(file)
+            }
+        }
+        result
+    }
+
     suspend fun loadAllCustomCovers(): Map<Long, Uri> = withContext(Dispatchers.IO) {
         val result = mutableMapOf<Long, Uri>()
         val files = coversDir.listFiles()?.sortedBy { it.lastModified() } ?: return@withContext result

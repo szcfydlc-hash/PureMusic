@@ -218,53 +218,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Card 1: Live Typography & Density Preview Card
-            BookSettingsCard(
-                cardBg = cardBg,
-                outlineColor = outlineColor,
-                radius = cardRadius,
-                liquidGlassEnabled = liquidGlassEnabled,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = layoutDensity.rowVerticalPaddingDp.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(layoutDensity.artSizeDp.dp)
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .border(0.6.dp, outlineColor, RoundedCornerShape(5.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.MusicNote,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(21.dp),
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "光影之间",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${layoutDensity.label} · ${(fontScale * 100).toInt()}% · ${fontWeight.label} · 倾斜 ${fontSlantDegrees.roundToInt()}°",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
+
 
             // Card 2: 悬浮与液态玻璃 (with live press-testable crystal glass preview!)
             SettingsSectionHeader("悬浮与液态玻璃")
@@ -777,6 +731,26 @@ fun SettingsScreen(
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Spacer(modifier = Modifier.height(12.dp))
 
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                ) {
+                    Text(
+                        text = "山海自有归期，风雨自有相逢",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "${fontWeight.label} · ${(fontScale * 100).toInt()}% · 倾斜 ${fontSlantDegrees.roundToInt()}°",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = "字体粗细",
                     style = MaterialTheme.typography.labelMedium,
@@ -1065,7 +1039,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v9.0.1",
+                            text = "v9.1.1",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,

@@ -782,22 +782,20 @@ fun SpinningVinylDisc(
             .clip(CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        // 180g Audiophile Glossy Jet-Black LP Shader (dual diagonal hourglass specular sheen + 56 micro-grooves)
+        // 180g Matte-Satin Jet-Black LP Shader (glare-free, refined dark micro-grooves)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            // 1. Deep jet-black virgin vinyl radial tone zones (raised outer lip, music grooves, glossy dead-wax)
+            // 1. Deep matte jet-black virgin vinyl radial base (zero harsh specular glare)
             drawCircle(
                 brush = Brush.radialGradient(
-                    0.00f to Color(0xFF060607),
-                    0.37f to Color(0xFF050506),
-                    0.44f to Color(0xFF121214),
-                    0.48f to Color(0xFF070708),
-                    0.72f to Color(0xFF101012),
-                    0.91f to Color(0xFF070708),
-                    0.96f to Color(0xFF1C1C1F),
-                    1.00f to Color(0xFF0A0A0B),
+                    0.00f to Color(0xFF0A0A0C),
+                    0.38f to Color(0xFF09090B),
+                    0.46f to Color(0xFF131316),
+                    0.68f to Color(0xFF0F0F12),
+                    0.92f to Color(0xFF141417),
+                    1.00f to Color(0xFF0A0A0C),
                     center = center,
                     radius = radius,
                 ),
@@ -805,105 +803,50 @@ fun SpinningVinylDisc(
                 center = center,
             )
 
-            // 2. Broad primary diagonal studio hourglass sheen (upper-left to lower-right like studio-lit LP)
-            drawCircle(
-                brush = Brush.sweepGradient(
-                    0.00f to Color.Transparent,
-                    0.05f to Color.Transparent,
-                    0.10f to Color(0xFFDADCE2).copy(alpha = 0.16f),
-                    0.135f to Color.White.copy(alpha = 0.34f),
-                    0.17f to Color(0xFFDADCE2).copy(alpha = 0.14f),
-                    0.24f to Color.Transparent,
-                    0.55f to Color.Transparent,
-                    0.60f to Color(0xFFDADCE2).copy(alpha = 0.16f),
-                    0.635f to Color.White.copy(alpha = 0.36f),
-                    0.67f to Color(0xFFDADCE2).copy(alpha = 0.14f),
-                    0.74f to Color.Transparent,
-                    1.00f to Color.Transparent,
-                    center = center,
-                ),
-                radius = radius * 0.965f,
-                center = center,
-            )
-
-            // 3. Razor-sharp secondary specular highlight core cones inside the hourglass sheen
-            drawCircle(
-                brush = Brush.sweepGradient(
-                    0.00f to Color.Transparent,
-                    0.118f to Color.Transparent,
-                    0.135f to Color.White.copy(alpha = 0.52f),
-                    0.152f to Color.Transparent,
-                    0.618f to Color.Transparent,
-                    0.635f to Color.White.copy(alpha = 0.54f),
-                    0.652f to Color.Transparent,
-                    1.00f to Color.Transparent,
-                    center = center,
-                ),
-                radius = radius * 0.955f,
-                center = center,
-            )
-
-            // 4. Subtle perpendicular ambient cross-reflection for realistic 3D vinyl sheen
-            drawCircle(
-                brush = Brush.sweepGradient(
-                    0.00f to Color.Transparent,
-                    0.34f to Color.Transparent,
-                    0.385f to Color.White.copy(alpha = 0.10f),
-                    0.43f to Color.Transparent,
-                    0.84f to Color.Transparent,
-                    0.885f to Color.White.copy(alpha = 0.10f),
-                    0.93f to Color.Transparent,
-                    1.00f to Color.Transparent,
-                    center = center,
-                ),
-                radius = radius * 0.95f,
-                center = center,
-            )
-
-            // 5. 56 ultra-fine concentric micro-grooves + 3 glossy track-separator bands
+            // 2. 56 understated matte dark-graphite concentric micro-grooves + 3 subtle track bands
             for (i in 0..55) {
                 val factor = 0.445f + i * 0.0091f
                 val isTrackGap = i == 15 || i == 31 || i == 46
                 val alpha = when {
-                    isTrackGap -> 0.24f
-                    i % 4 == 0 -> 0.11f
-                    i % 2 == 0 -> 0.055f
-                    else -> 0.025f
+                    isTrackGap -> 0.085f
+                    i % 4 == 0 -> 0.048f
+                    i % 2 == 0 -> 0.028f
+                    else -> 0.015f
                 }
                 drawCircle(
                     color = Color.White.copy(alpha = alpha),
                     radius = radius * factor,
                     center = center,
-                    style = Stroke(width = if (isTrackGap) 1.5f else 0.65f),
+                    style = Stroke(width = if (isTrackGap) 1.1f else 0.55f),
                 )
             }
 
-            // 6. Smooth dark mirror dead-wax run-out groove ring around center label
+            // 3. Soft matte dead-wax run-out groove around center label (no bright white ring)
             drawCircle(
-                color = Color.Black.copy(alpha = 0.45f),
+                color = Color.Black.copy(alpha = 0.42f),
                 radius = radius * 0.41f,
                 center = center,
                 style = Stroke(width = radius * 0.055f),
             )
             drawCircle(
-                color = Color.White.copy(alpha = 0.14f),
+                color = Color.White.copy(alpha = 0.05f),
                 radius = radius * 0.438f,
                 center = center,
-                style = Stroke(width = 1.0f),
+                style = Stroke(width = 0.8f),
             )
 
-            // 7. Raised beveled outer LP rim highlight
+            // 4. Clean matte dark outer LP bevel (no bright white outer halo)
             drawCircle(
-                color = Color.White.copy(alpha = 0.30f),
-                radius = radius - 1.4f,
+                color = Color.White.copy(alpha = 0.07f),
+                radius = radius - 1.2f,
                 center = center,
-                style = Stroke(width = 1.6f),
+                style = Stroke(width = 1.2f),
             )
             drawCircle(
-                color = Color.Black.copy(alpha = 0.92f),
-                radius = radius - 3.6f,
+                color = Color.Black.copy(alpha = 0.88f),
+                radius = radius - 3.2f,
                 center = center,
-                style = Stroke(width = 2.4f),
+                style = Stroke(width = 2.2f),
             )
         }
 

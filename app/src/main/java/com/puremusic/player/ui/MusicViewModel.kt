@@ -92,6 +92,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val currentAudioSpec: StateFlow<AudioTechSpec> = _currentAudioSpec.asStateFlow()
 
     private val _customCovers = MutableStateFlow<Map<Long, Uri>>(emptyMap())
+    private val _playlistCovers = MutableStateFlow<Map<String, Uri>>(emptyMap())
+    val playlistCovers: StateFlow<Map<String, Uri>> = _playlistCovers.asStateFlow()
     private val _metaOverrides = MutableStateFlow<Map<Long, SongMetaOverride>>(emptyMap())
     val metaOverrides: StateFlow<Map<Long, SongMetaOverride>> = _metaOverrides.asStateFlow()
 
@@ -411,6 +413,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             playlistRepository.ensureV8BookStyleEpoch()
             _customCovers.value = onlineMetadataRepository.loadAllCustomCovers()
+            _playlistCovers.value = onlineMetadataRepository.loadAllPlaylistCovers()
             _metaOverrides.value = onlineMetadataRepository.loadAllMetaOverrides()
             syncPlayerSnapshot()
         }
@@ -946,6 +949,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             if (deleted) {
                 onSongDeletedFromDevice(song)
             }
+        }
+    }
+
+    fun applyPlaylistCover(playlistId: String, sourceUri: Uri) {
+        viewModelScope.launch {
+            val saved = onlineMetadataRepository.savePlaylistCoverFromUri(playlistId, sourceUri)
+            if (saved != null) {
+                _playlistCovers.update { it + (playlistId to saved) }
+            }
+        }
+    }
+
+    fun clearPlaylistCover(playlistId: String) {
+        viewModelScope.launch {
+            onlineMetadataRepository.clearPlaylistCover(playlistId)
+            _playlistCovers.update { it - playlistId }
         }
     }
 

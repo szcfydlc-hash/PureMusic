@@ -63,6 +63,7 @@ import androidx.compose.material.icons.rounded.Whatshot
 import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicOff
+import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -178,6 +179,7 @@ fun LibraryScreen(
     artists: List<Artist>,
     folders: List<MusicFolder>,
     playlists: List<Playlist>,
+    playlistCovers: Map<String, android.net.Uri>,
     recentSongs: List<Song>,
     mostPlayedSongs: List<Song>,
     favoriteSongIds: Set<Long>,
@@ -208,6 +210,8 @@ fun LibraryScreen(
     onRequestRenamePlaylist: (Playlist) -> Unit,
     onRequestManagePlaylistSongs: (Playlist) -> Unit,
     onRequestManageFavorites: () -> Unit,
+    onRequestReplacePlaylistCover: (Playlist) -> Unit,
+    onClearPlaylistCover: (Playlist) -> Unit,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
     onOpenEqualizer: () -> Unit,
     onOpenSleepTimer: () -> Unit,
@@ -406,59 +410,7 @@ fun LibraryScreen(
                             )
                         }
 
-                        if (activeMainTab == MainTab.LIBRARY && selectedSubTab == LibrarySubTab.SONGS) {
-                            Box {
-                                HeaderToolButton(
-                                    onClick = { sortMenuExpanded = true },
-                                    active = false,
-                                    liquidGlassEnabled = liquidGlassEnabled,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Rounded.Sort,
-                                        contentDescription = "排序",
-                                        modifier = Modifier.size(19.dp),
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = sortMenuExpanded,
-                                    onDismissRequest = { sortMenuExpanded = false },
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                    tonalElevation = 0.dp,
-                                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
-                                ) {
-                                    SortOrder.entries.forEach { order ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = if (order == sortOrder) "✓ ${order.label}" else order.label,
-                                                    fontWeight = if (order == sortOrder) FontWeight.SemiBold else FontWeight.Normal,
-                                                )
-                                            },
-                                            onClick = {
-                                                sortMenuExpanded = false
-                                                onSelectSortOrder(order)
-                                            },
-                                        )
-                                    }
-                                }
-                            }
 
-                            HeaderToolButton(
-                                onClick = { usePosterGrid = !usePosterGrid },
-                                active = usePosterGrid,
-                                liquidGlassEnabled = liquidGlassEnabled,
-                            ) {
-                                Icon(
-                                    imageVector = if (usePosterGrid) {
-                                        Icons.AutoMirrored.Rounded.ViewList
-                                    } else {
-                                        Icons.Rounded.GridView
-                                    },
-                                    contentDescription = "切换视图",
-                                    modifier = Modifier.size(19.dp),
-                                )
-                            }
-                        }
 
                         if (activeMainTab == MainTab.ALBUMS && !isTabletLayout) {
                             HeaderToolButton(
@@ -603,70 +555,92 @@ fun LibraryScreen(
                     )
                 }
 
-                // 4. Refined Flat Outlined Action Buttons (播放全部 + 随机播放)
+                // 4. Ultra-Clean Compact Single-Line Toolbar (🔀 515  ...  Sort + Grid/List)
                 if (activeMainTab == MainTab.LIBRARY && selectedSubTab == LibrarySubTab.SONGS && !isLoading && songs.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            .padding(start = 18.dp, end = 12.dp, top = 6.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(actionCorner))
-                                .background(
-                                    if (liquidGlassEnabled) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surface
-                                    },
-                                )
-                                .border(0.75.dp, outlineColor, RoundedCornerShape(actionCorner))
-                                .clickable { onPlaySongs(songs, 0, false) },
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onPlaySongs(songs, 0, true) }
+                                .padding(horizontal = 4.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.PlayArrow,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp),
+                                imageVector = Icons.Rounded.Shuffle,
+                                contentDescription = "随机播放全部",
+                                tint = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.size(19.dp),
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "播放全部",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Medium,
+                                text = "${songs.size}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground,
                             )
                         }
 
                         Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(actionCorner))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .border(0.75.dp, outlineColor, RoundedCornerShape(actionCorner))
-                                .clickable { onPlaySongs(songs, 0, true) },
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Shuffle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "随机播放",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Medium,
-                            )
+                            Box {
+                                IconButton(
+                                    onClick = { sortMenuExpanded = true },
+                                    modifier = Modifier.size(36.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.Sort,
+                                        contentDescription = "排序",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = sortMenuExpanded,
+                                    onDismissRequest = { sortMenuExpanded = false },
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    tonalElevation = 0.dp,
+                                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                                ) {
+                                    SortOrder.entries.forEach { order ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = if (order == sortOrder) "✓ ${order.label}" else order.label,
+                                                    fontWeight = if (order == sortOrder) FontWeight.SemiBold else FontWeight.Normal,
+                                                )
+                                            },
+                                            onClick = {
+                                                sortMenuExpanded = false
+                                                onSelectSortOrder(order)
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { usePosterGrid = !usePosterGrid },
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    imageVector = if (usePosterGrid) {
+                                        Icons.AutoMirrored.Rounded.ViewList
+                                    } else {
+                                        Icons.Rounded.GridView
+                                    },
+                                    contentDescription = "切换视图",
+                                    tint = if (usePosterGrid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -729,6 +703,8 @@ fun LibraryScreen(
 
                             MainTab.PLAYLISTS -> PlaylistsTabContent(
                                 playlists = playlists,
+                                playlistCovers = playlistCovers,
+                                resolveSongsByIds = resolveSongsByIds,
                                 favoriteCount = favoriteSongIds.size,
                                 recentCount = recentSongs.size,
                                 mostPlayedCount = mostPlayedSongs.size,
@@ -746,6 +722,8 @@ fun LibraryScreen(
                                 onRequestDeletePlaylist = onRequestDeletePlaylist,
                                 onRequestRenamePlaylist = onRequestRenamePlaylist,
                                 onRequestManagePlaylistSongs = onRequestManagePlaylistSongs,
+                                onRequestReplacePlaylistCover = onRequestReplacePlaylistCover,
+                                onClearPlaylistCover = onClearPlaylistCover,
                                 bottomPadding = bottomContentPadding,
                             )
 
@@ -1145,6 +1123,34 @@ private fun SongsTabContent(
                     )
                 }
             }
+            val currentSongIdx = remember(songs, playerState.currentSong?.id) {
+                val cid = playerState.currentSong?.id
+                if (cid == null) -1 else songs.indexOfFirst { it.id == cid }
+            }
+            if (currentSongIdx >= 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 22.dp, bottom = bottomPadding.calculateBottomPadding() + 14.dp)
+                        .size(40.dp)
+                        .shadow(4.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(0.75.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        .clickable {
+                            scope.launch { listState.animateScrollToItem(currentSongIdx) }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MyLocation,
+                        contentDescription = "定位当前播放歌曲",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
+            }
+
             if (songs.size >= 20) {
                 AlphabetFastScroller(
                     onSelectLetter = { letter ->
@@ -1496,6 +1502,7 @@ private fun FoldersTabContent(
 @Composable
 private fun PlaylistsTabContent(
     playlists: List<Playlist>,
+    playlistCovers: Map<String, android.net.Uri>,
     favoriteCount: Int,
     recentCount: Int,
     mostPlayedCount: Int,
@@ -1508,6 +1515,8 @@ private fun PlaylistsTabContent(
     onRequestDeletePlaylist: (Playlist) -> Unit,
     onRequestRenamePlaylist: (Playlist) -> Unit,
     onRequestManagePlaylistSongs: (Playlist) -> Unit,
+    onRequestReplacePlaylistCover: (Playlist) -> Unit,
+    onClearPlaylistCover: (Playlist) -> Unit,
     bottomPadding: PaddingValues,
 ) {
     val cardShape = RoundedCornerShape(if (liquidGlassEnabled) 16.dp else 8.dp)
@@ -1671,19 +1680,34 @@ private fun PlaylistsTabContent(
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.QueueMusic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
+                val customCoverUri = playlistCovers[playlist.id]
+                val autoCoverUri = remember(playlist.songIds) {
+                    resolveSongsByIds(playlist.songIds).firstOrNull()?.albumArtUri
+                }
+                val finalCoverUri = customCoverUri ?: autoCoverUri
+                if (finalCoverUri != null) {
+                    AlbumArtwork(
+                        uri = finalCoverUri,
+                        contentDescription = playlist.name,
+                        modifier = Modifier.size(46.dp),
+                        cornerRadius = 6.dp,
+                        iconSize = 20.dp,
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.QueueMusic,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -1723,6 +1747,22 @@ private fun PlaylistsTabContent(
                                 onRequestManagePlaylistSongs(playlist)
                             },
                         )
+                        DropdownMenuItem(
+                            text = { Text("更换歌单封面") },
+                            onClick = {
+                                plMenuExpanded = false
+                                onRequestReplacePlaylistCover(playlist)
+                            },
+                        )
+                        if (customCoverUri != null) {
+                            DropdownMenuItem(
+                                text = { Text("恢复自动封面") },
+                                onClick = {
+                                    plMenuExpanded = false
+                                    onClearPlaylistCover(playlist)
+                                },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("重命名歌单") },
                             onClick = {
