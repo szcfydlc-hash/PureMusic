@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -55,6 +57,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -93,7 +96,7 @@ fun AlbumArtwork(
     uri: Uri?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 8.dp,
+    cornerRadius: Dp = 5.dp,
     iconSize: Dp = 24.dp,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
@@ -111,7 +114,7 @@ fun AlbumArtwork(
         contentScale = ContentScale.Crop,
         modifier = modifier
             .clip(shape)
-            .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f), shape),
+            .border(0.6.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.85f), shape),
         loading = { ArtworkPlaceholder(shape = shape, iconSize = iconSize) },
         error = { ArtworkPlaceholder(shape = shape, iconSize = iconSize) },
     )
@@ -154,124 +157,131 @@ fun SongRowItem(
     var menuExpanded by remember { mutableStateOf(false) }
     val density = LocalLayoutDensity.current
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = density.rowVerticalPaddingDp.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.size(density.artSizeDp.dp)) {
-            AlbumArtwork(
-                uri = song.albumArtUri,
-                contentDescription = song.album,
-                modifier = Modifier.fillMaxSize(),
-                cornerRadius = 10.dp,
-                iconSize = 20.dp,
-            )
-            if (isCurrent) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = density.rowVerticalPaddingDp.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(modifier = Modifier.size(density.artSizeDp.dp)) {
+                AlbumArtwork(
+                    uri = song.albumArtUri,
+                    contentDescription = song.album,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 5.dp,
+                    iconSize = 19.dp,
+                )
+                if (isCurrent) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.80f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "${song.artist} · ${formatDuration(song.durationMs)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        Box {
-            IconButton(onClick = { menuExpanded = true }) {
-                Icon(
-                    imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = "更多操作",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${song.artist} · ${formatDuration(song.durationMs)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-            ) {
-                DropdownMenuItem(
-                    text = { Text(if (isFavorite) "取消喜欢" else "添加到我喜欢") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            contentDescription = null,
-                        )
-                    },
-                    onClick = {
-                        menuExpanded = false
-                        onToggleFavorite()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("添加到歌单") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Rounded.PlaylistAdd,
-                            contentDescription = null,
-                        )
-                    },
-                    onClick = {
-                        menuExpanded = false
-                        onAddToPlaylist()
-                    },
-                )
-                if (onShowSongInfo != null) {
+
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = "更多操作",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
                     DropdownMenuItem(
-                        text = { Text("歌曲信息") },
+                        text = { Text(if (isFavorite) "取消喜欢" else "添加到我喜欢") },
                         leadingIcon = {
                             Icon(
-                                imageVector = Icons.Rounded.Info,
+                                imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                                 contentDescription = null,
                             )
                         },
                         onClick = {
                             menuExpanded = false
-                            onShowSongInfo()
+                            onToggleFavorite()
                         },
                     )
-                }
-                if (extraMenuActionLabel != null && onExtraMenuAction != null) {
                     DropdownMenuItem(
-                        text = { Text(extraMenuActionLabel) },
+                        text = { Text("添加到歌单") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.PlaylistAdd,
+                                contentDescription = null,
+                            )
+                        },
                         onClick = {
                             menuExpanded = false
-                            onExtraMenuAction()
+                            onAddToPlaylist()
                         },
                     )
+                    if (onShowSongInfo != null) {
+                        DropdownMenuItem(
+                            text = { Text("歌曲信息") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Info,
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onShowSongInfo()
+                            },
+                        )
+                    }
+                    if (extraMenuActionLabel != null && onExtraMenuAction != null) {
+                        DropdownMenuItem(
+                            text = { Text(extraMenuActionLabel) },
+                            onClick = {
+                                menuExpanded = false
+                                onExtraMenuAction()
+                            },
+                        )
+                    }
                 }
             }
         }
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 18.dp + density.artSizeDp.dp + 12.dp, end = 18.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
+        )
     }
 }
 
@@ -285,15 +295,16 @@ fun MiniPlayerBar(
     modifier: Modifier = Modifier,
 ) {
     val song = playerState.currentSong ?: return
-    val pillShape = RoundedCornerShape(22.dp)
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val barShape = RoundedCornerShape(if (liquidGlassEnabled) 22.dp else 8.dp)
+    val bookmarkColor = MaterialTheme.colorScheme.primary
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 6.dp)
-            .height(62.dp)
-            .clip(pillShape)
+            .height(60.dp)
+            .clip(barShape)
             .clickable(onClick = onOpenNowPlaying),
     ) {
         if (liquidGlassEnabled) {
@@ -308,7 +319,7 @@ fun MiniPlayerBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(blurModifier)
-                    .alpha(if (isDark) 0.30f else 0.36f),
+                    .alpha(if (isDark) 0.28f else 0.32f),
                 cornerRadius = 22.dp,
                 iconSize = 18.dp,
             )
@@ -319,58 +330,61 @@ fun MiniPlayerBar(
                         if (isDark) {
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color(0xFF1A1D24).copy(alpha = 0.88f),
-                                    Color(0xFF222630).copy(alpha = 0.80f),
-                                    Color(0xFF1A1D24).copy(alpha = 0.88f),
+                                    Color(0xFF1E1C19).copy(alpha = 0.88f),
+                                    Color(0xFF282420).copy(alpha = 0.80f),
+                                    Color(0xFF1E1C19).copy(alpha = 0.88f),
                                 ),
                             )
                         } else {
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color.White.copy(alpha = 0.86f),
-                                    Color(0xFFF6F7FB).copy(alpha = 0.78f),
-                                    Color.White.copy(alpha = 0.86f),
+                                    Color(0xFFFCFBF7).copy(alpha = 0.86f),
+                                    Color(0xFFF5F1E8).copy(alpha = 0.78f),
+                                    Color(0xFFFCFBF7).copy(alpha = 0.86f),
                                 ),
                             )
                         },
                     )
                     .border(
                         width = 0.8.dp,
-                        brush = Brush.linearGradient(
-                            colors = if (isDark) {
-                                listOf(
-                                    Color.White.copy(alpha = 0.22f),
-                                    Color.White.copy(alpha = 0.06f),
-                                    Color.White.copy(alpha = 0.16f),
-                                )
-                            } else {
-                                listOf(
-                                    Color.White.copy(alpha = 0.96f),
-                                    Color(0xFFD5DAE5).copy(alpha = 0.55f),
-                                    Color.White.copy(alpha = 0.90f),
-                                )
-                            },
-                        ),
-                        shape = pillShape,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
+                        shape = barShape,
                     ),
             )
         } else {
+            // Classic Vintage Book Bookmark Card (Flat archival paper + crisp hairline border + silk ribbon tab)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(if (isDark) Color(0xFF181B22) else Color.White)
-                    .border(
-                        0.8.dp,
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f),
-                        pillShape,
-                    ),
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.8.dp, MaterialTheme.colorScheme.outline, barShape),
             )
+            // Delicate Cinnabar / Accent Ribbon Bookmark tucked at top-left edge
+            Canvas(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 12.dp)
+                    .size(width = 10.dp, height = 16.dp),
+            ) {
+                val path = Path().apply {
+                    moveTo(0f, 0f)
+                    lineTo(size.width, 0f)
+                    lineTo(size.width, size.height)
+                    lineTo(size.width / 2f, size.height * 0.74f)
+                    lineTo(0f, size.height)
+                    close()
+                }
+                drawPath(path = path, color = bookmarkColor)
+            }
         }
 
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp),
+                .padding(
+                    start = if (liquidGlassEnabled) 10.dp else 28.dp,
+                    end = 10.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -389,11 +403,11 @@ fun MiniPlayerBar(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF121316))
-                            .border(1.dp, Color.White.copy(alpha = 0.22f), CircleShape)
-                            .padding(9.dp),
+                            .background(Color(0xFF181614))
+                            .border(0.8.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                            .padding(8.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         AlbumArtwork(
@@ -402,8 +416,8 @@ fun MiniPlayerBar(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape),
-                            cornerRadius = 20.dp,
-                            iconSize = 12.dp,
+                            cornerRadius = 18.dp,
+                            iconSize = 11.dp,
                         )
                     }
 
@@ -428,20 +442,34 @@ fun MiniPlayerBar(
                 }
             }
 
-            FilledIconButton(
-                onClick = onTogglePlayPause,
-                shape = CircleShape,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                modifier = Modifier.size(38.dp),
-            ) {
-                Icon(
-                    imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                    modifier = Modifier.size(21.dp),
-                )
+            if (liquidGlassEnabled) {
+                FilledIconButton(
+                    onClick = onTogglePlayPause,
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onTogglePlayPause,
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(23.dp),
+                    )
+                }
             }
 
             IconButton(
@@ -452,7 +480,7 @@ fun MiniPlayerBar(
                     imageVector = Icons.Rounded.SkipNext,
                     contentDescription = "下一首",
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(21.dp),
                 )
             }
         }

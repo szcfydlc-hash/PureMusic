@@ -19,23 +19,34 @@ import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
 
-val BerryRed = Color(0xFFFA2D48)
-val ForestGreen = Color(0xFFFA2D48)
+val CinnabarRed = Color(0xFFA63429)
+val ForestGreen = Color(0xFF2F5D50)
 
-val GlacialWhiteBg = Color(0xFFFFFFFF)
-val GlacialSidebar = Color(0xFFF4F5F8)
-val GlacialSurface = Color(0xFFF8F9FB)
-val GlacialSurfaceVariant = Color(0xFFF0F2F6)
-val ObsidianInk = Color(0xFF111318)
-val CoolMuted = Color(0xFF7A808D)
+// Classic Ivory Archival Book Paper (Unadorned, calm, refined)
+val BookPaperBg = Color(0xFFF7F4EC)
+val BookPaperCard = Color(0xFFFCFBF7)
+val BookPaperVariant = Color(0xFFEDE8DC)
+val BookInkPrimary = Color(0xFF1E1B18)
+val BookInkMuted = Color(0xFF6E675F)
+val BookHairlineLight = Color(0xFFDDD6C7)
 
-val WarmPaperBg = Color(0xFFF7F4EE)
-val DeepInkBg = Color(0xFF0A0B0E)
-val DeepInkSidebar = Color(0xFF14161B)
+// Crisp Bright Editorial Paper
+val PurePaperBg = Color(0xFFFFFFFF)
+val PurePaperCard = Color(0xFFF9F8F5)
+val PurePaperVariant = Color(0xFFF0EEE8)
+val PureHairlineLight = Color(0xFFE3DFD6)
+
+// Night Reading Charcoal Cloth & Warm Ivory Ink
+val NightBookBg = Color(0xFF141311)
+val NightBookCard = Color(0xFF1D1B18)
+val NightBookVariant = Color(0xFF282520)
+val NightBookInk = Color(0xFFEAE4D8)
+val NightBookMuted = Color(0xFF9C9488)
+val BookHairlineDark = Color(0xFF332F29)
 
 val LocalLayoutDensity = compositionLocalOf { LayoutDensity.STANDARD }
 
-fun sidebarColorFor(isDark: Boolean): Color = if (isDark) DeepInkSidebar else GlacialSidebar
+fun sidebarColorFor(isDark: Boolean): Color = if (isDark) NightBookCard else BookPaperVariant
 
 @Composable
 fun PureMusicTheme(
@@ -49,70 +60,73 @@ fun PureMusicTheme(
     val useDark = when (backgroundStyle) {
         BackgroundStyle.DEEP_INK -> true
         BackgroundStyle.SYSTEM -> isSystemInDarkTheme()
-        BackgroundStyle.PURE_WHITE, BackgroundStyle.WARM_PAPER -> false
+        BackgroundStyle.WARM_PAPER, BackgroundStyle.PURE_WHITE -> false
     }
 
-    val primaryAccent = if (accentColor == AppAccentColor.MONOCHROME && useDark) {
-        Color(0xFFE4E4E7)
+    val primaryAccent = if (accentColor == AppAccentColor.PURE_INK && useDark) {
+        Color(0xFFDCD5C7)
     } else {
         Color(accentColor.colorHex)
     }
-    val onPrimaryColor = if (accentColor == AppAccentColor.MONOCHROME && useDark) {
-        Color(0xFF111318)
+    val onPrimaryColor = if (accentColor == AppAccentColor.PURE_INK && useDark) {
+        Color(0xFF141311)
     } else {
-        Color.White
+        Color(0xFFFCFBF7)
     }
 
     val colorScheme = if (useDark) {
         darkColorScheme(
             primary = primaryAccent,
             onPrimary = onPrimaryColor,
-            primaryContainer = primaryAccent.copy(alpha = 0.20f),
-            onPrimaryContainer = Color(0xFFF5F6FA),
+            primaryContainer = primaryAccent.copy(alpha = 0.18f),
+            onPrimaryContainer = NightBookInk,
             secondary = primaryAccent.copy(alpha = 0.85f),
             onSecondary = onPrimaryColor,
-            background = DeepInkBg,
-            onBackground = Color(0xFFF5F6FA),
-            surface = Color(0xFF14161B),
-            onSurface = Color(0xFFF5F6FA),
-            surfaceVariant = Color(0xFF1E2129),
-            onSurfaceVariant = Color(0xFF9197A4),
+            background = NightBookBg,
+            onBackground = NightBookInk,
+            surface = NightBookCard,
+            onSurface = NightBookInk,
+            surfaceVariant = NightBookVariant,
+            onSurfaceVariant = NightBookMuted,
+            outline = BookHairlineDark,
         )
-    } else if (backgroundStyle == BackgroundStyle.WARM_PAPER) {
+    } else if (backgroundStyle == BackgroundStyle.PURE_WHITE) {
         lightColorScheme(
             primary = primaryAccent,
             onPrimary = onPrimaryColor,
-            primaryContainer = primaryAccent.copy(alpha = 0.12f),
+            primaryContainer = primaryAccent.copy(alpha = 0.10f),
             onPrimaryContainer = primaryAccent,
             secondary = primaryAccent.copy(alpha = 0.85f),
             onSecondary = onPrimaryColor,
-            background = WarmPaperBg,
-            onBackground = ObsidianInk,
-            surface = Color(0xFFFCFBF8),
-            onSurface = ObsidianInk,
-            surfaceVariant = Color(0xFFEEEAE2),
-            onSurfaceVariant = CoolMuted,
+            background = PurePaperBg,
+            onBackground = BookInkPrimary,
+            surface = PurePaperCard,
+            onSurface = BookInkPrimary,
+            surfaceVariant = PurePaperVariant,
+            onSurfaceVariant = BookInkMuted,
+            outline = PureHairlineLight,
         )
     } else {
         lightColorScheme(
             primary = primaryAccent,
             onPrimary = onPrimaryColor,
-            primaryContainer = primaryAccent.copy(alpha = 0.12f),
+            primaryContainer = primaryAccent.copy(alpha = 0.10f),
             onPrimaryContainer = primaryAccent,
             secondary = primaryAccent.copy(alpha = 0.85f),
             onSecondary = onPrimaryColor,
-            background = GlacialWhiteBg,
-            onBackground = ObsidianInk,
-            surface = GlacialSurface,
-            onSurface = ObsidianInk,
-            surfaceVariant = GlacialSurfaceVariant,
-            onSurfaceVariant = CoolMuted,
+            background = BookPaperBg,
+            onBackground = BookInkPrimary,
+            surface = BookPaperCard,
+            onSurface = BookInkPrimary,
+            surfaceVariant = BookPaperVariant,
+            onSurfaceVariant = BookInkMuted,
+            outline = BookHairlineLight,
         )
     }
 
     val family = when (fontStyle) {
-        AppFontStyle.SANS -> FontFamily.SansSerif
         AppFontStyle.SERIF -> FontFamily.Serif
+        AppFontStyle.SANS -> FontFamily.SansSerif
         AppFontStyle.MONOSPACE -> FontFamily.Monospace
     }
 

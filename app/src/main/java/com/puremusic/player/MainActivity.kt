@@ -422,12 +422,7 @@ private fun PureMusicBottomNavBar(
     activeTab: MainTab,
     onSelectTab: (MainTab) -> Unit,
 ) {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val barBg = if (isDark) {
-        Color(0xFF0E1015).copy(alpha = 0.96f)
-    } else {
-        Color.White.copy(alpha = 0.96f)
-    }
+    val barBg = MaterialTheme.colorScheme.surface
     val items: List<Pair<MainTab, ImageVector>> = listOf(
         MainTab.LIBRARY to Icons.Rounded.LibraryMusic,
         MainTab.ALBUMS to Icons.Rounded.Album,
@@ -442,8 +437,8 @@ private fun PureMusicBottomNavBar(
             .navigationBarsPadding(),
     ) {
         HorizontalDivider(
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.07f),
+            thickness = 0.75.dp,
+            color = MaterialTheme.colorScheme.outline,
         )
         Row(
             modifier = Modifier

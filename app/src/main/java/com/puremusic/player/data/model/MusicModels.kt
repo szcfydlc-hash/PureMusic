@@ -72,8 +72,8 @@ enum class PlayerTheme(val label: String) {
 }
 
 enum class AppFontStyle(val label: String) {
-    SANS("清晰黑体"),
     SERIF("优雅衬线"),
+    SANS("清晰黑体"),
     MONOSPACE("等宽体"),
 }
 
@@ -85,10 +85,10 @@ enum class LyricFontStyle(val label: String) {
 }
 
 enum class BackgroundStyle(val label: String) {
-    PURE_WHITE("极光白"),
-    DEEP_INK("曜石黑"),
+    WARM_PAPER("宣纸浅色"),
+    DEEP_INK("夜读深色"),
     SYSTEM("跟随系统"),
-    WARM_PAPER("柔和暖纸"),
+    PURE_WHITE("素白纸"),
 }
 
 enum class LayoutMode(val label: String) {
@@ -138,13 +138,13 @@ data class PlayerUiState(
     val repeatMode: RepeatMode = RepeatMode.OFF,
 )
 
-enum class AppAccentColor(val label: String, val colorHex: Long) {
-    BERRY_RED("极光莓红", 0xFFFA2D48),
-    COBALT_BLUE("电光钴蓝", 0xFF2563EB),
-    MINT_TEAL("薄荷青", 0xFF0D9488),
-    ELECTRIC_VIOLET("霓虹紫", 0xFF7C3AED),
-    VIBRANT_ORANGE("流光橘", 0xFFF97316),
-    MONOCHROME("极简曜石", 0xFF18181B),
+enum class AppAccentColor(val label: String, val shortLabel: String, val colorHex: Long) {
+    CINNABAR_RED("朱砂印泥", "朱砂", 0xFFA63429),
+    PINE_GREEN("松烟黛绿", "黛绿", 0xFF2F5D50),
+    PRUSSIAN_BLUE("普鲁士蓝", "普蓝", 0xFF2B4C7E),
+    WALNUT_SEPIA("胡桃褐", "胡桃", 0xFF7A5438),
+    ANTIQUE_OCHRE("秋香赭金", "赭金", 0xFF9E7332),
+    PURE_INK("纯墨黑", "纯墨", 0xFF262320),
 }
 
 enum class LayoutDensity(

@@ -185,18 +185,25 @@ fun NowPlayingScreen(
     }
     val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
+    val activeAccentColor = if (liquidGlassEnabled) animatedAccent else MaterialTheme.colorScheme.primary
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(baseCanvas)
-            .background(
-                Brush.radialGradient(
-                    0.00f to animatedGlow.copy(alpha = if (isDarkTheme) 0.26f else 0.16f),
-                    0.55f to animatedGlow.copy(alpha = if (isDarkTheme) 0.08f else 0.04f),
-                    1.00f to Color.Transparent,
-                    center = Offset(540f, 520f),
-                    radius = 950f,
-                ),
+            .then(
+                if (liquidGlassEnabled) {
+                    Modifier.background(
+                        Brush.radialGradient(
+                            0.00f to animatedGlow.copy(alpha = if (isDarkTheme) 0.24f else 0.14f),
+                            0.55f to animatedGlow.copy(alpha = if (isDarkTheme) 0.08f else 0.04f),
+                            1.00f to Color.Transparent,
+                            center = Offset(540f, 520f),
+                            radius = 950f,
+                        ),
+                    )
+                } else {
+                    Modifier
+                },
             ),
     ) {
         Column(
@@ -213,7 +220,7 @@ fun NowPlayingScreen(
                 backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
                 backIconTint = primaryTextColor,
                 sleepTimerRemainingMs = sleepTimerRemainingMs,
-                accentColor = animatedAccent,
+                accentColor = activeAccentColor,
                 onClose = onClose,
                 onSelectSong = onSelectSongFromWall,
                 onOpenSleepTimer = onOpenSleepTimer,
@@ -342,7 +349,7 @@ fun NowPlayingScreen(
                     positionMs = playerState.positionMs,
                     durationMs = durationMs,
                     activeLineColor = primaryTextColor.copy(alpha = 0.78f),
-                    accentColor = animatedAccent,
+                    accentColor = activeAccentColor,
                     trackColor = secondaryTextColor.copy(alpha = 0.28f),
                     onSeekTo = onSeekTo,
                 )
@@ -376,7 +383,7 @@ fun NowPlayingScreen(
                         Icon(
                             imageVector = Icons.Rounded.Shuffle,
                             contentDescription = "随机播放",
-                            tint = if (playerState.shuffleEnabled) animatedAccent else primaryTextColor.copy(alpha = 0.85f),
+                            tint = if (playerState.shuffleEnabled) activeAccentColor else primaryTextColor.copy(alpha = 0.85f),
                             modifier = Modifier.size(21.dp),
                         )
                     }
@@ -394,12 +401,12 @@ fun NowPlayingScreen(
                         onClick = onTogglePlayPause,
                         shape = CircleShape,
                         colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = animatedAccent,
-                            contentColor = Color.White,
+                            containerColor = if (liquidGlassEnabled) activeAccentColor else primaryTextColor,
+                            contentColor = if (liquidGlassEnabled) Color.White else baseCanvas,
                         ),
                         modifier = Modifier
                             .size(66.dp)
-                            .shadow(10.dp, CircleShape),
+                            .then(if (liquidGlassEnabled) Modifier.shadow(10.dp, CircleShape) else Modifier),
                     ) {
                         Icon(
                             imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,

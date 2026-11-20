@@ -74,6 +74,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -81,6 +82,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,11 +91,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -216,6 +215,7 @@ fun LibraryScreen(
             songs = detailSongs,
             favoriteSongIds = favoriteSongIds,
             playerState = playerState,
+            liquidGlassEnabled = liquidGlassEnabled,
             onBack = { activeDetail = null },
             onPlaySongs = onPlaySongs,
             onToggleFavorite = onToggleFavorite,
@@ -230,6 +230,9 @@ fun LibraryScreen(
         )
         return
     }
+
+    val outlineColor = MaterialTheme.colorScheme.outline
+    val actionCorner = if (liquidGlassEnabled) 14.dp else 7.dp
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -256,11 +259,11 @@ fun LibraryScreen(
                     onOpenSleepTimer = onOpenSleepTimer,
                     onOpenSettings = onOpenThemeSettings,
                 )
-                VerticalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f))
+                VerticalDivider(thickness = 0.75.dp, color = outlineColor)
             }
 
             Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                // 1. Sleek Modern Editorial Header (Zero top bloat!)
+                // 1. Classic Editorial Book Header
                 val headerTitle = when (activeMainTab) {
                     MainTab.LIBRARY -> "曲库"
                     MainTab.ALBUMS -> "专辑"
@@ -277,7 +280,7 @@ fun LibraryScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
+                        .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
@@ -289,6 +292,7 @@ fun LibraryScreen(
                             ),
                             color = MaterialTheme.colorScheme.onBackground,
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = headerSubtitle,
                             style = MaterialTheme.typography.labelSmall,
@@ -303,10 +307,11 @@ fun LibraryScreen(
                         if (sleepTimerRemainingMs != null) {
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .clip(RoundedCornerShape(actionCorner))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(0.75.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(actionCorner))
                                     .clickable(onClick = onOpenSleepTimer)
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    .padding(horizontal = 9.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
@@ -325,8 +330,7 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Expandable Search Icon Button
-                        HeaderCircleIconButton(
+                        HeaderToolButton(
                             onClick = {
                                 if (searchExpanded && searchQuery.isNotEmpty()) {
                                     onSearchQueryChange("")
@@ -334,6 +338,7 @@ fun LibraryScreen(
                                 searchExpanded = !searchExpanded
                             },
                             active = searchExpanded || searchQuery.isNotEmpty(),
+                            liquidGlassEnabled = liquidGlassEnabled,
                         ) {
                             Icon(
                                 imageVector = if (searchExpanded) Icons.Rounded.Close else Icons.Rounded.Search,
@@ -344,9 +349,10 @@ fun LibraryScreen(
 
                         if (activeMainTab == MainTab.LIBRARY && selectedSubTab == LibrarySubTab.SONGS) {
                             Box {
-                                HeaderCircleIconButton(
+                                HeaderToolButton(
                                     onClick = { sortMenuExpanded = true },
                                     active = false,
+                                    liquidGlassEnabled = liquidGlassEnabled,
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Rounded.Sort,
@@ -375,9 +381,10 @@ fun LibraryScreen(
                                 }
                             }
 
-                            HeaderCircleIconButton(
+                            HeaderToolButton(
                                 onClick = { usePosterGrid = !usePosterGrid },
                                 active = usePosterGrid,
+                                liquidGlassEnabled = liquidGlassEnabled,
                             ) {
                                 Icon(
                                     imageVector = if (usePosterGrid) {
@@ -392,14 +399,10 @@ fun LibraryScreen(
                         }
 
                         if (activeMainTab == MainTab.PLAYLISTS) {
-                            FilledIconButton(
+                            HeaderToolButton(
                                 onClick = onRequestCreatePlaylist,
-                                shape = CircleShape,
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                                ),
-                                modifier = Modifier.size(36.dp),
+                                active = true,
+                                liquidGlassEnabled = liquidGlassEnabled,
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Add,
@@ -411,7 +414,7 @@ fun LibraryScreen(
                     }
                 }
 
-                // 2. Collapsible Search Input Pill (expands smoothly ONLY on tap!)
+                // 2. Expandable Search Input Box
                 AnimatedVisibility(
                     visible = searchExpanded || searchQuery.isNotEmpty(),
                     enter = fadeIn() + expandVertically(),
@@ -421,9 +424,10 @@ fun LibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp, vertical = 6.dp)
-                            .height(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(actionCorner))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(0.75.dp, outlineColor, RoundedCornerShape(actionCorner))
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -431,13 +435,13 @@ fun LibraryScreen(
                             imageVector = Icons.Rounded.Search,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(17.dp),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(modifier = Modifier.weight(1f)) {
                             if (searchQuery.isEmpty()) {
                                 Text(
-                                    text = "搜索歌曲、专辑、歌手",
+                                    text = "检索歌曲、专辑、歌手",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                                     maxLines = 1,
@@ -471,60 +475,79 @@ fun LibraryScreen(
                     }
                 }
 
-                // 3. Inline Sub-Pills on Library tab (歌曲 / 歌手 / 文件夹)
+                // 3. Book-Index Underline Sub-Tabs on Library tab (歌曲 / 歌手 / 文件夹)
                 if (activeMainTab == MainTab.LIBRARY) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .padding(horizontal = 18.dp, vertical = 4.dp),
                     ) {
-                        LibrarySubTab.entries.forEach { subTab ->
-                            val selected = subTab == selectedSubTab
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(
-                                        if (selected) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            LibrarySubTab.entries.forEach { subTab ->
+                                val selected = subTab == selectedSubTab
+                                Column(
+                                    modifier = Modifier
+                                        .clickable { selectedSubTab = subTab }
+                                        .padding(top = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text(
+                                        text = subTab.label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = if (selected) {
                                             MaterialTheme.colorScheme.primary
                                         } else {
-                                            MaterialTheme.colorScheme.surfaceVariant
+                                            MaterialTheme.colorScheme.onSurfaceVariant
                                         },
                                     )
-                                    .clickable { selectedSubTab = subTab }
-                                    .padding(horizontal = 16.dp, vertical = 7.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = subTab.label,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.onPrimary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .width(34.dp)
+                                            .height(2.dp)
+                                            .background(
+                                                if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                            ),
+                                    )
+                                }
                             }
                         }
+                        HorizontalDivider(thickness = 0.75.dp, color = outlineColor)
                     }
+                } else {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+                        thickness = 0.75.dp,
+                        color = outlineColor,
+                    )
                 }
 
-                // 4. Twin Quick-Action Pills on Songs sub-tab (播放全部 + 随机播放)
+                // 4. Refined Flat Outlined Action Buttons (播放全部 + 随机播放)
                 if (activeMainTab == MainTab.LIBRARY && selectedSubTab == LibrarySubTab.SONGS && !isLoading && songs.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 8.dp),
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(actionCorner))
+                                .background(
+                                    if (liquidGlassEnabled) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surface
+                                    },
+                                )
+                                .border(0.75.dp, outlineColor, RoundedCornerShape(actionCorner))
                                 .clickable { onPlaySongs(songs, 0, false) },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
@@ -533,23 +556,24 @@ fun LibraryScreen(
                                 imageVector = Icons.Rounded.PlayArrow,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(19.dp),
+                                modifier = Modifier.size(18.dp),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "播放全部",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium,
                             )
                         }
 
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(actionCorner))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(0.75.dp, outlineColor, RoundedCornerShape(actionCorner))
                                 .clickable { onPlaySongs(songs, 0, true) },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
@@ -557,8 +581,8 @@ fun LibraryScreen(
                             Icon(
                                 imageVector = Icons.Rounded.Shuffle,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(17.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
@@ -619,6 +643,7 @@ fun LibraryScreen(
                             MainTab.ALBUMS -> AlbumsTabContent(
                                 albums = albums,
                                 gridColumns = albumGridColumns,
+                                liquidGlassEnabled = liquidGlassEnabled,
                                 onSelectAlbum = { activeDetail = CollectionDetail.AlbumDetail(it) },
                                 bottomPadding = bottomContentPadding,
                             )
@@ -626,6 +651,7 @@ fun LibraryScreen(
                             MainTab.PLAYLISTS -> PlaylistsTabContent(
                                 playlists = playlists,
                                 favoriteCount = favoriteSongIds.size,
+                                liquidGlassEnabled = liquidGlassEnabled,
                                 onOpenFavorites = { activeDetail = CollectionDetail.FavoritesDetail },
                                 onPlayFavorites = {
                                     val favSongs = allSongs.filter { it.id in favoriteSongIds }
@@ -648,27 +674,36 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun HeaderCircleIconButton(
+private fun HeaderToolButton(
     onClick: () -> Unit,
     active: Boolean,
+    liquidGlassEnabled: Boolean,
     content: @Composable () -> Unit,
 ) {
+    val shape = if (liquidGlassEnabled) CircleShape else RoundedCornerShape(7.dp)
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
+            .size(34.dp)
+            .clip(shape)
             .background(
-                if (active) {
-                    MaterialTheme.colorScheme.primaryContainer
+                when {
+                    active -> MaterialTheme.colorScheme.primaryContainer
+                    liquidGlassEnabled -> MaterialTheme.colorScheme.surfaceVariant
+                    else -> Color.Transparent
+                },
+            )
+            .then(
+                if (!liquidGlassEnabled && active) {
+                    Modifier.border(0.75.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), shape)
                 } else {
-                    MaterialTheme.colorScheme.surfaceVariant
+                    Modifier
                 },
             )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.material3.LocalContentColor provides if (active) {
+        CompositionLocalProvider(
+            LocalContentColor provides if (active) {
                 MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.onSurface
@@ -712,7 +747,7 @@ private fun TabletLeftSidebar(
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
                 text = "简约音乐",
@@ -720,15 +755,21 @@ private fun TabletLeftSidebar(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             )
+            HorizontalDivider(thickness = 0.75.dp, color = MaterialTheme.colorScheme.outline)
+            Spacer(modifier = Modifier.height(4.dp))
 
             navItems.forEach { (tab, icon) ->
                 val selected = tab == activeMainTab
+                val itemShape = RoundedCornerShape(if (liquidGlassEnabled) 14.dp else 8.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(itemShape)
                         .background(
-                            if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                        )
+                        .then(
+                            if (selected) Modifier.border(0.75.dp, MaterialTheme.colorScheme.outline, itemShape) else Modifier,
                         )
                         .clickable {
                             if (tab == MainTab.SETTINGS) onOpenSettings() else onSelectMainTab(tab)
@@ -740,13 +781,13 @@ private fun TabletLeftSidebar(
                         imageVector = icon,
                         contentDescription = null,
                         tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(19.dp),
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = tab.label,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
                 }
@@ -758,10 +799,20 @@ private fun TabletLeftSidebar(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             val song = playerState.currentSong
+            val cardShape = RoundedCornerShape(if (liquidGlassEnabled) 20.dp else 10.dp)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .liquidGlass(enabled = liquidGlassEnabled, shape = RoundedCornerShape(20.dp), elevation = 6.dp)
+                    .then(
+                        if (liquidGlassEnabled) {
+                            Modifier.liquidGlass(enabled = true, shape = cardShape, elevation = 6.dp)
+                        } else {
+                            Modifier
+                                .clip(cardShape)
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(0.75.dp, MaterialTheme.colorScheme.outline, cardShape)
+                        },
+                    )
                     .clickable(enabled = song != null, onClick = onOpenNowPlaying)
                     .padding(14.dp),
                 contentAlignment = Alignment.Center,
@@ -879,22 +930,21 @@ private fun SongsTabContent(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .shadow(4.dp, RoundedCornerShape(12.dp), clip = false),
+                            .aspectRatio(1f),
                     ) {
                         AlbumArtwork(
                             uri = song.albumArtUri,
                             contentDescription = song.album,
                             modifier = Modifier.fillMaxSize(),
-                            cornerRadius = 12.dp,
-                            iconSize = 28.dp,
+                            cornerRadius = 6.dp,
+                            iconSize = 26.dp,
                         )
                         if (isCurrent) {
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
                                     .padding(6.dp)
-                                    .size(26.dp)
+                                    .size(24.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primary),
                                 contentAlignment = Alignment.Center,
@@ -903,12 +953,12 @@ private fun SongsTabContent(
                                     imageVector = if (playerState.isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(15.dp),
+                                    modifier = Modifier.size(14.dp),
                                 )
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(7.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = song.title,
                         style = MaterialTheme.typography.bodySmall,
@@ -976,6 +1026,7 @@ private fun SongsTabContent(
 private fun AlbumsTabContent(
     albums: List<Album>,
     gridColumns: Int,
+    liquidGlassEnabled: Boolean,
     onSelectAlbum: (Album) -> Unit,
     bottomPadding: PaddingValues,
 ) {
@@ -986,43 +1037,40 @@ private fun AlbumsTabContent(
         return
     }
 
+    val frameShape = RoundedCornerShape(if (liquidGlassEnabled) 14.dp else 8.dp)
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridColumns),
         contentPadding = PaddingValues(
             start = 18.dp,
             end = 18.dp,
-            top = 10.dp,
+            top = 12.dp,
             bottom = 20.dp + bottomPadding.calculateBottomPadding(),
         ),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         items(albums, key = { it.id }) { album ->
+            // Archival Book Plate Frame
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onSelectAlbum(album) },
+                    .clip(frameShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.75.dp, MaterialTheme.colorScheme.outline, frameShape)
+                    .clickable { onSelectAlbum(album) }
+                    .padding(8.dp),
             ) {
-                Box(
+                AlbumArtwork(
+                    uri = album.albumArtUri,
+                    contentDescription = album.name,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = RoundedCornerShape(14.dp),
-                            ambientColor = Color.Black.copy(alpha = 0.14f),
-                            spotColor = Color.Black.copy(alpha = 0.18f),
-                        ),
-                ) {
-                    AlbumArtwork(
-                        uri = album.albumArtUri,
-                        contentDescription = album.name,
-                        modifier = Modifier.fillMaxSize(),
-                        cornerRadius = 14.dp,
-                        iconSize = 36.dp,
-                    )
-                }
-                Spacer(modifier = Modifier.height(9.dp))
+                        .aspectRatio(1f),
+                    cornerRadius = if (liquidGlassEnabled) 10.dp else 4.dp,
+                    iconSize = 34.dp,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = album.name,
                     style = MaterialTheme.typography.bodyMedium,
@@ -1068,16 +1116,17 @@ private fun ArtistsTabContent(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Person,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
                 Spacer(modifier = Modifier.width(14.dp))
@@ -1098,14 +1147,14 @@ private fun ArtistsTabContent(
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                    modifier = Modifier.size(19.dp),
                 )
             }
             HorizontalDivider(
-                modifier = Modifier.padding(start = 76.dp, end = 18.dp),
+                modifier = Modifier.padding(start = 72.dp, end = 18.dp),
                 thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
             )
         }
     }
@@ -1135,16 +1184,17 @@ private fun FoldersTabContent(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Folder,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
                 Spacer(modifier = Modifier.width(14.dp))
@@ -1167,14 +1217,14 @@ private fun FoldersTabContent(
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                    modifier = Modifier.size(19.dp),
                 )
             }
             HorizontalDivider(
-                modifier = Modifier.padding(start = 76.dp, end = 18.dp),
+                modifier = Modifier.padding(start = 72.dp, end = 18.dp),
                 thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
             )
         }
     }
@@ -1184,20 +1234,20 @@ private fun FoldersTabContent(
 private fun PlaylistsTabContent(
     playlists: List<Playlist>,
     favoriteCount: Int,
+    liquidGlassEnabled: Boolean,
     onOpenFavorites: () -> Unit,
     onPlayFavorites: () -> Unit,
     onOpenPlaylist: (Playlist) -> Unit,
     onDeletePlaylist: (String) -> Unit,
     bottomPadding: PaddingValues,
 ) {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val cardBg = if (isDark) Color(0xFF151820) else Color(0xFFF8F9FC)
+    val cardShape = RoundedCornerShape(if (liquidGlassEnabled) 16.dp else 8.dp)
 
     LazyColumn(
         contentPadding = PaddingValues(
             start = 18.dp,
             end = 18.dp,
-            top = 10.dp,
+            top = 12.dp,
             bottom = 20.dp + bottomPadding.calculateBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1206,36 +1256,25 @@ private fun PlaylistsTabContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.28f else 0.14f),
-                                MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.12f else 0.05f),
-                            ),
-                        ),
-                    )
-                    .border(
-                        0.8.dp,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                        RoundedCornerShape(20.dp),
-                    )
+                    .clip(cardShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.8.dp, MaterialTheme.colorScheme.outline, cardShape)
                     .clickable(onClick = onOpenFavorites)
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(15.dp))
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(if (liquidGlassEnabled) 14.dp else 6.dp))
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Favorite,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp),
                     )
                 }
                 Spacer(modifier = Modifier.width(14.dp))
@@ -1248,25 +1287,18 @@ private fun PlaylistsTabContent(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "$favoriteCount 首收藏歌曲",
+                        text = "$favoriteCount 首珍藏曲目",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 if (favoriteCount > 0) {
-                    FilledIconButton(
-                        onClick = onPlayFavorites,
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = Color.White,
-                        ),
-                        modifier = Modifier.size(40.dp),
-                    ) {
+                    IconButton(onClick = onPlayFavorites) {
                         Icon(
                             imageVector = Icons.Rounded.PlayArrow,
                             contentDescription = "播放我喜欢的音乐",
-                            modifier = Modifier.size(22.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(26.dp),
                         )
                     }
                 }
@@ -1279,7 +1311,7 @@ private fun PlaylistsTabContent(
                     text = "自建歌单",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+                    modifier = Modifier.padding(top = 6.dp, start = 2.dp),
                 )
             }
         }
@@ -1288,21 +1320,17 @@ private fun PlaylistsTabContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(cardBg)
-                    .border(
-                        0.5.dp,
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                        RoundedCornerShape(16.dp),
-                    )
+                    .clip(cardShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.75.dp, MaterialTheme.colorScheme.outline, cardShape)
                     .clickable { onOpenPlaylist(playlist) }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(6.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1310,7 +1338,7 @@ private fun PlaylistsTabContent(
                         imageVector = Icons.Rounded.QueueMusic,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
@@ -1347,6 +1375,7 @@ private fun CollectionDetailView(
     songs: List<Song>,
     favoriteSongIds: Set<Long>,
     playerState: PlayerUiState,
+    liquidGlassEnabled: Boolean,
     onBack: () -> Unit,
     onPlaySongs: (List<Song>, Int, Boolean) -> Unit,
     onToggleFavorite: (Long) -> Unit,
@@ -1355,6 +1384,7 @@ private fun CollectionDetailView(
     onRemoveFromPlaylist: ((Long) -> Unit)?,
     bottomContentPadding: PaddingValues,
 ) {
+    val actionCorner = if (liquidGlassEnabled) 14.dp else 7.dp
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -1404,6 +1434,11 @@ private fun CollectionDetailView(
                 contentPadding = bottomContentPadding,
             ) {
                 item {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 18.dp),
+                        thickness = 0.75.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1413,9 +1448,10 @@ private fun CollectionDetailView(
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(actionCorner))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(actionCorner))
                                 .clickable { onPlaySongs(songs, 0, false) },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
@@ -1424,22 +1460,23 @@ private fun CollectionDetailView(
                                 imageVector = Icons.Rounded.PlayArrow,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(19.dp),
+                                modifier = Modifier.size(18.dp),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "播放全部",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium,
                             )
                         }
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(actionCorner))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(actionCorner))
                                 .clickable { onPlaySongs(songs, 0, true) },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
@@ -1447,8 +1484,8 @@ private fun CollectionDetailView(
                             Icon(
                                 imageVector = Icons.Rounded.Shuffle,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(17.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(

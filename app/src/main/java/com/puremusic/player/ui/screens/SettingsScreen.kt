@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -116,17 +115,10 @@ fun SettingsScreen(
     var showFolderManagerDialog by remember { mutableStateOf(false) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val canvasBg = when {
-        isDark -> Color(0xFF0A0B0E)
-        backgroundStyle == BackgroundStyle.WARM_PAPER -> Color(0xFFF3EFE6)
-        else -> Color(0xFFF5F6FA)
-    }
-    val cardBg = when {
-        isDark -> Color(0xFF151820)
-        backgroundStyle == BackgroundStyle.WARM_PAPER -> Color(0xFFFCFBF7)
-        else -> Color(0xFFFFFFFF)
-    }
-    val dividerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.06f)
+    val canvasBg = MaterialTheme.colorScheme.background
+    val cardBg = MaterialTheme.colorScheme.surface
+    val outlineColor = MaterialTheme.colorScheme.outline
+    val cardRadius = if (liquidGlassEnabled) 18.dp else 9.dp
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -140,12 +132,12 @@ fun SettingsScreen(
                 .padding(
                     start = 16.dp,
                     end = 16.dp,
-                    top = 12.dp,
+                    top = 14.dp,
                     bottom = 24.dp + bottomContentPadding.calculateBottomPadding(),
                 ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Bold Editorial Page Header
+            // Classic Editorial Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -167,7 +159,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = "外观、曲库与播放偏好",
+                        text = "纸色、排印与曲库偏好",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -175,7 +167,7 @@ fun SettingsScreen(
             }
 
             // Card 1: Live Typography & Density Preview Card
-            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -185,15 +177,16 @@ fun SettingsScreen(
                     Box(
                         modifier = Modifier
                             .size(layoutDensity.artSizeDp.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(0.6.dp, outlineColor, RoundedCornerShape(5.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.MusicNote,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(21.dp),
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
@@ -206,7 +199,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "实时排版预览 · ${layoutDensity.label} · ${(fontScale * 100).toInt()}%",
+                            text = "实时排印预览 · ${layoutDensity.label} · ${(fontScale * 100).toInt()}%",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -218,33 +211,32 @@ fun SettingsScreen(
 
             // Card 2: 外观与排版
             SettingsSectionHeader("外观与排版")
-            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
-                // 外观模式
+            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
                 Text(
-                    text = "外观模式",
+                    text = "纸色模式",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 val quickModes = listOf(
-                    BackgroundStyle.PURE_WHITE to "浅色",
-                    BackgroundStyle.DEEP_INK to "深色",
+                    BackgroundStyle.WARM_PAPER to "宣纸浅色",
+                    BackgroundStyle.DEEP_INK to "夜读深色",
                     BackgroundStyle.SYSTEM to "跟随系统",
                 )
                 SegmentedOptionBar(
                     items = quickModes.map { it.second },
                     selectedIndex = quickModes.indexOfFirst { (style, _) ->
                         backgroundStyle == style ||
-                            (style == BackgroundStyle.PURE_WHITE && backgroundStyle == BackgroundStyle.WARM_PAPER)
+                            (style == BackgroundStyle.WARM_PAPER && backgroundStyle == BackgroundStyle.PURE_WHITE)
                     }.coerceAtLeast(0),
+                    liquidGlassEnabled = liquidGlassEnabled,
                     onSelect = { idx -> onSelectBackgroundStyle(quickModes[idx].first) },
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 布局模式
                 Text(
                     text = "屏幕布局",
                     style = MaterialTheme.typography.labelMedium,
@@ -254,21 +246,21 @@ fun SettingsScreen(
                 SegmentedOptionBar(
                     items = LayoutMode.entries.map { it.label },
                     selectedIndex = LayoutMode.entries.indexOf(layoutMode),
+                    liquidGlassEnabled = liquidGlassEnabled,
                     onSelect = { idx -> onSelectLayoutMode(LayoutMode.entries[idx]) },
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 自由配色
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "强调色",
+                        text = "书脊装帧色",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -288,38 +280,49 @@ fun SettingsScreen(
                     AppAccentColor.entries.forEach { colorOption ->
                         val selected = colorOption == accentColor
                         val swatch = Color(colorOption.colorHex)
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .border(
-                                    width = if (selected) 2.5.dp else 0.dp,
-                                    color = if (selected) MaterialTheme.colorScheme.onBackground else Color.Transparent,
-                                    shape = CircleShape,
-                                )
-                                .padding(if (selected) 3.dp else 0.dp)
-                                .clip(CircleShape)
-                                .background(swatch)
-                                .clickable { onSelectAccentColor(colorOption) },
-                            contentAlignment = Alignment.Center,
+                        val swatchShape = RoundedCornerShape(8.dp)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            if (selected) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = colorOption.label,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(15.dp),
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(swatchShape)
+                                    .border(
+                                        width = if (selected) 2.dp else 0.75.dp,
+                                        color = if (selected) MaterialTheme.colorScheme.onBackground else outlineColor,
+                                        shape = swatchShape,
+                                    )
+                                    .padding(if (selected) 2.5.dp else 0.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(swatch)
+                                    .clickable { onSelectAccentColor(colorOption) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (selected) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = colorOption.label,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
                             }
+                            Text(
+                                text = colorOption.shortLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            )
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 排版密度
                 Text(
                     text = "排版密度",
                     style = MaterialTheme.typography.labelMedium,
@@ -329,14 +332,14 @@ fun SettingsScreen(
                 SegmentedOptionBar(
                     items = LayoutDensity.entries.map { it.label },
                     selectedIndex = LayoutDensity.entries.indexOf(layoutDensity),
+                    liquidGlassEnabled = liquidGlassEnabled,
                     onSelect = { idx -> onSelectLayoutDensity(LayoutDensity.entries[idx]) },
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 全局字体大小
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -370,10 +373,9 @@ fun SettingsScreen(
                     Text("A+", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 液态玻璃开关
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -381,12 +383,12 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "液态玻璃与切页动效",
+                            text = "液态玻璃效果",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                         )
                         Text(
-                            text = "通透毛玻璃迷你栏与柔和过渡",
+                            text = "关闭呈现纯粹古典书籍纸页感，开启叠加毛玻璃",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -400,19 +402,19 @@ fun SettingsScreen(
 
             // Card 3: 字体与纸色
             SettingsSectionHeader("字体与纸色")
-            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
                 SettingsListRow(
                     label = "软件字体",
                     value = fontStyle.label,
                     onClick = { showAppFontDialog = true },
                 )
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 SettingsListRow(
                     label = "歌词字体",
                     value = lyricFontStyle.label,
                     onClick = { showLyricFontDialog = true },
                 )
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 SettingsListRow(
                     label = "背景纸色",
                     value = backgroundStyle.label,
@@ -422,7 +424,7 @@ fun SettingsScreen(
 
             // Card 4: 曲库管理
             SettingsSectionHeader("曲库管理")
-            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
                 Text(
                     text = "当前显示 $songCount 首歌曲 · $albumCount 张专辑 · 已发现 ${allFolders.size} 个目录",
                     style = MaterialTheme.typography.bodySmall,
@@ -430,12 +432,12 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Primary Full-Width Scan Pill Button
+                val btnShape = RoundedCornerShape(if (liquidGlassEnabled) 14.dp else 7.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .height(42.dp)
+                        .clip(btnShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable(enabled = !scanStatus.isScanning, onClick = onRescanLibrary),
                     verticalAlignment = Alignment.CenterVertically,
@@ -459,7 +461,7 @@ fun SettingsScreen(
                             imageVector = Icons.Rounded.Refresh,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(17.dp),
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -473,25 +475,26 @@ fun SettingsScreen(
 
                 if (!scanStatus.message.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(10.dp))
-                    val emerald = Color(0xFF10B981)
+                    val pine = Color(0xFF2F5D50)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(emerald.copy(alpha = if (isDark) 0.18f else 0.12f))
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(pine.copy(alpha = if (isDark) 0.24f else 0.10f))
+                            .border(0.6.dp, pine.copy(alpha = 0.35f), RoundedCornerShape(7.dp))
                             .padding(horizontal = 12.dp, vertical = 9.dp),
                     ) {
                         Text(
                             text = scanStatus.message,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (isDark) Color(0xFF34D399) else Color(0xFF059669),
+                            color = if (isDark) Color(0xFF8CC4B4) else pine,
                             fontWeight = FontWeight.Medium,
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
@@ -514,7 +517,7 @@ fun SettingsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
 
                 val enabledCount = (allFolders.size - excludedFolders.size).coerceAtLeast(0)
                 SettingsListRow(
@@ -526,32 +529,35 @@ fun SettingsScreen(
 
             // Card 5: 播放与音效
             SettingsSectionHeader("播放与音效")
-            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
                 SettingsActionIconRow(
                     icon = Icons.Rounded.Equalizer,
                     label = "音频均衡器",
                     subtitle = "5 段频响调节与预设音效",
+                    outlineColor = outlineColor,
                     onClick = onOpenEqualizer,
                 )
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 SettingsActionIconRow(
                     icon = Icons.Rounded.Timer,
                     label = "睡眠定时关闭",
                     subtitle = "倒计时结束后自动暂停播放",
+                    outlineColor = outlineColor,
                     onClick = onOpenSleepTimer,
                 )
-                HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 SettingsActionIconRow(
                     icon = Icons.Rounded.RestartAlt,
                     label = "恢复默认外观",
-                    subtitle = "重置配色、字体与排版设置",
+                    subtitle = "重置为宣纸书卷风默认排印",
+                    outlineColor = outlineColor,
                     onClick = onResetAppearance,
                 )
             }
 
             // Card 6: 关于
             SettingsSectionHeader("关于")
-            GroupedSettingsCard(cardBg = cardBg, isDark = isDark) {
+            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -564,12 +570,13 @@ fun SettingsScreen(
                     )
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(0.6.dp, outlineColor, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v7.0.0",
+                            text = "v8.0.0",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -578,7 +585,7 @@ fun SettingsScreen(
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "专注本地离线播放体验，无广告、无联网追踪。默认开启断点续播记忆、耳机拔出暂停与系统音频焦点管理。",
+                    text = "古典书籍复古版 · 专注纯粹离线音乐聆听，无广告无追踪。支持断点续播、拔出耳机自动暂停与系统音频焦点管理。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -642,26 +649,24 @@ private fun SettingsSectionHeader(title: String) {
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 6.dp, top = 2.dp),
+        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
     )
 }
 
 @Composable
-private fun GroupedSettingsCard(
+private fun BookSettingsCard(
     cardBg: Color,
-    isDark: Boolean,
+    outlineColor: Color,
+    radius: androidx.compose.ui.unit.Dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val shape = RoundedCornerShape(radius)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .background(cardBg)
-            .border(
-                width = 0.5.dp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f),
-                shape = RoundedCornerShape(18.dp),
-            )
+            .border(0.75.dp, outlineColor, shape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         content = content,
     )
@@ -671,13 +676,17 @@ private fun GroupedSettingsCard(
 private fun SegmentedOptionBar(
     items: List<String>,
     selectedIndex: Int,
+    liquidGlassEnabled: Boolean,
     onSelect: (Int) -> Unit,
 ) {
+    val outerShape = RoundedCornerShape(if (liquidGlassEnabled) 12.dp else 7.dp)
+    val innerShape = RoundedCornerShape(if (liquidGlassEnabled) 9.dp else 5.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(outerShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(0.6.dp, MaterialTheme.colorScheme.outline, outerShape)
             .padding(3.dp),
     ) {
         items.forEachIndexed { index, label ->
@@ -685,8 +694,14 @@ private fun SegmentedOptionBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .clip(innerShape)
+                    .background(
+                        if (selected) {
+                            if (liquidGlassEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                        } else {
+                            Color.Transparent
+                        },
+                    )
                     .clickable { onSelect(index) }
                     .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center,
@@ -695,7 +710,11 @@ private fun SegmentedOptionBar(
                     text = label,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) {
+                        if (liquidGlassEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.background
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     maxLines = 1,
                 )
             }
@@ -745,6 +764,7 @@ private fun SettingsActionIconRow(
     icon: ImageVector,
     label: String,
     subtitle: String,
+    outlineColor: Color,
     onClick: () -> Unit,
 ) {
     Row(
@@ -757,8 +777,9 @@ private fun SettingsActionIconRow(
         Box(
             modifier = Modifier
                 .size(34.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .clip(RoundedCornerShape(7.dp))
+                .background(MaterialTheme.colorScheme.background)
+                .border(0.6.dp, outlineColor, RoundedCornerShape(7.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -821,7 +842,7 @@ private fun FolderManagerDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .clickable { onToggleFolderExcluded(folder.path) }
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -882,7 +903,7 @@ private fun <T> OptionPickerDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(8.dp))
                             .clickable { onSelect(value) }
                             .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,

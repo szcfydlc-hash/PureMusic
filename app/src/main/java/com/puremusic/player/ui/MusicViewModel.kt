@@ -101,7 +101,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val fontStyle: StateFlow<AppFontStyle> = playlistRepository.fontStyleFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = AppFontStyle.SANS,
+        initialValue = AppFontStyle.SERIF,
     )
 
     val lyricFontStyle: StateFlow<LyricFontStyle> = playlistRepository.lyricFontStyleFlow.stateIn(
@@ -113,7 +113,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val backgroundStyle: StateFlow<BackgroundStyle> = playlistRepository.backgroundStyleFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = BackgroundStyle.PURE_WHITE,
+        initialValue = BackgroundStyle.WARM_PAPER,
     )
 
     val layoutDensity: StateFlow<LayoutDensity> = playlistRepository.layoutDensityFlow.stateIn(
@@ -137,13 +137,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val accentColor: StateFlow<AppAccentColor> = playlistRepository.accentColorFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = AppAccentColor.BERRY_RED,
+        initialValue = AppAccentColor.CINNABAR_RED,
     )
 
     val liquidGlassEnabled: StateFlow<Boolean> = playlistRepository.liquidGlassEnabledFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = true,
+        initialValue = false,
     )
 
     val excludedFolders: StateFlow<Set<String>> = playlistRepository.excludedFoldersFlow.stateIn(
@@ -274,6 +274,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        viewModelScope.launch { playlistRepository.ensureV8BookStyleEpoch() }
         connectMediaController()
     }
 

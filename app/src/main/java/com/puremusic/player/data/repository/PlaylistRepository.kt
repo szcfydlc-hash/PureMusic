@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import kotlinx.coroutines.flow.first
 import com.puremusic.player.data.model.AppAccentColor
@@ -57,6 +58,7 @@ class PlaylistRepository(private val context: Context) {
         val LAST_SONG_ID = longPreferencesKey("last_song_id")
         val LAST_POSITION_MS = longPreferencesKey("last_position_ms")
         val LAST_QUEUE_IDS = stringPreferencesKey("last_queue_ids")
+        val PREF_STYLE_EPOCH = intPreferencesKey("pref_style_epoch")
     }
 
     val playlistsFlow: Flow<List<Playlist>> = context.pureMusicDataStore.data.map { prefs ->
@@ -76,7 +78,7 @@ class PlaylistRepository(private val context: Context) {
     val fontStyleFlow: Flow<AppFontStyle> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.FONT_STYLE]?.let { name ->
             AppFontStyle.entries.firstOrNull { it.name == name }
-        } ?: AppFontStyle.SANS
+        } ?: AppFontStyle.SERIF
     }
 
     val lyricFontStyleFlow: Flow<LyricFontStyle> = context.pureMusicDataStore.data.map { prefs ->
@@ -88,7 +90,7 @@ class PlaylistRepository(private val context: Context) {
     val backgroundStyleFlow: Flow<BackgroundStyle> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.BACKGROUND_STYLE]?.let { name ->
             BackgroundStyle.entries.firstOrNull { it.name == name }
-        } ?: BackgroundStyle.PURE_WHITE
+        } ?: BackgroundStyle.WARM_PAPER
     }
 
     val layoutDensityFlow: Flow<LayoutDensity> = context.pureMusicDataStore.data.map { prefs ->
@@ -108,7 +110,7 @@ class PlaylistRepository(private val context: Context) {
     }
 
     val liquidGlassEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
-        prefs[Keys.LIQUID_GLASS_ENABLED] ?: true
+        prefs[Keys.LIQUID_GLASS_ENABLED] ?: false
     }
 
     val excludedFoldersFlow: Flow<Set<String>> = context.pureMusicDataStore.data.map { prefs ->
@@ -124,7 +126,7 @@ class PlaylistRepository(private val context: Context) {
     val accentColorFlow: Flow<AppAccentColor> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.ACCENT_COLOR]?.let { name ->
             AppAccentColor.entries.firstOrNull { it.name == name }
-        } ?: AppAccentColor.BERRY_RED
+        } ?: AppAccentColor.CINNABAR_RED
     }
 
     val sortOrderFlow: Flow<SortOrder> = context.pureMusicDataStore.data.map { prefs ->
@@ -236,17 +238,31 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { it[Keys.MIN_DURATION_FILTER] = filter.name }
     }
 
+    suspend fun ensureV8BookStyleEpoch() {
+        context.pureMusicDataStore.edit { prefs ->
+            val epoch = prefs[Keys.PREF_STYLE_EPOCH] ?: 0
+            if (epoch < 8) {
+                prefs[Keys.FONT_STYLE] = AppFontStyle.SERIF.name
+                prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SERIF_ITALIC.name
+                prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
+                prefs[Keys.LIQUID_GLASS_ENABLED] = false
+                prefs[Keys.ACCENT_COLOR] = AppAccentColor.CINNABAR_RED.name
+                prefs[Keys.PREF_STYLE_EPOCH] = 8
+            }
+        }
+    }
+
     suspend fun resetAppearance() {
         context.pureMusicDataStore.edit { prefs ->
             prefs[Keys.PLAYER_THEME] = PlayerTheme.POSTER_WALL.name
-            prefs[Keys.FONT_STYLE] = AppFontStyle.SANS.name
+            prefs[Keys.FONT_STYLE] = AppFontStyle.SERIF.name
             prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SERIF_ITALIC.name
-            prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.PURE_WHITE.name
+            prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
             prefs[Keys.LAYOUT_MODE] = LayoutMode.AUTO.name
             prefs[Keys.LAYOUT_DENSITY] = LayoutDensity.STANDARD.name
             prefs[Keys.FONT_SCALE] = 1.0f
-            prefs[Keys.LIQUID_GLASS_ENABLED] = true
-            prefs[Keys.ACCENT_COLOR] = AppAccentColor.BERRY_RED.name
+            prefs[Keys.LIQUID_GLASS_ENABLED] = false
+            prefs[Keys.ACCENT_COLOR] = AppAccentColor.CINNABAR_RED.name
         }
     }
 
