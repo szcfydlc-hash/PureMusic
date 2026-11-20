@@ -181,6 +181,7 @@ private fun PureMusicApp(
                 searchQuery = searchQuery,
                 sortOrder = sortOrder,
                 playerState = playerState,
+                playerTheme = playerTheme,
                 sleepTimerRemainingMs = sleepTimerRemainingMs,
                 liquidGlassEnabled = liquidGlassEnabled,
                 isTabletLayout = isTabletLayout,

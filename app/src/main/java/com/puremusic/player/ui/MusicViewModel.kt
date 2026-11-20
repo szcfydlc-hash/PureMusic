@@ -51,7 +51,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val musicRepository = MusicRepository(application)
     private val playlistRepository = PlaylistRepository(application)
-    private val lyricsRepository = LyricsRepository()
+    private val lyricsRepository = LyricsRepository(application)
     private val sleepTimerManager = SleepTimerManager()
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -229,15 +229,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val sleepTimerRemainingMs: StateFlow<Long?> = sleepTimerManager.remainingMs
 
     private var activeQueueSongs: List<Song> = emptyList()
+    private var hasRestoredPlayback = false
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             syncPlayerSnapshot()
-            if (isPlaying) startPositionTicker() else stopPositionTicker()
+            if (isPlaying) {
+                startPositionTicker()
+            } else {
+                stopPositionTicker()
+                persistCurrentPlayback()
+            }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             syncPlayerSnapshot()
+            persistCurrentPlayback()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -269,11 +276,60 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     mediaController = controller
                     controller.addListener(playerListener)
                     syncPlayerSnapshot()
+                    tryRestorePlaybackSnapshot()
                     if (controller.isPlaying) startPositionTicker()
                 }
             },
             ContextCompat.getMainExecutor(app),
         )
+    }
+
+    private fun tryRestorePlaybackSnapshot() {
+        if (hasRestoredPlayback) return
+        val controller = mediaController ?: return
+        val songs = _rawSongs.value
+        if (songs.isEmpty()) return
+        if (controller.mediaItemCount > 0) {
+            hasRestoredPlayback = true
+            return
+        }
+        hasRestoredPlayback = true
+        viewModelScope.launch {
+            val snap = runCatching { playlistRepository.loadPlaybackSnapshot() }.getOrNull() ?: return@launch
+            val lookup = songs.associateBy { it.id }
+            val restoredQueue = snap.queueIds.mapNotNull { lookup[it] }
+            val targetSong = snap.lastSongId?.let { lookup[it] } ?: restoredQueue.firstOrNull() ?: return@launch
+            val finalQueue = if (restoredQueue.isNotEmpty()) restoredQueue else listOf(targetSong)
+            val startIdx = finalQueue.indexOfFirst { it.id == targetSong.id }.coerceAtLeast(0)
+
+            activeQueueSongs = finalQueue
+            val mediaItems = finalQueue.map { song ->
+                MediaItem.Builder()
+                    .setMediaId(song.id.toString())
+                    .setUri(song.contentUri)
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle(song.title)
+                            .setArtist(song.artist)
+                            .setAlbumTitle(song.album)
+                            .setArtworkUri(song.albumArtUri)
+                            .build(),
+                    )
+                    .build()
+            }
+            controller.setMediaItems(mediaItems, startIdx, snap.lastPositionMs)
+            controller.prepare()
+            syncPlayerSnapshot()
+        }
+    }
+
+    private fun persistCurrentPlayback() {
+        val current = _playerState.value.currentSong ?: return
+        val pos = _playerState.value.positionMs
+        val qIds = _playerState.value.queue.map { it.id }
+        viewModelScope.launch {
+            playlistRepository.savePlaybackSnapshot(current.id, pos, qIds)
+        }
     }
 
     fun loadLibrary() {
@@ -283,6 +339,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             _rawSongs.value = loaded
             _isLoading.value = false
             syncPlayerSnapshot()
+            tryRestorePlaybackSnapshot()
         }
     }
 
@@ -545,6 +602,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     _playerState.update { it.copy(positionMs = pos, durationMs = dur) }
                 }
                 delay(400L)
+                if (System.currentTimeMillis() % 5000L < 450L) {
+                    persistCurrentPlayback()
+                }
             }
         }
     }
@@ -555,6 +615,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        persistCurrentPlayback()
         stopPositionTicker()
         lyricsJob?.cancel()
         sleepTimerManager.cancel()

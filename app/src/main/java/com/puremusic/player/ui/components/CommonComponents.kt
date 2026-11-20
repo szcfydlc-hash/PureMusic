@@ -2,6 +2,13 @@ package com.puremusic.player.ui.components
 
 import android.net.Uri
 import android.os.Build
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,7 +61,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.puremusic.player.data.model.PlayerUiState
 import com.puremusic.player.data.model.Song
 import com.puremusic.player.ui.theme.ForestGreen
@@ -88,8 +97,16 @@ fun AlbumArtwork(
     iconSize: Dp = 24.dp,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
+    val context = LocalContext.current
+    val request = remember(uri) {
+        ImageRequest.Builder(context)
+            .data(uri)
+            .size(360)
+            .crossfade(true)
+            .build()
+    }
     SubcomposeAsyncImage(
-        model = uri,
+        model = request,
         contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
         modifier = modifier.clip(shape),
@@ -250,17 +267,17 @@ fun MiniPlayerBar(
 ) {
     val song = playerState.currentSong ?: return
     val pillShape = RoundedCornerShape(34.dp)
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .height(66.dp)
-            .liquidGlass(enabled = liquidGlassEnabled, shape = pillShape, elevation = 14.dp)
+            .clip(pillShape)
             .clickable(onClick = onOpenNowPlaying),
     ) {
         if (liquidGlassEnabled) {
-            // Refracted blurred album-art color layer inside the frosted glass capsule
             val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 Modifier.blur(26.dp)
             } else {
@@ -272,7 +289,7 @@ fun MiniPlayerBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(blurModifier)
-                    .alpha(0.45f),
+                    .alpha(if (isDark) 0.34f else 0.42f),
                 cornerRadius = 34.dp,
                 iconSize = 18.dp,
             )
@@ -280,22 +297,40 @@ fun MiniPlayerBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.62f),
-                                Color(0xFFF6F2EB).copy(alpha = 0.44f),
-                                Color.White.copy(alpha = 0.58f),
-                            ),
-                        ),
+                        if (isDark) {
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color(0xFF1D2025).copy(alpha = 0.84f),
+                                    Color(0xFF252930).copy(alpha = 0.74f),
+                                    Color(0xFF1D2025).copy(alpha = 0.84f),
+                                ),
+                            )
+                        } else {
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.76f),
+                                    Color(0xFFF6F2EB).copy(alpha = 0.60f),
+                                    Color.White.copy(alpha = 0.74f),
+                                ),
+                            )
+                        },
                     )
                     .border(
-                        width = 1.4.dp,
+                        width = 1.dp,
                         brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.95f),
-                                Color.White.copy(alpha = 0.32f),
-                                Color.White.copy(alpha = 0.85f),
-                            ),
+                            colors = if (isDark) {
+                                listOf(
+                                    Color.White.copy(alpha = 0.28f),
+                                    Color.White.copy(alpha = 0.08f),
+                                    Color.White.copy(alpha = 0.20f),
+                                )
+                            } else {
+                                listOf(
+                                    Color.White.copy(alpha = 0.96f),
+                                    Color(0xFFD6CFC4).copy(alpha = 0.45f),
+                                    Color.White.copy(alpha = 0.88f),
+                                )
+                            },
                         ),
                         shape = pillShape,
                     ),
@@ -320,46 +355,60 @@ fun MiniPlayerBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Miniature glossy black vinyl disc
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .shadow(6.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(Color(0xFF111111))
-                    .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
-                    .padding(11.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                AlbumArtwork(
-                    uri = song.albumArtUri,
-                    contentDescription = song.album,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape),
-                    cornerRadius = 20.dp,
-                    iconSize = 12.dp,
-                )
-            }
+            // Smooth AnimatedContent transition when switching songs!
+            AnimatedContent(
+                targetState = song,
+                transitionSpec = {
+                    (fadeIn() + slideInVertically { it / 4 }) togetherWith
+                        (fadeOut() + slideOutVertically { -it / 4 })
+                },
+                label = "miniPlayerTrack",
+                modifier = Modifier.weight(1f),
+            ) { current ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF111111))
+                            .border(1.dp, Color.White.copy(alpha = 0.24f), CircleShape)
+                            .padding(10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AlbumArtwork(
+                            uri = current.albumArtUri,
+                            contentDescription = current.album,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            cornerRadius = 20.dp,
+                            iconSize = 12.dp,
+                        )
+                    }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = FontFamily.Serif,
-                        fontWeight = FontWeight.SemiBold,
-                    ),
-                    color = Color(0xFF1A1918),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF4F4C47),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = current.title,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = FontFamily.Serif,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = current.artist,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
 
             FilledIconButton(
@@ -369,9 +418,7 @@ fun MiniPlayerBar(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color.White,
                 ),
-                modifier = Modifier
-                    .size(44.dp)
-                    .shadow(6.dp, CircleShape),
+                modifier = Modifier.size(44.dp),
             ) {
                 Icon(
                     imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,

@@ -1,5 +1,7 @@
 package com.puremusic.player.data.repository
 
+import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.os.Environment
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.Song
@@ -8,14 +10,45 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.charset.Charset
 
-class LyricsRepository {
+class LyricsRepository(private val context: Context) {
 
     private val timeTagRegex = Regex("\\[(\\d{1,2}):(\\d{2})(?:[.:](\\d{1,3}))?]")
 
     suspend fun loadLyricsForSong(song: Song): List<LyricLine> = withContext(Dispatchers.IO) {
-        val candidate = findLrcFile(song) ?: return@withContext emptyList()
-        val rawText = readTextWithFallback(candidate) ?: return@withContext emptyList()
-        parseLrc(rawText)
+        val externalFile = findLrcFile(song)
+        if (externalFile != null) {
+            val rawText = readTextWithFallback(externalFile)
+            if (!rawText.isNullOrBlank()) {
+                val parsed = parseLrc(rawText)
+                if (parsed.isNotEmpty()) return@withContext parsed
+            }
+        }
+
+        // Fallback: read embedded lyrics tag from the audio file itself
+        val embedded = readEmbeddedLyrics(song)
+        if (!embedded.isNullOrBlank()) {
+            val parsed = parseLrc(embedded)
+            if (parsed.isNotEmpty()) return@withContext parsed
+            return@withContext embedded.lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .map { LyricLine(timeMs = 0L, primaryText = it) }
+                .toList()
+        }
+
+        emptyList()
+    }
+
+    private fun readEmbeddedLyrics(song: Song): String? {
+        val retriever = MediaMetadataRetriever()
+        return runCatching {
+            retriever.setDataSource(context, song.contentUri)
+            // Standard MediaMetadataRetriever key 1000+ is not public, check common text/lyric fallback or file tags
+            val raw = retriever.extractMetadata(1001) // some OEMs map LYRIC here
+            raw?.takeIf { it.isNotBlank() }
+        }.getOrNull().also {
+            runCatching { retriever.release() }
+        }
     }
 
     private fun findLrcFile(song: Song): File? {
@@ -42,7 +75,7 @@ class LyricsRepository {
     private fun readTextWithFallback(file: File): String? = runCatching {
         val bytes = file.readBytes()
         val utf8 = bytes.toString(Charsets.UTF_8)
-        if (!utf8.contains('�')) {
+        if (!utf8.contains('\uFFFD')) {
             utf8
         } else {
             runCatching { bytes.toString(Charset.forName("GBK")) }.getOrDefault(utf8)

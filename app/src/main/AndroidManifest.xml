@@ -40,6 +40,20 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name=".widget.PureMusicWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.puremusic.player.WIDGET_TOGGLE" />
+                <action android:name="com.puremusic.player.WIDGET_NEXT" />
+                <action android:name="com.puremusic.player.WIDGET_PREV" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pure_music_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

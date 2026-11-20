@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.longPreferencesKey
+import kotlinx.coroutines.flow.first
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
@@ -27,6 +29,12 @@ private val Context.pureMusicDataStore: DataStore<Preferences> by preferencesDat
     name = "puremusic_preferences",
 )
 
+data class PlaybackSnapshot(
+    val lastSongId: Long? = null,
+    val lastPositionMs: Long = 0L,
+    val queueIds: List<Long> = emptyList(),
+)
+
 class PlaylistRepository(private val context: Context) {
 
     private object Keys {
@@ -42,6 +50,9 @@ class PlaylistRepository(private val context: Context) {
         val MIN_DURATION_FILTER = stringPreferencesKey("min_duration_filter")
         val ACCENT_COLOR = stringPreferencesKey("accent_color")
         val SORT_ORDER = stringPreferencesKey("sort_order")
+        val LAST_SONG_ID = longPreferencesKey("last_song_id")
+        val LAST_POSITION_MS = longPreferencesKey("last_position_ms")
+        val LAST_QUEUE_IDS = stringPreferencesKey("last_queue_ids")
     }
 
     val playlistsFlow: Flow<List<Playlist>> = context.pureMusicDataStore.data.map { prefs ->
@@ -217,6 +228,25 @@ class PlaylistRepository(private val context: Context) {
 
     suspend fun setAccentColor(color: AppAccentColor) {
         context.pureMusicDataStore.edit { it[Keys.ACCENT_COLOR] = color.name }
+    }
+
+    suspend fun savePlaybackSnapshot(songId: Long, positionMs: Long, queueIds: List<Long>) {
+        context.pureMusicDataStore.edit { prefs ->
+            prefs[Keys.LAST_SONG_ID] = songId
+            prefs[Keys.LAST_POSITION_MS] = positionMs.coerceAtLeast(0L)
+            prefs[Keys.LAST_QUEUE_IDS] = queueIds.take(300).joinToString(",")
+        }
+    }
+
+    suspend fun loadPlaybackSnapshot(): PlaybackSnapshot {
+        val prefs = context.pureMusicDataStore.data.first()
+        val songId = prefs[Keys.LAST_SONG_ID]
+        val posMs = prefs[Keys.LAST_POSITION_MS] ?: 0L
+        val qIds = prefs[Keys.LAST_QUEUE_IDS]
+            .orEmpty()
+            .split(",")
+            .mapNotNull { it.trim().toLongOrNull() }
+        return PlaybackSnapshot(lastSongId = songId, lastPositionMs = posMs, queueIds = qIds)
     }
 
     suspend fun setSortOrder(order: SortOrder) {

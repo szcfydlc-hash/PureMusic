@@ -5,12 +5,14 @@ import android.content.Intent
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.puremusic.player.MainActivity
+import com.puremusic.player.widget.PureMusicWidgetProvider
 
 class PlaybackService : MediaSessionService() {
 
@@ -41,6 +43,14 @@ class PlaybackService : MediaSessionService() {
                         AudioEqualizerManager.attachToSession(audioSessionId)
                     }
                 }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    pushWidgetUpdate(player)
+                }
+
+                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    pushWidgetUpdate(player)
+                }
             },
         )
 
@@ -57,6 +67,35 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivityPendingIntent)
             .build()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val player = mediaSession?.player
+        when (intent?.action) {
+            PureMusicWidgetProvider.ACTION_TOGGLE -> {
+                if (player != null && player.mediaItemCount > 0) {
+                    if (player.isPlaying) player.pause() else player.play()
+                    pushWidgetUpdate(player)
+                }
+            }
+            PureMusicWidgetProvider.ACTION_NEXT -> {
+                player?.seekToNextMediaItem()
+            }
+            PureMusicWidgetProvider.ACTION_PREV -> {
+                player?.seekToPreviousMediaItem()
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun pushWidgetUpdate(player: Player) {
+        val metadata = player.currentMediaItem?.mediaMetadata
+        PureMusicWidgetProvider.pushState(
+            context = this,
+            title = metadata?.title?.toString(),
+            artist = metadata?.artist?.toString(),
+            isPlaying = player.isPlaying,
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {

@@ -2,7 +2,13 @@ package com.puremusic.player.ui.screens
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -562,11 +568,20 @@ private fun InteractivePosterWallHeader(
                     .align(Alignment.TopCenter)
                     .offset(y = gridHeight - discSize * 0.56f),
             ) {
-                SpinningVinylDisc(
-                    albumArtUri = currentSong.albumArtUri,
-                    rotationDegrees = vinylRotation,
-                    discSize = discSize,
-                )
+                AnimatedContent(
+                    targetState = currentSong.id to currentSong.albumArtUri,
+                    transitionSpec = {
+                        (fadeIn(tween(320)) + scaleIn(initialScale = 0.92f, animationSpec = tween(320))) togetherWith
+                            (fadeOut(tween(220)) + scaleOut(targetScale = 0.96f, animationSpec = tween(220)))
+                    },
+                    label = "vinylTrackSwitch",
+                ) { (_, artUri) ->
+                    SpinningVinylDisc(
+                        albumArtUri = artUri,
+                        rotationDegrees = vinylRotation,
+                        discSize = discSize,
+                    )
+                }
             }
         }
     }
@@ -725,18 +740,18 @@ private fun RetroHiFiDeckHero(
         modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
-        val deckWidth = min(maxWidth, maxHeight * 1.25f)
-        val windowHeight = min(maxHeight * 0.56f, 180.dp)
-        val artSize = windowHeight - 20.dp
+        val deckWidth = min(maxWidth, maxHeight * 1.15f)
+        val windowHeight = min(maxHeight * 0.56f, 186.dp)
+        val artSize = windowHeight - 24.dp
 
         Column(
             modifier = Modifier
                 .width(deckWidth)
-                .shadow(12.dp, RoundedCornerShape(18.dp))
+                .shadow(16.dp, RoundedCornerShape(18.dp))
                 .clip(RoundedCornerShape(18.dp))
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color(0xFFE0DCD4), Color(0xFFC0BBB0)),
+                        colors = listOf(Color(0xFFE6E2DA), Color(0xFFC8C3B9), Color(0xFFB9B4AA)),
                     ),
                 )
                 .border(1.5.dp, Color(0xFF8C877E), RoundedCornerShape(18.dp))
@@ -744,33 +759,40 @@ private fun RetroHiFiDeckHero(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Top Braun-style Deck Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "PURE HI-FI DECK",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = FontFamily.Monospace,
+                    text = "PureMusic",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Bold,
                     ),
-                    color = Color(0xFF3A3732),
+                    color = Color(0xFF282623),
                 )
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(if (isPlaying) Color(0xFF1B7A43) else Color(0xFFB7362A)),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    repeat(3) {
+                        Box(
+                            modifier = Modifier
+                                .width(26.dp)
+                                .height(2.dp)
+                                .background(Color(0xFF5A5650)),
+                        )
+                    }
+                }
             }
 
+            // Dark Tinted Cassette / Album Viewport
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(windowHeight)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF191919))
+                    .background(Color(0xFF191A1C))
+                    .border(1.dp, Color(0xFF3A3C40), RoundedCornerShape(10.dp))
                     .padding(10.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -778,23 +800,61 @@ private fun RetroHiFiDeckHero(
                     uri = currentSong.albumArtUri,
                     contentDescription = currentSong.album,
                     modifier = Modifier.size(artSize),
-                    cornerRadius = 8.dp,
+                    cornerRadius = 6.dp,
                     iconSize = 44.dp,
                 )
             }
 
+            // Bottom Power LED + Amber VU Level Meter Bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                repeat(4) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Box(
                         modifier = Modifier
-                            .width(42.dp)
-                            .height(9.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color(0xFF9C968C)),
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (isPlaying) Color(0xFF39B54A) else Color(0xFFC93B2B)),
                     )
+                    Text(
+                        text = "POWER",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
+                        ),
+                        color = Color(0xFF47443F),
+                    )
+                }
+
+                // Amber VU Meter Strip
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF1F2124))
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val litBars = if (isPlaying) 7 else 2
+                    for (idx in 0 until 9) {
+                        val barColor = when {
+                            idx >= litBars -> Color(0xFF3C3E42)
+                            idx >= 7 -> Color(0xFFD93829)
+                            else -> Color(0xFFE8A42A)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .width(6.dp)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(1.5.dp))
+                                .background(barColor),
+                        )
+                    }
                 }
             }
         }

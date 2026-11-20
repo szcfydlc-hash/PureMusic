@@ -12,11 +12,23 @@ android {
         applicationId = "com.puremusic.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "3.3.0"
+        versionCode = 12
+        versionName = "5.0.0"
 
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            val ksPath = System.getenv("KEYSTORE_PATH")
+            if (!ksPath.isNullOrBlank() && file(ksPath).exists()) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "puremusic123"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "puremusic"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "puremusic123"
+            }
         }
     }
 
@@ -24,6 +36,10 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            val releaseSign = signingConfigs.findByName("release")
+            if (releaseSign?.storeFile != null) {
+                signingConfig = releaseSign
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

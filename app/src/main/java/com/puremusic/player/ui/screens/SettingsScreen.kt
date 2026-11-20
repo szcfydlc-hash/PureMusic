@@ -75,9 +75,8 @@ import com.puremusic.player.data.model.MusicFolder
 import com.puremusic.player.data.model.PlayerTheme
 import com.puremusic.player.data.model.ScanStatus
 import com.puremusic.player.ui.components.liquidGlass
-import com.puremusic.player.ui.theme.DeepInkSidebar
 import com.puremusic.player.ui.theme.VermilionAccent
-import com.puremusic.player.ui.theme.WarmPaperSidebar
+import com.puremusic.player.ui.theme.sidebarColorFor
 
 private enum class SettingsSection(val label: String, val icon: ImageVector) {
     ALL_SONGS("全部歌曲", Icons.Rounded.MusicNote),
@@ -126,7 +125,7 @@ fun SettingsScreen(
     var showBackgroundDialog by remember { mutableStateOf(false) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val sidebarBg = if (isDark) DeepInkSidebar else WarmPaperSidebar
+    val sidebarBg = sidebarColorFor(playerTheme, isDark)
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -403,7 +402,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "版本 3.3.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，支持自由配色、流光液态玻璃、封面动态取色与可滑动唱片海报墙。",
+                                text = "版本 5.0.0\n\n纯本地离线音乐播放器，采用 Kotlin + Jetpack Compose + Media3 独立编写，支持自由配色、流光液态玻璃、封面动态取色与可滑动唱片海报墙。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -599,12 +598,12 @@ private fun AppearanceSettingsPane(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "液态玻璃流光动效",
+                text = "液态玻璃与切页动效",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                text = "开启流动虹彩高光玻璃质感",
+                text = "开启通透玻璃质感与切换弹性动画",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
