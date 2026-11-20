@@ -71,7 +71,11 @@ import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MainTab
 import com.puremusic.player.data.model.Song
 import com.puremusic.player.ui.MusicViewModel
+import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.ui.components.AddToPlaylistDialog
+import com.puremusic.player.ui.components.BatchSongPickerSheet
+import com.puremusic.player.ui.components.ConfirmDeletePlaylistDialog
+import com.puremusic.player.ui.components.RenamePlaylistDialog
 import com.puremusic.player.ui.components.CreatePlaylistDialog
 import com.puremusic.player.ui.components.EqualizerBottomSheet
 import com.puremusic.player.ui.components.LyricsBottomSheet
@@ -189,6 +193,7 @@ private fun PureMusicApp(
         val lyricSearchResults by viewModel.lyricSearchResults.collectAsStateWithLifecycle()
         val isSearchingLyrics by viewModel.isSearchingLyrics.collectAsStateWithLifecycle()
         val lyricSearchError by viewModel.lyricSearchError.collectAsStateWithLifecycle()
+        val isTranslatingLyrics by viewModel.isTranslatingLyrics.collectAsStateWithLifecycle()
         val coverSearchResults by viewModel.coverSearchResults.collectAsStateWithLifecycle()
         val isSearchingCovers by viewModel.isSearchingCovers.collectAsStateWithLifecycle()
         val coverSearchError by viewModel.coverSearchError.collectAsStateWithLifecycle()
@@ -206,6 +211,10 @@ private fun PureMusicApp(
         var coverSearchSong by remember { mutableStateOf<Song?>(null) }
         var pendingGalleryCoverSong by remember { mutableStateOf<Song?>(null) }
         var pendingLocalLrcSong by remember { mutableStateOf<Song?>(null) }
+        var managingPlaylist by remember { mutableStateOf<Playlist?>(null) }
+        var managingFavorites by remember { mutableStateOf(false) }
+        var renamingPlaylist by remember { mutableStateOf<Playlist?>(null) }
+        var deletingPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
         val galleryCoverLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetContent(),
@@ -323,7 +332,10 @@ private fun PureMusicApp(
                         onReplaceCover = { coverSearchSong = it },
                         onMatchLyrics = { lyricsSearchSong = it },
                         onRequestCreatePlaylist = { showCreatePlaylist = true },
-                        onDeletePlaylist = viewModel::deletePlaylist,
+                        onRequestDeletePlaylist = { deletingPlaylist = it },
+                        onRequestRenamePlaylist = { renamingPlaylist = it },
+                        onRequestManagePlaylistSongs = { managingPlaylist = it },
+                        onRequestManageFavorites = { managingFavorites = true },
                         onRemoveSongFromPlaylist = viewModel::removeSongFromPlaylist,
                         onOpenEqualizer = { showEqualizer = true },
                         onOpenSleepTimer = { showSleepTimer = true },
@@ -398,6 +410,8 @@ private fun PureMusicApp(
                     onAddToPlaylist = { pendingPlaylistSong = it },
                     onOpenCoverSearch = { coverSearchSong = it },
                     onOpenLyricsSearch = { lyricsSearchSong = it },
+                    isTranslatingLyrics = isTranslatingLyrics,
+                    onTranslateLyrics = viewModel::translateCurrentLyricsToChinese,
                 )
             }
         }
@@ -406,6 +420,43 @@ private fun PureMusicApp(
             CreatePlaylistDialog(
                 onDismiss = { showCreatePlaylist = false },
                 onCreate = { viewModel.createPlaylist(it) },
+            )
+        }
+
+        renamingPlaylist?.let { pl ->
+            RenamePlaylistDialog(
+                currentName = pl.name,
+                onDismiss = { renamingPlaylist = null },
+                onConfirm = { newName -> viewModel.renamePlaylist(pl.id, newName) },
+            )
+        }
+
+        deletingPlaylist?.let { pl ->
+            ConfirmDeletePlaylistDialog(
+                playlistName = pl.name,
+                onDismiss = { deletingPlaylist = null },
+                onConfirmDelete = { viewModel.deletePlaylist(pl.id) },
+            )
+        }
+
+        managingPlaylist?.let { pl ->
+            val livePl = playlists.firstOrNull { it.id == pl.id } ?: pl
+            BatchSongPickerSheet(
+                title = "管理「${livePl.name}」",
+                allSongs = allSongs,
+                initialSelectedIds = livePl.songIds.toSet(),
+                onSave = { updatedIds -> viewModel.setPlaylistSongs(livePl.id, updatedIds) },
+                onDismiss = { managingPlaylist = null },
+            )
+        }
+
+        if (managingFavorites) {
+            BatchSongPickerSheet(
+                title = "管理「我喜欢的音乐」",
+                allSongs = allSongs,
+                initialSelectedIds = favoriteSongIds,
+                onSave = { updatedIds -> viewModel.setFavoriteSongIds(updatedIds.toSet()) },
+                onDismiss = { managingFavorites = false },
             )
         }
 

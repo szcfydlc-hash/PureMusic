@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import com.puremusic.player.data.model.LyricLine
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -175,6 +177,70 @@ class OnlineMetadataRepository(private val context: Context) {
     suspend fun clearCustomLyrics(songId: Long) = withContext(Dispatchers.IO) {
         val target = File(lyricsDir, "song_${songId}.lrc")
         if (target.exists()) runCatching { target.delete() }
+    }
+
+    suspend fun translateLyricsToBilingualLrc(lines: List<LyricLine>): Result<String> = withContext(Dispatchers.IO) {
+        if (lines.isEmpty()) return@withContext Result.failure(IllegalArgumentException("Empty lyrics"))
+        runCatching {
+            val cjkRegex = Regex("[\\u4E00-\\u9FFF]")
+            val translatedMap = HashMap<Int, String>()
+
+            // Collect indices of lines that are non-Chinese and don't already have a translation
+            val pendingIndices = lines.indices.filter { idx ->
+                val line = lines[idx]
+                line.secondaryText.isNullOrBlank() &&
+                    line.primaryText.isNotBlank() &&
+                    !cjkRegex.containsMatchIn(line.primaryText)
+            }
+
+            // Translate in safe batches of 18 lines to avoid URL length limits
+            val chunkSize = 18
+            for (start in pendingIndices.indices step chunkSize) {
+                val batchIdx = pendingIndices.subList(start, minOf(start + chunkSize, pendingIndices.size))
+                val joined = batchIdx.joinToString("\n") { lines[it].primaryText.replace("\n", " ") }
+                val encoded = URLEncoder.encode(joined, "UTF-8")
+                val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=$encoded"
+                val rawJson = httpGetText(url)
+                val root = JSONArray(rawJson)
+                val segments = root.optJSONArray(0)
+                val fullTranslated = buildString {
+                    if (segments != null) {
+                        for (i in 0 until segments.length()) {
+                            val seg = segments.optJSONArray(i)
+                            val part = seg?.optString(0).orEmpty()
+                            append(part)
+                        }
+                    }
+                }
+                val translatedLines = fullTranslated.split("\n")
+                batchIdx.forEachIndexed { offset, lineIdx ->
+                    val zh = translatedLines.getOrNull(offset)?.trim().orEmpty()
+                    if (zh.isNotBlank() && !zh.equals(lines[lineIdx].primaryText.trim(), ignoreCase = true)) {
+                        translatedMap[lineIdx] = zh
+                    }
+                }
+            }
+
+            // Re-assemble into standard bilingual .lrc so LyricsRepository groups primary + secondary lines automatically
+            buildString {
+                lines.forEachIndexed { idx, line ->
+                    val tag = formatLrcTimestamp(line.timeMs)
+                    append(tag).append(line.primaryText.trim()).append('\n')
+                    val secondary = line.secondaryText?.takeIf { it.isNotBlank() } ?: translatedMap[idx]
+                    if (!secondary.isNullOrBlank()) {
+                        append(tag).append(secondary.trim()).append('\n')
+                    }
+                }
+            }
+        }
+    }
+
+    private fun formatLrcTimestamp(timeMs: Long): String {
+        val safe = timeMs.coerceAtLeast(0L)
+        val minutes = safe / 60_000L
+        val seconds = (safe % 60_000L) / 1_000L
+        val hundredths = (safe % 1_000L) / 10L
+        return String.format(Locale.US, "[%02d:%02d.%02d]", minutes, seconds, hundredths)
     }
 
     private fun saveCompressedCoverBytes(songId: Long, rawBytes: ByteArray): Uri? {

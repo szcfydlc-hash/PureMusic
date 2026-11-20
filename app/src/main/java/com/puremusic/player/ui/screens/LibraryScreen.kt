@@ -9,9 +9,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +35,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -47,11 +51,14 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicOff
 import androidx.compose.material.icons.rounded.Pause
@@ -92,7 +99,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -178,7 +189,10 @@ fun LibraryScreen(
     onReplaceCover: (Song) -> Unit,
     onMatchLyrics: (Song) -> Unit,
     onRequestCreatePlaylist: () -> Unit,
-    onDeletePlaylist: (String) -> Unit,
+    onRequestDeletePlaylist: (Playlist) -> Unit,
+    onRequestRenamePlaylist: (Playlist) -> Unit,
+    onRequestManagePlaylistSongs: (Playlist) -> Unit,
+    onRequestManageFavorites: () -> Unit,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
     onOpenEqualizer: () -> Unit,
     onOpenSleepTimer: () -> Unit,
@@ -191,6 +205,7 @@ fun LibraryScreen(
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
     var usePosterGrid by remember { mutableStateOf(false) }
+    var albumCompactThreeCol by remember { mutableStateOf(true) }
 
     BackHandler(enabled = activeDetail != null || searchExpanded || searchQuery.isNotEmpty()) {
         when {
@@ -213,8 +228,21 @@ fun LibraryScreen(
             CollectionDetail.FavoritesDetail -> allSongs.filter { it.id in favoriteSongIds }
         }
 
+        val livePlaylist = if (detail is CollectionDetail.PlaylistDetail) {
+            playlists.firstOrNull { it.id == detail.playlistId }
+        } else {
+            null
+        }
+        val liveTitle = livePlaylist?.name ?: detail.title
+        val liveSubtitle = when (detail) {
+            is CollectionDetail.PlaylistDetail -> "自定义歌单 · ${detailSongs.size} 首"
+            CollectionDetail.FavoritesDetail -> "收藏列表 · ${detailSongs.size} 首"
+            else -> detail.subtitle
+        }
+
         CollectionDetailView(
-            detail = detail,
+            title = liveTitle,
+            subtitle = liveSubtitle,
             songs = detailSongs,
             favoriteSongIds = favoriteSongIds,
             playerState = playerState,
@@ -226,6 +254,12 @@ fun LibraryScreen(
             onShowSongInfo = onShowSongInfo,
             onReplaceCover = onReplaceCover,
             onMatchLyrics = onMatchLyrics,
+            onManageSongs = when (detail) {
+                is CollectionDetail.PlaylistDetail -> livePlaylist?.let { pl -> { onRequestManagePlaylistSongs(pl) } }
+                CollectionDetail.FavoritesDetail -> onRequestManageFavorites
+                else -> null
+            },
+            onRenamePlaylist = livePlaylist?.let { pl -> { onRequestRenamePlaylist(pl) } },
             onRemoveFromPlaylist = if (detail is CollectionDetail.PlaylistDetail) {
                 { songId -> onRemoveSongFromPlaylist(detail.playlistId, songId) }
             } else {
@@ -401,6 +435,20 @@ fun LibraryScreen(
                                         Icons.Rounded.GridView
                                     },
                                     contentDescription = "切换视图",
+                                    modifier = Modifier.size(19.dp),
+                                )
+                            }
+                        }
+
+                        if (activeMainTab == MainTab.ALBUMS && !isTabletLayout) {
+                            HeaderToolButton(
+                                onClick = { albumCompactThreeCol = !albumCompactThreeCol },
+                                active = albumCompactThreeCol,
+                                liquidGlassEnabled = liquidGlassEnabled,
+                            ) {
+                                Icon(
+                                    imageVector = if (albumCompactThreeCol) Icons.Rounded.GridView else Icons.Rounded.ViewModule,
+                                    contentDescription = "切换 2/3 列",
                                     modifier = Modifier.size(19.dp),
                                 )
                             }
@@ -610,7 +658,7 @@ fun LibraryScreen(
                     }
                 } else {
                     val songGridColumns = if (isTabletLayout) 4 else 3
-                    val albumGridColumns = if (isTabletLayout) 4 else 2
+                    val albumGridColumns = if (isTabletLayout) 4 else if (albumCompactThreeCol) 3 else 2
 
                     AnimatedContent(
                         targetState = Pair(activeMainTab, selectedSubTab),
@@ -670,7 +718,9 @@ fun LibraryScreen(
                                 onOpenPlaylist = {
                                     activeDetail = CollectionDetail.PlaylistDetail(it.id, it.name)
                                 },
-                                onDeletePlaylist = onDeletePlaylist,
+                                onRequestDeletePlaylist = onRequestDeletePlaylist,
+                                onRequestRenamePlaylist = onRequestRenamePlaylist,
+                                onRequestManagePlaylistSongs = onRequestManagePlaylistSongs,
                                 bottomPadding = bottomContentPadding,
                             )
 
@@ -898,6 +948,7 @@ private fun TabletLeftSidebar(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SongsTabContent(
     songs: List<Song>,
@@ -921,72 +972,120 @@ private fun SongsTabContent(
     }
 
     if (usePosterGrid) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(gridColumns),
-            contentPadding = PaddingValues(
-                start = 18.dp,
-                end = 18.dp,
-                top = 6.dp,
-                bottom = 20.dp + bottomPadding.calculateBottomPadding(),
-            ),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
-                val isCurrent = playerState.currentSong?.id == song.id
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onPlaySongs(songs, index, false) },
-                ) {
-                    Box(
+        val gridState = rememberLazyGridState()
+        val scope = rememberCoroutineScope()
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Fixed(gridColumns),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 26.dp,
+                    top = 8.dp,
+                    bottom = 24.dp + bottomPadding.calculateBottomPadding(),
+                ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
+                    val isCurrent = playerState.currentSong?.id == song.id
+                    var itemMenuExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(1f),
+                            .combinedClickable(
+                                onClick = { onPlaySongs(songs, index, false) },
+                                onLongClick = { itemMenuExpanded = true },
+                            ),
                     ) {
-                        AlbumArtwork(
-                            uri = song.albumArtUri,
+                        VinylSleeveCover(
+                            albumArtUri = song.albumArtUri,
                             contentDescription = song.album,
-                            modifier = Modifier.fillMaxSize(),
-                            cornerRadius = 6.dp,
-                            iconSize = 26.dp,
+                            isCurrent = isCurrent,
+                            accentColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                        if (isCurrent) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(6.dp)
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = if (playerState.isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp),
+                        Spacer(modifier = Modifier.height(7.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isCurrent) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary),
                                 )
+                                Spacer(modifier = Modifier.width(5.dp))
                             }
+                            Text(
+                                text = song.title,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
+                        Text(
+                            text = song.artist,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(
+                            thickness = 0.6.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
+                        )
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = song.title,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = song.artist,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    DropdownMenu(
+                        expanded = itemMenuExpanded,
+                        onDismissRequest = { itemMenuExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(if (song.id in favoriteSongIds) "取消喜欢" else "添加到我喜欢") },
+                            onClick = { itemMenuExpanded = false; onToggleFavorite(song.id) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("添加到歌单") },
+                            onClick = { itemMenuExpanded = false; onRequestAddToPlaylist(song) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("更换封面") },
+                            onClick = { itemMenuExpanded = false; onReplaceCover(song) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("匹配 / 导入歌词") },
+                            onClick = { itemMenuExpanded = false; onMatchLyrics(song) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("歌曲信息") },
+                            onClick = { itemMenuExpanded = false; onShowSongInfo(song) },
+                        )
+                    }
+                    }
                 }
+            }
+            if (songs.size >= 20) {
+                AlphabetFastScroller(
+                    onSelectLetter = { letter ->
+                        val targetIdx = if (letter == "#") {
+                            songs.indexOfFirst { s -> s.title.firstOrNull()?.uppercaseChar()?.isLetter() != true }
+                        } else {
+                            songs.indexOfFirst { s -> s.title.trimStart().uppercase().startsWith(letter) }
+                        }
+                        if (targetIdx >= 0) {
+                            scope.launch { gridState.scrollToItem(targetIdx) }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 2.dp, bottom = bottomPadding.calculateBottomPadding()),
+                )
             }
         }
     } else {
@@ -1051,57 +1150,176 @@ private fun AlbumsTabContent(
         return
     }
 
-    val frameShape = RoundedCornerShape(if (liquidGlassEnabled) 14.dp else 8.dp)
+    val gridState = rememberLazyGridState()
+    val scope = rememberCoroutineScope()
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(gridColumns),
-        contentPadding = PaddingValues(
-            start = 18.dp,
-            end = 18.dp,
-            top = 12.dp,
-            bottom = 20.dp + bottomPadding.calculateBottomPadding(),
-        ),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        items(albums, key = { it.id }) { album ->
-            // Archival Book Plate Frame
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(frameShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(0.75.dp, MaterialTheme.colorScheme.outline, frameShape)
-                    .clickable { onSelectAlbum(album) }
-                    .padding(8.dp),
-            ) {
-                AlbumArtwork(
-                    uri = album.albumArtUri,
-                    contentDescription = album.name,
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(gridColumns),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 26.dp,
+                top = 12.dp,
+                bottom = 24.dp + bottomPadding.calculateBottomPadding(),
+            ),
+            horizontalArrangement = Arrangement.spacedBy(if (gridColumns >= 3) 12.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            items(albums, key = { it.id }) { album ->
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1f),
-                    cornerRadius = if (liquidGlassEnabled) 10.dp else 4.dp,
-                    iconSize = 34.dp,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = album.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${album.artist} · ${album.songs.size} 首",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                        .clickable { onSelectAlbum(album) },
+                ) {
+                    VinylSleeveCover(
+                        albumArtUri = album.albumArtUri,
+                        contentDescription = album.name,
+                        isCurrent = false,
+                        accentColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(7.dp))
+                    Text(
+                        text = "${album.songs.size} 首",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                        maxLines = 1,
+                    )
+                    Spacer(modifier = Modifier.height(1.dp))
+                    Text(
+                        text = album.name,
+                        style = if (gridColumns >= 3) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = album.artist,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(
+                        thickness = 0.6.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
+                    )
+                }
             }
+        }
+
+        if (albums.size >= 18) {
+            AlphabetFastScroller(
+                onSelectLetter = { letter ->
+                    val targetIdx = if (letter == "#") {
+                        albums.indexOfFirst { a -> a.name.firstOrNull()?.uppercaseChar()?.isLetter() != true }
+                    } else {
+                        albums.indexOfFirst { a -> a.name.trimStart().uppercase().startsWith(letter) }
+                    }
+                    if (targetIdx >= 0) {
+                        scope.launch { gridState.scrollToItem(targetIdx) }
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 2.dp, bottom = bottomPadding.calculateBottomPadding()),
+            )
+        }
+    }
+}
+
+@Composable
+private fun VinylSleeveCover(
+    albumArtUri: android.net.Uri?,
+    contentDescription: String?,
+    isCurrent: Boolean,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    // Lightweight physical vinyl sleeve (left 84% square cover + right peeking glossy black LP edge)
+    Box(
+        modifier = modifier.aspectRatio(1.16f),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        // Peeking glossy jet-black vinyl LP disc behind right edge (slides slightly further out when playing!)
+        Canvas(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight(0.90f)
+                .aspectRatio(1f)
+                .padding(end = if (isCurrent) 0.dp else 3.dp),
+        ) {
+            val r = size.minDimension / 2f
+            val c = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0.0f to Color(0xFF0A0A0C),
+                    0.75f to Color(0xFF141417),
+                    1.0f to Color(0xFF08080A),
+                    center = c,
+                    radius = r,
+                ),
+                radius = r,
+                center = c,
+            )
+            // Subtle glossy groove rings
+            drawCircle(
+                color = Color.White.copy(alpha = 0.14f),
+                radius = r * 0.84f,
+                center = c,
+                style = Stroke(width = 0.9f),
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.10f),
+                radius = r * 0.66f,
+                center = c,
+                style = Stroke(width = 0.8f),
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.22f),
+                radius = r - 0.8f,
+                center = c,
+                style = Stroke(width = 1.0f),
+            )
+            // Center label peek
+            drawCircle(
+                color = if (isCurrent) accentColor else Color(0xFF2A2825),
+                radius = r * 0.30f,
+                center = c,
+            )
+        }
+
+        // Sharp Square Archival Vinyl Sleeve with delicate printed spine crease on left edge
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f)
+                .shadow(
+                    elevation = 4.dp,
+                    shape = RoundedCornerShape(3.dp),
+                    ambientColor = Color.Black.copy(alpha = 0.18f),
+                    spotColor = Color.Black.copy(alpha = 0.22f),
+                ),
+        ) {
+            AlbumArtwork(
+                uri = albumArtUri,
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = 3.dp,
+                iconSize = 26.dp,
+            )
+            // Subtle physical cardboard sleeve spine crease line on left edge
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 4.dp)
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(Color.White.copy(alpha = 0.28f)),
+            )
         }
     }
 }
@@ -1252,7 +1470,10 @@ private fun PlaylistsTabContent(
     onOpenFavorites: () -> Unit,
     onPlayFavorites: () -> Unit,
     onOpenPlaylist: (Playlist) -> Unit,
-    onDeletePlaylist: (String) -> Unit,
+    onRequestDeletePlaylist: (Playlist) -> Unit,
+    onRequestRenamePlaylist: (Playlist) -> Unit,
+    onRequestManagePlaylistSongs: (Playlist) -> Unit,
+    onRequestManageFavorites: () -> Unit,
     bottomPadding: PaddingValues,
 ) {
     val cardShape = RoundedCornerShape(if (liquidGlassEnabled) 16.dp else 8.dp)
@@ -1370,12 +1591,44 @@ private fun PlaylistsTabContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = { onDeletePlaylist(playlist.id) }) {
-                    Icon(
-                        imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = "删除歌单",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                var plMenuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { plMenuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = "歌单操作",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = plMenuExpanded,
+                        onDismissRequest = { plMenuExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("添加 / 管理歌曲") },
+                            onClick = {
+                                plMenuExpanded = false
+                                onRequestManagePlaylistSongs(playlist)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("重命名歌单") },
+                            onClick = {
+                                plMenuExpanded = false
+                                onRequestRenamePlaylist(playlist)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除歌单", color = MaterialTheme.colorScheme.primary) },
+                            onClick = {
+                                plMenuExpanded = false
+                                onRequestDeletePlaylist(playlist)
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -1385,7 +1638,8 @@ private fun PlaylistsTabContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CollectionDetailView(
-    detail: CollectionDetail,
+    title: String,
+    subtitle: String,
     songs: List<Song>,
     favoriteSongIds: Set<Long>,
     playerState: PlayerUiState,
@@ -1397,6 +1651,8 @@ private fun CollectionDetailView(
     onShowSongInfo: (Song) -> Unit,
     onReplaceCover: (Song) -> Unit,
     onMatchLyrics: (Song) -> Unit,
+    onManageSongs: (() -> Unit)?,
+    onRenamePlaylist: (() -> Unit)?,
     onRemoveFromPlaylist: ((Long) -> Unit)?,
     bottomContentPadding: PaddingValues,
 ) {
@@ -1411,13 +1667,13 @@ private fun CollectionDetailView(
                 title = {
                     Column {
                         Text(
-                            text = detail.title,
+                            text = title,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = detail.subtitle,
+                            text = subtitle,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -1430,17 +1686,56 @@ private fun CollectionDetailView(
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
                     }
                 },
+                actions = {
+                    if (onManageSongs != null) {
+                        IconButton(onClick = onManageSongs) {
+                            Icon(Icons.Rounded.Add, contentDescription = "添加或管理歌曲")
+                        }
+                    }
+                    if (onRenamePlaylist != null) {
+                        IconButton(onClick = onRenamePlaylist) {
+                            Icon(Icons.Rounded.Edit, contentDescription = "重命名歌单", modifier = Modifier.size(20.dp))
+                        }
+                    }
+                },
             )
         },
     ) { innerPadding ->
         if (songs.isEmpty()) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center,
+                    .padding(innerPadding)
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
                 Text("这里还没有歌曲", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (onManageSongs != null) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(actionCorner))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable(onClick = onManageSongs)
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "添加歌曲到歌单",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
             }
         } else {
             LazyColumn(

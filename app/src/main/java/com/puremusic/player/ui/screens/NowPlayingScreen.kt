@@ -8,6 +8,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -54,7 +56,9 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.graphics.Path
 import androidx.compose.material.icons.rounded.Pause
@@ -89,6 +93,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -144,6 +149,9 @@ fun NowPlayingScreen(
     onAddToPlaylist: (Song) -> Unit,
     onOpenCoverSearch: (Song) -> Unit,
     onOpenLyricsSearch: (Song) -> Unit,
+    isTranslatingLyrics: Boolean = false,
+    onTranslateLyrics: () -> Unit = {},
+    onAddToPlaylist: () -> Unit = {},
 ) {
     var showFullLyrics by remember { mutableStateOf(false) }
     BackHandler {
@@ -202,25 +210,19 @@ fun NowPlayingScreen(
     val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
     val activeAccentColor = if (liquidGlassEnabled) animatedAccent else MaterialTheme.colorScheme.primary
+    val dynamicDarkSolidBg by animateColorAsState(
+        targetValue = if (isDarkTheme) {
+            lerp(Color(0xFF101113), extractedPalette.accent, 0.26f)
+        } else {
+            baseCanvas
+        },
+        animationSpec = tween(durationMillis = 550),
+        label = "darkSolidDynamicBg",
+    )
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(baseCanvas)
-            .then(
-                if (liquidGlassEnabled) {
-                    Modifier.background(
-                        Brush.radialGradient(
-                            0.00f to animatedGlow.copy(alpha = if (isDarkTheme) 0.24f else 0.14f),
-                            0.55f to animatedGlow.copy(alpha = if (isDarkTheme) 0.08f else 0.04f),
-                            1.00f to Color.Transparent,
-                            center = Offset(540f, 520f),
-                            radius = 950f,
-                        ),
-                    )
-                } else {
-                    Modifier
-                },
-            ),
+            .background(if (isDarkTheme) dynamicDarkSolidBg else baseCanvas),
     ) {
         if (showFullLyrics) {
             EditorialFullScreenLyricsView(
@@ -242,6 +244,9 @@ fun NowPlayingScreen(
                 onSeekTo = onSeekTo,
                 onOpenLyricsSearch = { onOpenLyricsSearch(song) },
                 onOpenCoverSearch = { onOpenCoverSearch(song) },
+                isTranslatingLyrics = isTranslatingLyrics,
+                onTranslateLyrics = onTranslateLyrics,
+                onAddToPlaylist = { onAddToPlaylist(song) },
             )
             return@Box
         }
@@ -343,28 +348,39 @@ fun NowPlayingScreen(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     if (activeLyric != null) {
-                        Text(
-                            text = activeLyric.primaryText,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontFamily = lyricFamily,
-                                fontStyle = lyricStyleItalic,
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            color = primaryTextColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
-                        if (!activeLyric.secondaryText.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = activeLyric.secondaryText,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = lyricFamily),
-                                color = secondaryTextColor,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                            )
+                        AnimatedContent(
+                            targetState = activeLyric,
+                            transitionSpec = {
+                                (fadeIn(tween(240)) + slideInVertically(tween(240)) { it / 3 }) togetherWith
+                                    (fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it / 3 })
+                            },
+                            label = "vinylLyricPreview",
+                        ) { line ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = line.primaryText,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontFamily = lyricFamily,
+                                        fontStyle = lyricStyleItalic,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    color = primaryTextColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                )
+                                if (!line.secondaryText.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = line.secondaryText,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = lyricFamily),
+                                        color = secondaryTextColor,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
                         }
                     } else {
                         Text(
@@ -985,6 +1001,9 @@ private fun EditorialFullScreenLyricsView(
     onSeekTo: (Long) -> Unit,
     onOpenLyricsSearch: () -> Unit,
     onOpenCoverSearch: () -> Unit,
+    isTranslatingLyrics: Boolean = false,
+    onTranslateLyrics: () -> Unit = {},
+    onAddToPlaylist: () -> Unit = {},
 ) {
     val activeIdx = remember(lyrics, positionMs) {
         lyrics.indexOfLast { it.timeMs <= positionMs }
@@ -1123,6 +1142,34 @@ private fun EditorialFullScreenLyricsView(
                     )
                 }
 
+                if (lyrics.isNotEmpty()) {
+                    val pillShape = RoundedCornerShape(6.dp)
+                    Box(
+                        modifier = Modifier
+                            .clip(pillShape)
+                            .border(0.75.dp, outlineColor, pillShape)
+                            .clickable(enabled = !isTranslatingLyrics, onClick = onTranslateLyrics)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isTranslatingLyrics) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 1.6.dp,
+                                color = accentColor,
+                            )
+                        } else {
+                            Text(
+                                text = "译",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = accentColor,
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
@@ -1138,11 +1185,28 @@ private fun EditorialFullScreenLyricsView(
                         tonalElevation = 0.dp,
                         border = BorderStroke(0.75.dp, outlineColor),
                     ) {
+                        if (lyrics.isNotEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text(if (isTranslatingLyrics) "正在翻译中文双语..." else "翻译为中文双语歌词") },
+                                enabled = !isTranslatingLyrics,
+                                onClick = {
+                                    menuExpanded = false
+                                    onTranslateLyrics()
+                                },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("在线匹配 / 导入歌词") },
                             onClick = {
                                 menuExpanded = false
                                 onOpenLyricsSearch()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("添加到歌单") },
+                            onClick = {
+                                menuExpanded = false
+                                onAddToPlaylist()
                             },
                         )
                         DropdownMenuItem(
@@ -1234,11 +1298,15 @@ private fun EditorialFullScreenLyricsView(
                             isNear -> 35.sp
                             else -> 26.sp
                         }
-                        val textColor = when {
-                            isActive -> accentColor
-                            isNear -> primaryTextColor
-                            else -> secondaryTextColor.copy(alpha = 0.72f)
-                        }
+                        val textColor by animateColorAsState(
+                            targetValue = when {
+                                isActive -> accentColor
+                                isNear -> primaryTextColor
+                                else -> secondaryTextColor.copy(alpha = 0.65f)
+                            },
+                            animationSpec = tween(durationMillis = 280),
+                            label = "lyricLineColor",
+                        )
 
                         Column(
                             modifier = Modifier

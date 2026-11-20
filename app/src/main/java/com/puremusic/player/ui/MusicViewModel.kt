@@ -90,6 +90,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _lyricSearchError = MutableStateFlow<String?>(null)
     val lyricSearchError: StateFlow<String?> = _lyricSearchError.asStateFlow()
 
+    private val _isTranslatingLyrics = MutableStateFlow(false)
+    val isTranslatingLyrics: StateFlow<Boolean> = _isTranslatingLyrics.asStateFlow()
+
     private val _coverSearchResults = MutableStateFlow<List<OnlineCoverCandidate>>(emptyList())
     val coverSearchResults: StateFlow<List<OnlineCoverCandidate>> = _coverSearchResults.asStateFlow()
     private val _isSearchingCovers = MutableStateFlow(false)
@@ -545,6 +548,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.createPlaylist(name, initialSongIds) }
     }
 
+    fun renamePlaylist(playlistId: String, newName: String) {
+        viewModelScope.launch { playlistRepository.renamePlaylist(playlistId, newName) }
+    }
+
+    fun setPlaylistSongs(playlistId: String, songIds: List<Long>) {
+        viewModelScope.launch { playlistRepository.setPlaylistSongs(playlistId, songIds) }
+    }
+
+    fun setFavoriteSongIds(songIds: Set<Long>) {
+        viewModelScope.launch { playlistRepository.setFavoriteSongIds(songIds) }
+    }
+
     fun deletePlaylist(playlistId: String) {
         viewModelScope.launch { playlistRepository.deletePlaylist(playlistId) }
     }
@@ -684,6 +699,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 lastLoadedLyricsSongId = null
                 refreshLyricsIfNeeded(song)
             }
+        }
+    }
+
+    fun translateCurrentLyricsToChinese() {
+        if (_isTranslatingLyrics.value) return
+        val song = _playerState.value.currentSong ?: return
+        val lines = _currentLyrics.value
+        if (lines.isEmpty()) return
+        viewModelScope.launch {
+            _isTranslatingLyrics.value = true
+            val res = onlineMetadataRepository.translateLyricsToBilingualLrc(lines)
+            res.onSuccess { bilingualLrc ->
+                val saved = onlineMetadataRepository.saveCustomLyricsText(song.id, bilingualLrc)
+                if (saved) {
+                    lastLoadedLyricsSongId = null
+                    refreshLyricsIfNeeded(song)
+                }
+            }
+            _isTranslatingLyrics.value = false
         }
     }
 

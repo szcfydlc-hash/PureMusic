@@ -177,6 +177,32 @@ class PlaylistRepository(private val context: Context) {
         }
     }
 
+    suspend fun renamePlaylist(playlistId: String, newName: String) {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) return
+        context.pureMusicDataStore.edit { prefs ->
+            val updated = decodePlaylists(prefs[Keys.PLAYLISTS_JSON].orEmpty()).map { playlist ->
+                if (playlist.id == playlistId) playlist.copy(name = trimmed) else playlist
+            }
+            prefs[Keys.PLAYLISTS_JSON] = encodePlaylists(updated)
+        }
+    }
+
+    suspend fun setPlaylistSongs(playlistId: String, songIds: List<Long>) {
+        context.pureMusicDataStore.edit { prefs ->
+            val updated = decodePlaylists(prefs[Keys.PLAYLISTS_JSON].orEmpty()).map { playlist ->
+                if (playlist.id == playlistId) playlist.copy(songIds = songIds.distinct()) else playlist
+            }
+            prefs[Keys.PLAYLISTS_JSON] = encodePlaylists(updated)
+        }
+    }
+
+    suspend fun setFavoriteSongIds(songIds: Set<Long>) {
+        context.pureMusicDataStore.edit { prefs ->
+            prefs[Keys.FAVORITE_SONG_IDS] = songIds.map { it.toString() }.toSet()
+        }
+    }
+
     suspend fun deletePlaylist(playlistId: String) {
         context.pureMusicDataStore.edit { prefs ->
             val updated = decodePlaylists(prefs[Keys.PLAYLISTS_JSON].orEmpty())

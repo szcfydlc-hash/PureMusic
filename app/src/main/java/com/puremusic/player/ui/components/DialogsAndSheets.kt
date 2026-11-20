@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -157,8 +159,14 @@ fun AddToPlaylistDialog(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (playlists.isNotEmpty()) {
-                    Column(modifier = Modifier.heightIn(max = 220.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
                         playlists.forEach { playlist ->
+                            val alreadyIn = song.id in playlist.songIds
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -181,6 +189,14 @@ fun AddToPlaylistDialog(
                                         text = "${playlist.songIds.size} 首歌曲",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                if (alreadyIn) {
+                                    Text(
+                                        text = "已加入",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold,
                                     )
                                 }
                             }
@@ -416,7 +432,7 @@ fun EqualizerBottomSheet(
                                     .padding(horizontal = 14.dp, vertical = 7.dp),
                             ) {
                                 Text(
-                                    text = presetName,
+                                    text = localizeEqPresetName(presetName),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                     color = if (selected && state.enabled) {
@@ -1392,6 +1408,301 @@ fun OnlineCoverSearchSheet(
                 ) {
                     Text("恢复原封面", style = MaterialTheme.typography.labelMedium)
                 }
+            }
+        }
+    }
+}
+
+private fun localizeEqPresetName(raw: String): String {
+    return when (raw.trim().lowercase(Locale.US)) {
+        "normal" -> "标准"
+        "classical" -> "古典"
+        "dance" -> "舞曲"
+        "flat" -> "平直"
+        "folk" -> "民谣"
+        "heavy metal" -> "重金属"
+        "hip hop", "hip-hop", "hiphop" -> "嘻哈"
+        "jazz" -> "爵士"
+        "pop" -> "流行"
+        "rock" -> "摇滚"
+        "acoustic" -> "原声"
+        "electronic", "electronica" -> "电子"
+        "vocal", "voice", "vocal booster" -> "人声"
+        "bass boost", "bass booster" -> "低音增强"
+        "treble booster" -> "高音增强"
+        "fx booster" -> "环绕增强"
+        "r&b", "rnb" -> "蓝调"
+        "latin" -> "拉丁"
+        "lounge" -> "轻音乐"
+        "piano" -> "钢琴"
+        "small room" -> "小房间"
+        "medium room" -> "中房间"
+        "large hall" -> "音乐厅"
+        "plate" -> "板式混响"
+        "custom" -> "自定义"
+        else -> raw
+    }
+}
+
+@Composable
+fun RenamePlaylistDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember(currentName) { mutableStateOf(currentName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(12.dp),
+        title = { Text("重命名歌单", fontWeight = FontWeight.SemiBold) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("新歌单名称") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        onConfirm(name.trim())
+                        onDismiss()
+                    }
+                },
+                enabled = name.isNotBlank(),
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+
+@Composable
+fun ConfirmDeletePlaylistDialog(
+    playlistName: String,
+    onDismiss: () -> Unit,
+    onConfirmDelete: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(12.dp),
+        title = { Text("删除歌单", fontWeight = FontWeight.SemiBold) },
+        text = {
+            Text(
+                text = "确定要删除自建歌单「$playlistName」吗？本地音乐文件不会被删除。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirmDelete()
+                    onDismiss()
+                },
+            ) {
+                Text("确认删除", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BatchSongPickerSheet(
+    title: String,
+    allSongs: List<Song>,
+    initialSelectedIds: Set<Long>,
+    onSave: (List<Long>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    var selectedIds by remember(initialSelectedIds) { mutableStateOf(initialSelectedIds) }
+    val filtered = remember(allSongs, query) {
+        val q = query.trim().lowercase(Locale.getDefault())
+        if (q.isEmpty()) {
+            allSongs
+        } else {
+            allSongs.filter {
+                it.title.lowercase(Locale.getDefault()).contains(q) ||
+                    it.artist.lowercase(Locale.getDefault()).contains(q) ||
+                    it.album.lowercase(Locale.getDefault()).contains(q)
+            }
+        }
+    }
+    val outlineColor = MaterialTheme.colorScheme.outline
+    val boxShape = RoundedCornerShape(8.dp)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.background,
+        tonalElevation = 0.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = outlineColor) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 26.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "已选 ${selectedIds.size} 首歌曲",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                if (selectedIds.isNotEmpty()) {
+                    TextButton(onClick = { selectedIds = emptySet() }) {
+                        Text("清空已选", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+
+            // Search input
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .clip(boxShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.75.dp, outlineColor, boxShape)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(17.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    if (query.isEmpty()) {
+                        Text(
+                            text = "搜索歌名、歌手或专辑",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                        )
+                    }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { query = "" }, modifier = Modifier.size(26.dp)) {
+                        Icon(Icons.Rounded.Close, contentDescription = "清空", modifier = Modifier.size(15.dp))
+                    }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 180.dp, max = 360.dp),
+            ) {
+                itemsIndexed(filtered, key = { _, song -> song.id }) { _, song ->
+                    val checked = song.id in selectedIds
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedIds = if (checked) selectedIds - song.id else selectedIds + song.id
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = {
+                                selectedIds = if (checked) selectedIds - song.id else selectedIds + song.id
+                            },
+                        )
+                        AlbumArtwork(
+                            uri = song.albumArtUri,
+                            contentDescription = song.album,
+                            modifier = Modifier.size(40.dp),
+                            cornerRadius = 5.dp,
+                            iconSize = 16.dp,
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = song.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = song.artist,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = outlineColor.copy(alpha = 0.5f),
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(boxShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable {
+                        // Preserve original order for existing songs, append newly added in library order
+                        val ordered = allSongs.filter { it.id in selectedIds }.map { it.id }
+                        onSave(ordered)
+                        onDismiss()
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "保存更改 (${selectedIds.size} 首)",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }
