@@ -10,8 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 data class DynamicSongPalette(
-    val glowColor: Color = BerryRed,
-    val accent: Color = BerryRed,
+    val glowColor: Color = CinnabarRed,
+    val accent: Color = CinnabarRed,
 )
 
 object DynamicColorExtractor {
