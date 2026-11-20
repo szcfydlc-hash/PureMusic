@@ -14,6 +14,8 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.puremusic.player.data.model.Album
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
+import com.puremusic.player.data.model.AppFontWeight
+import com.puremusic.player.data.model.AudioTechSpec
 import com.puremusic.player.data.model.Artist
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.EqualizerState
@@ -68,6 +70,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private var positionTickerJob: Job? = null
     private var lyricsJob: Job? = null
     private var lastLoadedLyricsSongId: Long? = null
+    private var lastRecordedPlaySongId: Long? = null
+    private var fadeInJob: Job? = null
+    private var audioSpecJob: Job? = null
+    private var lastSpecSongId: Long? = null
 
     private val _rawSongs = MutableStateFlow<List<Song>>(emptyList())
     private val _isLoading = MutableStateFlow(false)
@@ -81,6 +87,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _currentLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val currentLyrics: StateFlow<List<LyricLine>> = _currentLyrics.asStateFlow()
+
+    private val _currentAudioSpec = MutableStateFlow(AudioTechSpec())
+    val currentAudioSpec: StateFlow<AudioTechSpec> = _currentAudioSpec.asStateFlow()
 
     private val _customCovers = MutableStateFlow<Map<Long, Uri>>(emptyMap())
     private val _metaOverrides = MutableStateFlow<Map<Long, SongMetaOverride>>(emptyMap())
@@ -199,6 +208,42 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = 58,
     )
 
+    val fontWeight: StateFlow<AppFontWeight> = playlistRepository.fontWeightFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = AppFontWeight.NORMAL,
+    )
+
+    val fontSlantDegrees: StateFlow<Float> = playlistRepository.fontSlantDegreesFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 0f,
+    )
+
+    val playbackSpeed: StateFlow<Float> = playlistRepository.playbackSpeedFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 1.0f,
+    )
+
+    val fadeInSeconds: StateFlow<Int> = playlistRepository.fadeInSecondsFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 0,
+    )
+
+    val keepScreenOn: StateFlow<Boolean> = playlistRepository.keepScreenOnFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false,
+    )
+
+    val lyricOffsets: StateFlow<Map<Long, Long>> = playlistRepository.lyricOffsetsFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyMap(),
+    )
+
     val excludedFolders: StateFlow<Set<String>> = playlistRepository.excludedFoldersFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -304,6 +349,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList(),
     )
 
+    val recentSongs: StateFlow<List<Song>> = combine(allSongs, playlistRepository.recentSongIdsFlow) { songs, ids ->
+        val map = songs.associateBy { it.id }
+        ids.mapNotNull { map[it] }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList(),
+    )
+
+    val mostPlayedSongs: StateFlow<List<Song>> = combine(allSongs, playlistRepository.playCountsFlow) { songs, counts ->
+        songs.filter { (counts[it.id] ?: 0) > 0 }
+            .sortedByDescending { counts[it.id] ?: 0 }
+            .take(50)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList(),
+    )
+
     private val _playerState = MutableStateFlow(PlayerUiState())
     val playerState: StateFlow<PlayerUiState> = _playerState.asStateFlow()
 
@@ -327,6 +391,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             syncPlayerSnapshot()
             persistCurrentPlayback()
+            triggerFadeInIfEnabled()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -363,6 +428,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     val controller = future.get()
                     mediaController = controller
                     controller.addListener(playerListener)
+                    controller.setPlaybackSpeed(playbackSpeed.value)
                     syncPlayerSnapshot()
                     tryRestorePlaybackSnapshot()
                     if (controller.isPlaying) startPositionTicker()
@@ -648,6 +714,61 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.setMiniPlayerHeightDp(heightDp) }
     }
 
+    fun setFontWeight(weight: AppFontWeight) {
+        viewModelScope.launch { playlistRepository.setFontWeight(weight) }
+    }
+
+    fun setFontSlantDegrees(degrees: Float) {
+        viewModelScope.launch { playlistRepository.setFontSlantDegrees(degrees) }
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        val safe = speed.coerceIn(0.5f, 2.0f)
+        mediaController?.setPlaybackSpeed(safe)
+        viewModelScope.launch { playlistRepository.setPlaybackSpeed(safe) }
+    }
+
+    fun setFadeInSeconds(seconds: Int) {
+        viewModelScope.launch { playlistRepository.setFadeInSeconds(seconds) }
+    }
+
+    fun setKeepScreenOn(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setKeepScreenOn(enabled) }
+    }
+
+    fun adjustCurrentLyricOffset(deltaMs: Long) {
+        val song = _playerState.value.currentSong ?: return
+        val current = lyricOffsets.value[song.id] ?: 0L
+        viewModelScope.launch {
+            playlistRepository.setLyricOffsetMs(song.id, current + deltaMs)
+        }
+    }
+
+    fun resetCurrentLyricOffset() {
+        val song = _playerState.value.currentSong ?: return
+        viewModelScope.launch {
+            playlistRepository.setLyricOffsetMs(song.id, 0L)
+        }
+    }
+
+    private fun triggerFadeInIfEnabled() {
+        val secs = fadeInSeconds.value
+        val controller = mediaController ?: return
+        fadeInJob?.cancel()
+        if (secs <= 0 || !controller.isPlaying) {
+            controller.volume = 1f
+            return
+        }
+        fadeInJob = viewModelScope.launch {
+            val steps = secs * 12
+            for (i in 1..steps) {
+                controller.volume = (i.toFloat() / steps.toFloat()).coerceIn(0.08f, 1f)
+                delay(83L)
+            }
+            controller.volume = 1f
+        }
+    }
+
     fun toggleFolderExcluded(folderPath: String) {
         viewModelScope.launch { playlistRepository.toggleFolderExcluded(folderPath) }
     }
@@ -886,6 +1007,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             repeatMode = repeat,
         )
         refreshLyricsIfNeeded(currentSong)
+        if (currentSong != null) {
+            if (currentSong.id != lastSpecSongId) {
+                lastSpecSongId = currentSong.id
+                audioSpecJob?.cancel()
+                audioSpecJob = viewModelScope.launch {
+                    _currentAudioSpec.value = musicRepository.extractAudioTechSpec(currentSong)
+                }
+            }
+            if (controller.isPlaying && currentSong.id != lastRecordedPlaySongId) {
+                lastRecordedPlaySongId = currentSong.id
+                viewModelScope.launch { playlistRepository.recordSongPlayed(currentSong.id) }
+            }
+        } else {
+            lastSpecSongId = null
+            _currentAudioSpec.value = AudioTechSpec()
+        }
     }
 
     private fun startPositionTicker() {

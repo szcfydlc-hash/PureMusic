@@ -83,6 +83,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
+import com.puremusic.player.data.model.AppFontWeight
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
@@ -107,6 +108,11 @@ fun SettingsScreen(
     layoutMode: LayoutMode,
     layoutDensity: LayoutDensity,
     fontScale: Float,
+    fontWeight: AppFontWeight,
+    fontSlantDegrees: Float,
+    playbackSpeed: Float,
+    fadeInSeconds: Int,
+    keepScreenOn: Boolean,
     liquidGlassEnabled: Boolean,
     floatingControlsEnabled: Boolean,
     liquidGlassLevel: LiquidGlassLevel,
@@ -122,6 +128,11 @@ fun SettingsScreen(
     onSelectLayoutMode: (LayoutMode) -> Unit,
     onSelectLayoutDensity: (LayoutDensity) -> Unit,
     onChangeFontScale: (Float) -> Unit,
+    onSelectFontWeight: (AppFontWeight) -> Unit,
+    onChangeFontSlantDegrees: (Float) -> Unit,
+    onSelectPlaybackSpeed: (Float) -> Unit,
+    onSelectFadeInSeconds: (Int) -> Unit,
+    onToggleKeepScreenOn: (Boolean) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onToggleFloatingControls: (Boolean) -> Unit,
     onSelectLiquidGlassLevel: (LiquidGlassLevel) -> Unit,
@@ -143,6 +154,8 @@ fun SettingsScreen(
     var showAppFontDialog by remember { mutableStateOf(false) }
     var showLyricFontDialog by remember { mutableStateOf(false) }
     var showBackgroundDialog by remember { mutableStateOf(false) }
+    var showSpeedDialog by remember { mutableStateOf(false) }
+    var showFadeInDialog by remember { mutableStateOf(false) }
     var showFolderManagerDialog by remember { mutableStateOf(false) }
     var glassLevelMenuExpanded by remember { mutableStateOf(false) }
 
@@ -243,7 +256,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "实时排印预览 · ${layoutDensity.label} · ${(fontScale * 100).toInt()}%",
+                            text = "${layoutDensity.label} · ${(fontScale * 100).toInt()}% · ${fontWeight.label} · 倾斜 ${fontSlantDegrees.roundToInt()}°",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -761,6 +774,62 @@ fun SettingsScreen(
                     value = backgroundStyle.label,
                     onClick = { showBackgroundDialog = true },
                 )
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "字体粗细",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SegmentedOptionBar(
+                    items = AppFontWeight.entries.map { it.label },
+                    selectedIndex = AppFontWeight.entries.indexOf(fontWeight),
+                    liquidGlassEnabled = liquidGlassEnabled,
+                    onSelect = { idx -> onSelectFontWeight(AppFontWeight.entries[idx]) },
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "字体倾斜度",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = if (fontSlantDegrees < 0.5f) "0° (直立)" else "${fontSlantDegrees.roundToInt()}°",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("0°", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    VintageRulerSlider(
+                        value = fontSlantDegrees,
+                        minValue = 0f,
+                        maxValue = 16f,
+                        steps = 8,
+                        onValueChange = onChangeFontSlantDegrees,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp),
+                    )
+                    Text("16°", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
 
             // Card 5: 曲库管理
@@ -923,6 +992,44 @@ fun SettingsScreen(
                     onClick = onOpenSleepTimer,
                 )
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                SettingsListRow(
+                    label = "播放倍速",
+                    value = "${playbackSpeed}×",
+                    onClick = { showSpeedDialog = true },
+                )
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                SettingsListRow(
+                    label = "切歌柔和淡入",
+                    value = if (fadeInSeconds <= 0) "关闭" else "${fadeInSeconds} 秒",
+                    onClick = { showFadeInDialog = true },
+                )
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "播放页屏幕常亮",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "欣赏黑胶与 3 行动态字幕时不自动息屏",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = keepScreenOn,
+                        onCheckedChange = onToggleKeepScreenOn,
+                        colors = switchColors,
+                    )
+                }
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 SettingsActionIconRow(
                     icon = Icons.Rounded.RestartAlt,
                     label = "恢复默认外观",
@@ -958,7 +1065,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v8.8.0",
+                            text = "v9.0.0",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -1027,6 +1134,32 @@ fun SettingsScreen(
                 showBackgroundDialog = false
             },
             onDismiss = { showBackgroundDialog = false },
+        )
+    }
+
+    if (showSpeedDialog) {
+        OptionPickerDialog(
+            title = "选择播放倍速",
+            options = listOf(0.75f to "0.75× (舒缓)", 1.0f to "1.0× (原速)", 1.25f to "1.25×", 1.5f to "1.5×", 2.0f to "2.0×"),
+            selected = playbackSpeed,
+            onSelect = {
+                onSelectPlaybackSpeed(it)
+                showSpeedDialog = false
+            },
+            onDismiss = { showSpeedDialog = false },
+        )
+    }
+
+    if (showFadeInDialog) {
+        OptionPickerDialog(
+            title = "切歌柔和淡入时长",
+            options = listOf(0 to "关闭", 1 to "1 秒", 2 to "2 秒", 4 to "4 秒"),
+            selected = fadeInSeconds,
+            onSelect = {
+                onSelectFadeInSeconds(it)
+                showFadeInDialog = false
+            },
+            onDismiss = { showFadeInDialog = false },
         )
     }
 

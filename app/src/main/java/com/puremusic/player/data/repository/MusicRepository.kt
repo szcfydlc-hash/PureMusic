@@ -2,7 +2,11 @@ package com.puremusic.player.data.repository
 
 import android.content.ContentUris
 import android.content.Context
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaScannerConnection
+import com.puremusic.player.data.model.AudioTechSpec
+import java.util.Locale
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -212,5 +216,57 @@ class MusicRepository(private val context: Context) {
             val path = parent?.absolutePath ?: "/"
             name to path
         }
+    }
+
+    suspend fun extractAudioTechSpec(song: Song): AudioTechSpec = withContext(Dispatchers.IO) {
+        val ext = song.filePath.substringAfterLast('.', "").uppercase(Locale.US)
+        val extractor = MediaExtractor()
+        var sampleRate = 0
+        var bitrateKbps = 0
+        var mimeFormat = ext
+        try {
+            extractor.setDataSource(context, song.contentUri, null)
+            for (i in 0 until extractor.trackCount) {
+                val fmt = extractor.getTrackFormat(i)
+                val mime = fmt.getString(MediaFormat.KEY_MIME).orEmpty()
+                if (mime.startsWith("audio/")) {
+                    if (fmt.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                        sampleRate = fmt.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                    }
+                    if (fmt.containsKey(MediaFormat.KEY_BIT_RATE)) {
+                        bitrateKbps = fmt.getInteger(MediaFormat.KEY_BIT_RATE) / 1000
+                    }
+                    if (mimeFormat.isBlank()) {
+                        mimeFormat = when {
+                            mime.contains("flac") -> "FLAC"
+                            mime.contains("mpeg") -> "MP3"
+                            mime.contains("mp4a") -> "AAC"
+                            mime.contains("raw") -> "WAV"
+                            mime.contains("opus") -> "OPUS"
+                            mime.contains("vorbis") -> "OGG"
+                            else -> "AUDIO"
+                        }
+                    }
+                    break
+                }
+            }
+        } catch (_: Exception) {
+        } finally {
+            runCatching { extractor.release() }
+        }
+        if (bitrateKbps <= 0 && song.filePath.isNotBlank() && song.durationMs > 1000L) {
+            val bytes = runCatching { File(song.filePath).length() }.getOrDefault(0L)
+            if (bytes > 0L) {
+                bitrateKbps = ((bytes * 8L) / song.durationMs).toInt()
+            }
+        }
+        val lossless = mimeFormat in setOf("FLAC", "WAV", "ALAC", "APE", "DSD")
+        val hiRes = (lossless && sampleRate >= 48_000) || bitrateKbps >= 900
+        AudioTechSpec(
+            format = mimeFormat.ifBlank { "AUDIO" },
+            sampleRateHz = sampleRate,
+            bitrateKbps = bitrateKbps,
+            isHiRes = hiRes,
+        )
     }
 }

@@ -14,13 +14,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.core.view.WindowCompat
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
+import com.puremusic.player.data.model.AppFontWeight
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.MiniPlayerStyle
+import kotlin.math.tan
 
 val CinnabarRed = Color(0xFFA63429)
 val ForestGreen = Color(0xFF2F5D50)
@@ -35,60 +39,61 @@ private data class PaperPalette(
     val outline: Color,
 )
 
+// Distinct, authentic dyed archival paper tones (~92% lightness so 宣纸浅色 is unmistakably distinct from 素白纸 #FFFFFF!)
 private fun lightPaperFor(accent: AppAccentColor): PaperPalette = when (accent) {
     AppAccentColor.PRUSSIAN_BLUE -> PaperPalette(
-        bg = Color(0xFFF2F5FA),
-        card = Color(0xFFFAFBFD),
-        variant = Color(0xFFE5ECF5),
-        high = Color(0xFFD9E3F0),
-        ink = Color(0xFF171D26),
-        muted = Color(0xFF5F6B7A),
-        outline = Color(0xFFD5DFEC),
+        bg = Color(0xFFE6EDF7),
+        card = Color(0xFFF5F8FC),
+        variant = Color(0xFFD8E3F2),
+        high = Color(0xFFCBD8EB),
+        ink = Color(0xFF151C26),
+        muted = Color(0xFF536173),
+        outline = Color(0xFFC3D2E6),
     )
     AppAccentColor.PINE_GREEN -> PaperPalette(
-        bg = Color(0xFFF2F6F4),
-        card = Color(0xFFFAFDFB),
-        variant = Color(0xFFE4EEE9),
-        high = Color(0xFFD8E6DF),
-        ink = Color(0xFF16201C),
-        muted = Color(0xFF5D6E66),
-        outline = Color(0xFFD4E0DA),
+        bg = Color(0xFFE7F0EC),
+        card = Color(0xFFF5FAF8),
+        variant = Color(0xFFD8E7E0),
+        high = Color(0xFFCADDD4),
+        ink = Color(0xFF14201B),
+        muted = Color(0xFF50635B),
+        outline = Color(0xFFC2D6CD),
     )
     AppAccentColor.CINNABAR_RED -> PaperPalette(
-        bg = Color(0xFFF8F4F1),
-        card = Color(0xFFFDFBF9),
-        variant = Color(0xFFEFE6E1),
-        high = Color(0xFFE7DBD5),
-        ink = Color(0xFF211A18),
-        muted = Color(0xFF72645E),
-        outline = Color(0xFFE6DBD6),
+        bg = Color(0xFFF2E7E0),
+        card = Color(0xFFFAF5F2),
+        variant = Color(0xFFE7D7CE),
+        high = Color(0xFFDEC9BD),
+        ink = Color(0xFF211816),
+        muted = Color(0xFF6B5B55),
+        outline = Color(0xFFD9C5BB),
     )
     AppAccentColor.WALNUT_SEPIA -> PaperPalette(
-        bg = Color(0xFFF6F2EC),
-        card = Color(0xFFFCF9F5),
-        variant = Color(0xFFECE4D9),
-        high = Color(0xFFE3D8CA),
-        ink = Color(0xFF211C17),
-        muted = Color(0xFF70655B),
-        outline = Color(0xFFE2D8CA),
+        bg = Color(0xFFEFE7DA),
+        card = Color(0xFFFAF6EE),
+        variant = Color(0xFFE3D7C4),
+        high = Color(0xFFD9C9B2),
+        ink = Color(0xFF211B15),
+        muted = Color(0xFF695D50),
+        outline = Color(0xFFD5C6B2),
     )
     AppAccentColor.ANTIQUE_OCHRE -> PaperPalette(
-        bg = Color(0xFFF7F4EA),
-        card = Color(0xFFFDFBF5),
-        variant = Color(0xFFEEE8D6),
-        high = Color(0xFFE5DEC8),
-        ink = Color(0xFF201D15),
-        muted = Color(0xFF706958),
-        outline = Color(0xFFE4DCC6),
+        bg = Color(0xFFF2ECD9),
+        card = Color(0xFFFAF7EE),
+        variant = Color(0xFFE6DEC5),
+        high = Color(0xFFDCD2B4),
+        ink = Color(0xFF211D13),
+        muted = Color(0xFF69614E),
+        outline = Color(0xFFD8CEB2),
     )
     AppAccentColor.PURE_INK -> PaperPalette(
-        bg = Color(0xFFF5F5F4),
-        card = Color(0xFFFFFFFF),
-        variant = Color(0xFFEAEAE8),
-        high = Color(0xFFE0E0DD),
-        ink = Color(0xFF181818),
-        muted = Color(0xFF666664),
-        outline = Color(0xFFDFDFDC),
+        bg = Color(0xFFEBEAE6),
+        card = Color(0xFFF7F6F3),
+        variant = Color(0xFFDFDDD7),
+        high = Color(0xFFD4D2CB),
+        ink = Color(0xFF181817),
+        muted = Color(0xFF5E5D59),
+        outline = Color(0xFFCFCDC6),
     )
 }
 
@@ -164,6 +169,8 @@ fun PureMusicTheme(
     fontStyle: AppFontStyle,
     layoutDensity: LayoutDensity = LayoutDensity.STANDARD,
     fontScale: Float = 1.0f,
+    fontWeight: AppFontWeight = AppFontWeight.NORMAL,
+    fontSlantDegrees: Float = 0f,
     liquidGlassLevel: LiquidGlassLevel = LiquidGlassLevel.FULL,
     floatingControlsEnabled: Boolean = false,
     miniPlayerStyle: MiniPlayerStyle = MiniPlayerStyle.CLASSIC_BOOK,
@@ -218,41 +225,41 @@ fun PureMusicTheme(
             outlineVariant = p.outline.copy(alpha = 0.7f),
         )
     } else if (backgroundStyle == BackgroundStyle.PURE_WHITE) {
-        val p = lightPaperFor(accentColor)
+        // Pure crisp neutral gallery white — zero warm tint, unmistakably distinct from 宣纸浅色!
         lightColorScheme(
             primary = primaryAccent,
             onPrimary = onPrimaryColor,
-            primaryContainer = primaryAccent.copy(alpha = 0.12f),
+            primaryContainer = primaryAccent.copy(alpha = 0.10f),
             onPrimaryContainer = primaryAccent,
             secondary = primaryAccent.copy(alpha = 0.85f),
             onSecondary = onPrimaryColor,
-            secondaryContainer = p.variant,
-            onSecondaryContainer = p.ink,
+            secondaryContainer = Color(0xFFF2F2F4),
+            onSecondaryContainer = Color(0xFF161618),
             tertiary = primaryAccent,
             onTertiary = onPrimaryColor,
-            tertiaryContainer = p.variant,
-            onTertiaryContainer = p.ink,
+            tertiaryContainer = Color(0xFFF2F2F4),
+            onTertiaryContainer = Color(0xFF161618),
             background = Color(0xFFFFFFFF),
-            onBackground = p.ink,
-            surface = Color(0xFFFAFAFA),
-            onSurface = p.ink,
-            surfaceVariant = p.variant,
-            onSurfaceVariant = p.muted,
+            onBackground = Color(0xFF161618),
+            surface = Color(0xFFF7F7F8),
+            onSurface = Color(0xFF161618),
+            surfaceVariant = Color(0xFFEEEEF0),
+            onSurfaceVariant = Color(0xFF66666B),
             surfaceTint = Color.Transparent,
             surfaceContainerLowest = Color(0xFFFFFFFF),
-            surfaceContainerLow = Color(0xFFFAFAFA),
-            surfaceContainer = Color(0xFFFAFAFA),
-            surfaceContainerHigh = p.variant,
-            surfaceContainerHighest = p.high,
-            outline = p.outline,
-            outlineVariant = p.outline.copy(alpha = 0.7f),
+            surfaceContainerLow = Color(0xFFF7F7F8),
+            surfaceContainer = Color(0xFFF7F7F8),
+            surfaceContainerHigh = Color(0xFFEEEEF0),
+            surfaceContainerHighest = Color(0xFFE5E5E8),
+            outline = Color(0xFFE2E2E6),
+            outlineVariant = Color(0xFFEAEAEF),
         )
     } else {
         val p = lightPaperFor(accentColor)
         lightColorScheme(
             primary = primaryAccent,
             onPrimary = onPrimaryColor,
-            primaryContainer = primaryAccent.copy(alpha = 0.12f),
+            primaryContainer = primaryAccent.copy(alpha = 0.14f),
             onPrimaryContainer = primaryAccent,
             secondary = primaryAccent.copy(alpha = 0.85f),
             onSecondary = onPrimaryColor,
@@ -275,7 +282,7 @@ fun PureMusicTheme(
             surfaceContainerHigh = p.card,
             surfaceContainerHighest = p.high,
             outline = p.outline,
-            outlineVariant = p.outline.copy(alpha = 0.7f),
+            outlineVariant = p.outline.copy(alpha = 0.75f),
         )
     }
 
@@ -284,12 +291,25 @@ fun PureMusicTheme(
         AppFontStyle.SANS -> FontFamily.SansSerif
         AppFontStyle.MONOSPACE -> FontFamily.Monospace
     }
-    val textFontStyle = if (fontStyle == AppFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
+    val clampedSlant = fontSlantDegrees.coerceIn(0f, 16f)
+    val textFontStyle = if (fontStyle == AppFontStyle.SERIF_ITALIC && clampedSlant < 0.5f) {
+        FontStyle.Italic
+    } else {
+        FontStyle.Normal
+    }
+    val geometricTransform = if (clampedSlant >= 0.5f) {
+        TextGeometricTransform(skewX = -tan(Math.toRadians(clampedSlant.toDouble())).toFloat())
+    } else {
+        null
+    }
+    val baseWeight = FontWeight(fontWeight.weightValue)
 
     val scale = fontScale.coerceIn(0.85f, 1.25f)
     fun androidx.compose.ui.text.TextStyle.scaled() = copy(
         fontFamily = family,
         fontStyle = textFontStyle,
+        fontWeight = baseWeight,
+        textGeometricTransform = geometricTransform,
         fontSize = fontSize * scale,
         lineHeight = lineHeight * scale,
     )

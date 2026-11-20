@@ -58,6 +58,8 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Whatshot
 import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicOff
@@ -153,6 +155,16 @@ sealed interface CollectionDetail {
         override val title: String = "我喜欢的音乐"
         override val subtitle: String = "收藏列表"
     }
+
+    data object RecentDetail : CollectionDetail {
+        override val title: String = "最近播放"
+        override val subtitle: String = "播放历史"
+    }
+
+    data object MostPlayedDetail : CollectionDetail {
+        override val title: String = "常听曲目"
+        override val subtitle: String = "本地聆听排行"
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,6 +178,8 @@ fun LibraryScreen(
     artists: List<Artist>,
     folders: List<MusicFolder>,
     playlists: List<Playlist>,
+    recentSongs: List<Song>,
+    mostPlayedSongs: List<Song>,
     favoriteSongIds: Set<Long>,
     isLoading: Boolean,
     searchQuery: String,
@@ -227,6 +241,8 @@ fun LibraryScreen(
                 if (pl != null) resolveSongsByIds(pl.songIds) else emptyList()
             }
             CollectionDetail.FavoritesDetail -> allSongs.filter { it.id in favoriteSongIds }
+            CollectionDetail.RecentDetail -> recentSongs
+            CollectionDetail.MostPlayedDetail -> mostPlayedSongs
         }
 
         val livePlaylist = if (detail is CollectionDetail.PlaylistDetail) {
@@ -238,6 +254,8 @@ fun LibraryScreen(
         val liveSubtitle = when (detail) {
             is CollectionDetail.PlaylistDetail -> "自定义歌单 · ${detailSongs.size} 首"
             CollectionDetail.FavoritesDetail -> "收藏列表 · ${detailSongs.size} 首"
+            CollectionDetail.RecentDetail -> "最近播放 · ${detailSongs.size} 首"
+            CollectionDetail.MostPlayedDetail -> "常听排行 · ${detailSongs.size} 首"
             else -> detail.subtitle
         }
 
@@ -712,8 +730,12 @@ fun LibraryScreen(
                             MainTab.PLAYLISTS -> PlaylistsTabContent(
                                 playlists = playlists,
                                 favoriteCount = favoriteSongIds.size,
+                                recentCount = recentSongs.size,
+                                mostPlayedCount = mostPlayedSongs.size,
                                 liquidGlassEnabled = liquidGlassEnabled,
                                 onOpenFavorites = { activeDetail = CollectionDetail.FavoritesDetail },
+                                onOpenRecent = { activeDetail = CollectionDetail.RecentDetail },
+                                onOpenMostPlayed = { activeDetail = CollectionDetail.MostPlayedDetail },
                                 onPlayFavorites = {
                                     val favSongs = allSongs.filter { it.id in favoriteSongIds }
                                     if (favSongs.isNotEmpty()) onPlaySongs(favSongs, 0, false)
@@ -1475,8 +1497,12 @@ private fun FoldersTabContent(
 private fun PlaylistsTabContent(
     playlists: List<Playlist>,
     favoriteCount: Int,
+    recentCount: Int,
+    mostPlayedCount: Int,
     liquidGlassEnabled: Boolean,
     onOpenFavorites: () -> Unit,
+    onOpenRecent: () -> Unit,
+    onOpenMostPlayed: () -> Unit,
     onPlayFavorites: () -> Unit,
     onOpenPlaylist: (Playlist) -> Unit,
     onRequestDeletePlaylist: (Playlist) -> Unit,
@@ -1544,6 +1570,81 @@ private fun PlaylistsTabContent(
                             modifier = Modifier.size(26.dp),
                         )
                     }
+                }
+            }
+        }
+
+        item(key = "smart_playlists_row") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(cardShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(0.75.dp, MaterialTheme.colorScheme.outline, cardShape)
+                        .clickable(onClick = onOpenRecent)
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "最近播放",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "$recentCount 首",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.History,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(cardShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(0.75.dp, MaterialTheme.colorScheme.outline, cardShape)
+                        .clickable(onClick = onOpenMostPlayed)
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "常听曲目",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "$mostPlayedCount 首",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.Whatshot,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
         }

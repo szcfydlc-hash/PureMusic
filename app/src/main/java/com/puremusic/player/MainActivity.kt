@@ -123,6 +123,11 @@ private fun PureMusicApp(
     val liquidGlassLevel by viewModel.liquidGlassLevel.collectAsStateWithLifecycle()
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
     val miniPlayerHeightDp by viewModel.miniPlayerHeightDp.collectAsStateWithLifecycle()
+    val fontWeight by viewModel.fontWeight.collectAsStateWithLifecycle()
+    val fontSlantDegrees by viewModel.fontSlantDegrees.collectAsStateWithLifecycle()
+    val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
+    val fadeInSeconds by viewModel.fadeInSeconds.collectAsStateWithLifecycle()
+    val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
 
     val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -164,6 +169,8 @@ private fun PureMusicApp(
         fontStyle = fontStyle,
         layoutDensity = layoutDensity,
         fontScale = fontScale,
+        fontWeight = fontWeight,
+        fontSlantDegrees = fontSlantDegrees,
         liquidGlassLevel = liquidGlassLevel,
         floatingControlsEnabled = floatingControlsEnabled,
         miniPlayerStyle = miniPlayerStyle,
@@ -186,6 +193,10 @@ private fun PureMusicApp(
         val minDurationFilter by viewModel.minDurationFilter.collectAsStateWithLifecycle()
         val scanStatus by viewModel.scanStatus.collectAsStateWithLifecycle()
         val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+        val recentSongs by viewModel.recentSongs.collectAsStateWithLifecycle()
+        val mostPlayedSongs by viewModel.mostPlayedSongs.collectAsStateWithLifecycle()
+        val currentAudioSpec by viewModel.currentAudioSpec.collectAsStateWithLifecycle()
+        val lyricOffsets by viewModel.lyricOffsets.collectAsStateWithLifecycle()
         val favoriteSongIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle()
         val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
         val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -299,6 +310,11 @@ private fun PureMusicApp(
                         layoutMode = layoutMode,
                         layoutDensity = layoutDensity,
                         fontScale = fontScale,
+                        fontWeight = fontWeight,
+                        fontSlantDegrees = fontSlantDegrees,
+                        playbackSpeed = playbackSpeed,
+                        fadeInSeconds = fadeInSeconds,
+                        keepScreenOn = keepScreenOn,
                         liquidGlassEnabled = liquidGlassEnabled,
                         floatingControlsEnabled = floatingControlsEnabled,
                         liquidGlassLevel = liquidGlassLevel,
@@ -314,6 +330,11 @@ private fun PureMusicApp(
                         onSelectLayoutMode = viewModel::setLayoutMode,
                         onSelectLayoutDensity = viewModel::setLayoutDensity,
                         onChangeFontScale = viewModel::setFontScale,
+                        onSelectFontWeight = viewModel::setFontWeight,
+                        onChangeFontSlantDegrees = viewModel::setFontSlantDegrees,
+                        onSelectPlaybackSpeed = viewModel::setPlaybackSpeed,
+                        onSelectFadeInSeconds = viewModel::setFadeInSeconds,
+                        onToggleKeepScreenOn = viewModel::setKeepScreenOn,
                         onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
                         onToggleFloatingControls = viewModel::setFloatingControlsEnabled,
                         onSelectLiquidGlassLevel = viewModel::setLiquidGlassLevel,
@@ -340,6 +361,8 @@ private fun PureMusicApp(
                         artists = artists,
                         folders = folders,
                         playlists = playlists,
+                        recentSongs = recentSongs,
+                        mostPlayedSongs = mostPlayedSongs,
                         favoriteSongIds = favoriteSongIds,
                         isLoading = isLoading,
                         searchQuery = searchQuery,
@@ -444,6 +467,11 @@ private fun PureMusicApp(
                     onOpenLyricsSearch = { lyricsSearchSong = it },
                     isTranslatingLyrics = isTranslatingLyrics,
                     onTranslateLyrics = viewModel::translateCurrentLyricsToChinese,
+                    audioSpec = currentAudioSpec,
+                    lyricOffsetMs = currentSong?.let { lyricOffsets[it.id] } ?: 0L,
+                    keepScreenOn = keepScreenOn,
+                    onAdjustLyricOffset = viewModel::adjustCurrentLyricOffset,
+                    onResetLyricOffset = viewModel::resetCurrentLyricOffset,
                 )
             }
         }

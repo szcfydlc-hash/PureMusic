@@ -184,3 +184,28 @@ enum class MiniPlayerStyle(val label: String) {
     VINYL_DISC("黑胶唱片"),
     FLOATING_PILL("悬浮胶囊"),
 }
+
+enum class AppFontWeight(val label: String, val weightValue: Int) {
+    LIGHT("纤细", 300),
+    NORMAL("常规", 400),
+    MEDIUM("适中", 500),
+    SEMIBOLD("加粗", 600),
+}
+
+data class AudioTechSpec(
+    val format: String = "",
+    val sampleRateHz: Int = 0,
+    val bitrateKbps: Int = 0,
+    val isHiRes: Boolean = false,
+) {
+    val displayText: String
+        get() = buildList {
+            if (format.isNotBlank()) add(format)
+            if (sampleRateHz > 0) {
+                val khz = sampleRateHz / 1000f
+                val khzStr = if (sampleRateHz % 1000 == 0) "${sampleRateHz / 1000}kHz" else String.format("%.1fkHz", khz)
+                add(khzStr)
+            }
+            if (bitrateKbps > 0) add("${bitrateKbps}kbps")
+        }.joinToString(" · ")
+}

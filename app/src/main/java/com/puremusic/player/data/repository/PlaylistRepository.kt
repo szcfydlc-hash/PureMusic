@@ -14,6 +14,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import kotlinx.coroutines.flow.first
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
+import com.puremusic.player.data.model.AppFontWeight
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
@@ -57,6 +58,14 @@ class PlaylistRepository(private val context: Context) {
         val LIQUID_GLASS_LEVEL = stringPreferencesKey("liquid_glass_level")
         val MINI_PLAYER_STYLE = stringPreferencesKey("mini_player_style")
         val MINI_PLAYER_HEIGHT_DP = intPreferencesKey("mini_player_height_dp")
+        val FONT_WEIGHT = stringPreferencesKey("font_weight")
+        val FONT_SLANT_DEGREES = floatPreferencesKey("font_slant_degrees")
+        val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
+        val FADE_IN_SECONDS = intPreferencesKey("fade_in_seconds")
+        val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val RECENT_SONG_IDS = stringPreferencesKey("recent_song_ids")
+        val PLAY_COUNTS_JSON = stringPreferencesKey("play_counts_json")
+        val LYRIC_OFFSETS_JSON = stringPreferencesKey("lyric_offsets_json")
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         val MIN_DURATION_FILTER = stringPreferencesKey("min_duration_filter")
         val ACCENT_COLOR = stringPreferencesKey("accent_color")
@@ -137,6 +146,43 @@ class PlaylistRepository(private val context: Context) {
 
     val miniPlayerHeightDpFlow: Flow<Int> = context.pureMusicDataStore.data.map { prefs ->
         (prefs[Keys.MINI_PLAYER_HEIGHT_DP] ?: 58).coerceIn(48, 68)
+    }
+
+    val fontWeightFlow: Flow<AppFontWeight> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.FONT_WEIGHT]?.let { name ->
+            AppFontWeight.entries.firstOrNull { it.name == name }
+        } ?: AppFontWeight.NORMAL
+    }
+
+    val fontSlantDegreesFlow: Flow<Float> = context.pureMusicDataStore.data.map { prefs ->
+        (prefs[Keys.FONT_SLANT_DEGREES] ?: 0f).coerceIn(0f, 16f)
+    }
+
+    val playbackSpeedFlow: Flow<Float> = context.pureMusicDataStore.data.map { prefs ->
+        (prefs[Keys.PLAYBACK_SPEED] ?: 1.0f).coerceIn(0.5f, 2.0f)
+    }
+
+    val fadeInSecondsFlow: Flow<Int> = context.pureMusicDataStore.data.map { prefs ->
+        (prefs[Keys.FADE_IN_SECONDS] ?: 0).coerceIn(0, 6)
+    }
+
+    val keepScreenOnFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.KEEP_SCREEN_ON] ?: false
+    }
+
+    val recentSongIdsFlow: Flow<List<Long>> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.RECENT_SONG_IDS]
+            .orEmpty()
+            .split(",")
+            .mapNotNull { it.trim().toLongOrNull() }
+    }
+
+    val playCountsFlow: Flow<Map<Long, Int>> = context.pureMusicDataStore.data.map { prefs ->
+        decodeLongIntMap(prefs[Keys.PLAY_COUNTS_JSON].orEmpty())
+    }
+
+    val lyricOffsetsFlow: Flow<Map<Long, Long>> = context.pureMusicDataStore.data.map { prefs ->
+        decodeLongLongMap(prefs[Keys.LYRIC_OFFSETS_JSON].orEmpty())
     }
 
     val excludedFoldersFlow: Flow<Set<String>> = context.pureMusicDataStore.data.map { prefs ->
@@ -294,6 +340,50 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { it[Keys.MINI_PLAYER_HEIGHT_DP] = heightDp.coerceIn(48, 68) }
     }
 
+    suspend fun setFontWeight(weight: AppFontWeight) {
+        context.pureMusicDataStore.edit { it[Keys.FONT_WEIGHT] = weight.name }
+    }
+
+    suspend fun setFontSlantDegrees(degrees: Float) {
+        context.pureMusicDataStore.edit { it[Keys.FONT_SLANT_DEGREES] = degrees.coerceIn(0f, 16f) }
+    }
+
+    suspend fun setPlaybackSpeed(speed: Float) {
+        context.pureMusicDataStore.edit { it[Keys.PLAYBACK_SPEED] = speed.coerceIn(0.5f, 2.0f) }
+    }
+
+    suspend fun setFadeInSeconds(seconds: Int) {
+        context.pureMusicDataStore.edit { it[Keys.FADE_IN_SECONDS] = seconds.coerceIn(0, 6) }
+    }
+
+    suspend fun setKeepScreenOn(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.KEEP_SCREEN_ON] = enabled }
+    }
+
+    suspend fun recordSongPlayed(songId: Long) {
+        context.pureMusicDataStore.edit { prefs ->
+            val currentRecent = prefs[Keys.RECENT_SONG_IDS]
+                .orEmpty()
+                .split(",")
+                .mapNotNull { it.trim().toLongOrNull() }
+                .filterNot { it == songId }
+            val updatedRecent = (listOf(songId) + currentRecent).take(50)
+            prefs[Keys.RECENT_SONG_IDS] = updatedRecent.joinToString(",")
+
+            val counts = decodeLongIntMap(prefs[Keys.PLAY_COUNTS_JSON].orEmpty()).toMutableMap()
+            counts[songId] = (counts[songId] ?: 0) + 1
+            prefs[Keys.PLAY_COUNTS_JSON] = encodeLongIntMap(counts)
+        }
+    }
+
+    suspend fun setLyricOffsetMs(songId: Long, offsetMs: Long) {
+        context.pureMusicDataStore.edit { prefs ->
+            val map = decodeLongLongMap(prefs[Keys.LYRIC_OFFSETS_JSON].orEmpty()).toMutableMap()
+            if (offsetMs == 0L) map.remove(songId) else map[songId] = offsetMs.coerceIn(-15_000L, 15_000L)
+            prefs[Keys.LYRIC_OFFSETS_JSON] = encodeLongLongMap(map)
+        }
+    }
+
     suspend fun toggleFolderExcluded(folderPath: String) {
         context.pureMusicDataStore.edit { prefs ->
             val current = prefs[Keys.EXCLUDED_FOLDERS].orEmpty().toMutableSet()
@@ -398,5 +488,47 @@ class PlaylistRepository(private val context: Context) {
                 }
             }
         }.getOrDefault(emptyList())
+    }
+
+    private fun encodeLongIntMap(map: Map<Long, Int>): String {
+        val obj = JSONObject()
+        map.forEach { (k, v) -> obj.put(k.toString(), v) }
+        return obj.toString()
+    }
+
+    private fun decodeLongIntMap(json: String): Map<Long, Int> {
+        if (json.isBlank()) return emptyMap()
+        return runCatching {
+            val obj = JSONObject(json)
+            val result = mutableMapOf<Long, Int>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                val id = k.toLongOrNull() ?: continue
+                result[id] = obj.optInt(k, 0)
+            }
+            result
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun encodeLongLongMap(map: Map<Long, Long>): String {
+        val obj = JSONObject()
+        map.forEach { (k, v) -> obj.put(k.toString(), v) }
+        return obj.toString()
+    }
+
+    private fun decodeLongLongMap(json: String): Map<Long, Long> {
+        if (json.isBlank()) return emptyMap()
+        return runCatching {
+            val obj = JSONObject(json)
+            val result = mutableMapOf<Long, Long>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                val id = k.toLongOrNull() ?: continue
+                result[id] = obj.optLong(k, 0L)
+            }
+            result
+        }.getOrDefault(emptyMap())
     }
 }

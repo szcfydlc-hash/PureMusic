@@ -1,6 +1,10 @@
 package com.puremusic.player.ui.screens
 
+import android.app.Activity
 import android.net.Uri
+import android.view.WindowManager
+import androidx.compose.runtime.DisposableEffect
+import com.puremusic.player.data.model.AudioTechSpec
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -151,6 +155,11 @@ fun NowPlayingScreen(
     onOpenLyricsSearch: (Song) -> Unit,
     isTranslatingLyrics: Boolean = false,
     onTranslateLyrics: () -> Unit = {},
+    audioSpec: AudioTechSpec = AudioTechSpec(),
+    lyricOffsetMs: Long = 0L,
+    keepScreenOn: Boolean = false,
+    onAdjustLyricOffset: (Long) -> Unit = {},
+    onResetLyricOffset: () -> Unit = {},
 ) {
     var showFullLyrics by remember { mutableStateOf(false) }
     BackHandler {
@@ -158,6 +167,15 @@ fun NowPlayingScreen(
     }
 
     val context = LocalContext.current
+    DisposableEffect(keepScreenOn) {
+        val window = (context as? Activity)?.window
+        if (keepScreenOn) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
     val song = playerState.currentSong ?: return
     val durationMs = playerState.durationMs.coerceAtLeast(1L)
 
@@ -183,8 +201,9 @@ fun NowPlayingScreen(
     val primaryTextColor = MaterialTheme.colorScheme.onBackground
     val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-    val activeLyric = remember(lyrics, playerState.positionMs) {
-        lyrics.lastOrNull { it.timeMs <= playerState.positionMs }
+    val adjustedPosMs = (playerState.positionMs + lyricOffsetMs).coerceAtLeast(0L)
+    val activeLyric = remember(lyrics, adjustedPosMs) {
+        lyrics.lastOrNull { it.timeMs <= adjustedPosMs }
     }
 
     val vinylAngle = remember { Animatable(0f) }
@@ -248,6 +267,10 @@ fun NowPlayingScreen(
                 onAddToPlaylist = { onAddToPlaylist(song) },
                 isDarkTheme = isDarkTheme,
                 onOpenFullLyricsSheet = onOpenLyrics,
+                audioSpec = audioSpec,
+                lyricOffsetMs = lyricOffsetMs,
+                onAdjustLyricOffset = onAdjustLyricOffset,
+                onResetLyricOffset = onResetLyricOffset,
             )
             return@Box
         }
@@ -334,6 +357,15 @@ fun NowPlayingScreen(
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center,
                         )
+                        if (audioSpec.displayText.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            AudioSpecStamp(
+                                spec = audioSpec,
+                                accentColor = activeAccentColor,
+                                outlineColor = MaterialTheme.colorScheme.outline,
+                                secondaryTextColor = secondaryTextColor,
+                            )
+                        }
                     }
                 }
 
@@ -680,6 +712,15 @@ private fun PosterWallTile(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
+    DisposableEffect(keepScreenOn) {
+        val window = (context as? Activity)?.window
+        if (keepScreenOn) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
     val request = remember(song.albumArtUri) {
         ImageRequest.Builder(context)
             .data(song.albumArtUri)
@@ -1007,11 +1048,17 @@ private fun EditorialFullScreenLyricsView(
     onAddToPlaylist: () -> Unit = {},
     isDarkTheme: Boolean = false,
     onOpenFullLyricsSheet: () -> Unit = {},
+    audioSpec: AudioTechSpec = AudioTechSpec(),
+    lyricOffsetMs: Long = 0L,
+    onAdjustLyricOffset: (Long) -> Unit = {},
+    onResetLyricOffset: () -> Unit = {},
 ) {
-    val activeIdx = remember(lyrics, positionMs) {
-        val found = lyrics.indexOfLast { it.timeMs <= positionMs }
+    val effectivePosMs = (positionMs + lyricOffsetMs).coerceAtLeast(0L)
+    val activeIdx = remember(lyrics, effectivePosMs) {
+        val found = lyrics.indexOfLast { it.timeMs <= effectivePosMs }
         if (found >= 0) found else if (lyrics.isNotEmpty()) 0 else -1
     }
+    var showOffsetBar by remember { mutableStateOf(false) }
 
     var menuExpanded by remember { mutableStateOf(false) }
     val outlineColor = MaterialTheme.colorScheme.outline
@@ -1096,6 +1143,13 @@ private fun EditorialFullScreenLyricsView(
                                 onClick = {
                                     menuExpanded = false
                                     onTranslateLyrics()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (showOffsetBar) "隐藏时间轴微调" else "歌词时间轴微调 (±0.5s)") },
+                                onClick = {
+                                    menuExpanded = false
+                                    showOffsetBar = !showOffsetBar
                                 },
                             )
                             DropdownMenuItem(
@@ -1209,6 +1263,15 @@ private fun EditorialFullScreenLyricsView(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (audioSpec.displayText.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        AudioSpecStamp(
+                            spec = audioSpec,
+                            accentColor = activeLineColor,
+                            outlineColor = outlineColor,
+                            secondaryTextColor = secondaryTextColor,
+                        )
+                    }
                 }
 
                 if (lyrics.isNotEmpty()) {
@@ -1402,6 +1465,59 @@ private fun EditorialFullScreenLyricsView(
                 }
             }
 
+            // Optional Compact Lyric Time-Offset Calibrator Pill (-0.5s / +0.5s / Reset)
+            if (showOffsetBar && lyrics.isNotEmpty()) {
+                val offsetSec = lyricOffsetMs / 1000f
+                val offsetLabel = String.format("偏移 %+.1fs", offsetSec)
+                val barShape = RoundedCornerShape(16.dp)
+                Row(
+                    modifier = Modifier
+                        .padding(bottom = 6.dp)
+                        .clip(barShape)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
+                        .border(0.75.dp, outlineColor, barShape)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "-0.5s",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primaryTextColor,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onAdjustLyricOffset(-500L) }
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                    Text(
+                        text = offsetLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = activeLineColor,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "+0.5s",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primaryTextColor,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onAdjustLyricOffset(500L) }
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                    Text(
+                        text = "重置",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondaryTextColor,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onResetLyricOffset() }
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+            }
+
             // 5. Minimal Diamond-Thumb Progress Line + Timestamps + Clean 3-Button Footer
             Column(
                 modifier = Modifier
@@ -1550,6 +1666,50 @@ private fun DiamondThinSeekBar(
                 close()
             }
             drawPath(path = diamond, color = activeColor)
+        }
+    }
+}
+
+@Composable
+private fun AudioSpecStamp(
+    spec: AudioTechSpec,
+    accentColor: Color,
+    outlineColor: Color,
+    secondaryTextColor: Color,
+) {
+    val stampShape = RoundedCornerShape(4.dp)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        if (spec.isHiRes) {
+            Box(
+                modifier = Modifier
+                    .clip(stampShape)
+                    .background(accentColor.copy(alpha = 0.14f))
+                    .border(0.6.dp, accentColor.copy(alpha = 0.55f), stampShape)
+                    .padding(horizontal = 5.dp, vertical = 1.dp),
+            ) {
+                Text(
+                    text = "Hi-Res",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp),
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .clip(stampShape)
+                .border(0.6.dp, outlineColor.copy(alpha = 0.85f), stampShape)
+                .padding(horizontal = 6.dp, vertical = 1.dp),
+        ) {
+            Text(
+                text = spec.displayText,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp),
+                color = secondaryTextColor,
+                maxLines = 1,
+            )
         }
     }
 }
