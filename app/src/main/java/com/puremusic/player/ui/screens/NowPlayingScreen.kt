@@ -712,15 +712,6 @@ private fun PosterWallTile(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
-    DisposableEffect(keepScreenOn) {
-        val window = (context as? Activity)?.window
-        if (keepScreenOn) {
-            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-        onDispose {
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-    }
     val request = remember(song.albumArtUri) {
         ImageRequest.Builder(context)
             .data(song.albumArtUri)
