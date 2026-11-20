@@ -50,7 +50,12 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.graphics.Path
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.QueueMusic
@@ -216,54 +221,53 @@ fun NowPlayingScreen(
                 },
             ),
     ) {
+        if (showFullLyrics) {
+            EditorialFullScreenLyricsView(
+                song = song,
+                lyrics = lyrics,
+                positionMs = playerState.positionMs,
+                durationMs = durationMs,
+                isPlaying = playerState.isPlaying,
+                lyricFamily = lyricFamily,
+                lyricStyleItalic = lyricStyleItalic,
+                accentColor = activeAccentColor,
+                primaryTextColor = primaryTextColor,
+                secondaryTextColor = secondaryTextColor,
+                onBackToVinyl = { showFullLyrics = false },
+                onClosePlayer = onClose,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipPrevious = onSkipPrevious,
+                onSkipNext = onSkipNext,
+                onSeekTo = onSeekTo,
+                onOpenLyricsSearch = { onOpenLyricsSearch(song) },
+                onOpenCoverSearch = { onOpenCoverSearch(song) },
+            )
+            return@Box
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 1. Smooth Toggle between 180g Vinyl Poster Wall <-> Full-Screen Synced Scrolling Lyrics
-            AnimatedContent(
-                targetState = showFullLyrics,
-                transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(180)) },
-                label = "vinylOrFullLyrics",
+            // 1. Edge-to-Edge 4-Row Manually Swipeable & Tappable Poster Wall + Giant 180g Glossy Vinyl
+            InteractivePosterWallHeader(
+                currentSong = song,
+                allSongs = allSongs,
+                vinylRotation = vinylAngle.value,
+                backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+                backIconTint = primaryTextColor,
+                sleepTimerRemainingMs = sleepTimerRemainingMs,
+                accentColor = activeAccentColor,
+                onClose = onClose,
+                onSelectSong = onSelectSongFromWall,
+                onOpenSleepTimer = onOpenSleepTimer,
+                onLongPressVinyl = { onOpenCoverSearch(song) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1.22f),
-            ) { fullLyricsMode ->
-                if (fullLyricsMode) {
-                    FullScreenLyricsPane(
-                        song = song,
-                        lyrics = lyrics,
-                        positionMs = playerState.positionMs,
-                        lyricFamily = lyricFamily,
-                        lyricStyleItalic = lyricStyleItalic,
-                        accentColor = activeAccentColor,
-                        primaryTextColor = primaryTextColor,
-                        secondaryTextColor = secondaryTextColor,
-                        onClosePlayer = onClose,
-                        onBackToVinyl = { showFullLyrics = false },
-                        onOpenLyricsSearch = { onOpenLyricsSearch(song) },
-                        onOpenCoverSearch = { onOpenCoverSearch(song) },
-                        onSeekTo = onSeekTo,
-                    )
-                } else {
-                    InteractivePosterWallHeader(
-                        currentSong = song,
-                        allSongs = allSongs,
-                        vinylRotation = vinylAngle.value,
-                        backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-                        backIconTint = primaryTextColor,
-                        sleepTimerRemainingMs = sleepTimerRemainingMs,
-                        accentColor = activeAccentColor,
-                        onClose = onClose,
-                        onSelectSong = onSelectSongFromWall,
-                        onOpenSleepTimer = onOpenSleepTimer,
-                        onLongPressVinyl = { onOpenCoverSearch(song) },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
+            )
 
             // 2. Refined Editorial Track Metadata, Lyrics, Progress & Controls (supports swipe left/right to skip, swipe down to close)
             var dragTotalX by remember { mutableFloatStateOf(0f) }
@@ -961,20 +965,25 @@ private fun ThinSeekBar(
 }
 
 @Composable
-private fun FullScreenLyricsPane(
+private fun EditorialFullScreenLyricsView(
     song: Song,
     lyrics: List<LyricLine>,
     positionMs: Long,
+    durationMs: Long,
+    isPlaying: Boolean,
     lyricFamily: FontFamily,
     lyricStyleItalic: FontStyle,
     accentColor: Color,
     primaryTextColor: Color,
     secondaryTextColor: Color,
-    onClosePlayer: () -> Unit,
     onBackToVinyl: () -> Unit,
+    onClosePlayer: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSeekTo: (Long) -> Unit,
     onOpenLyricsSearch: () -> Unit,
     onOpenCoverSearch: () -> Unit,
-    onSeekTo: (Long) -> Unit,
 ) {
     val activeIdx = remember(lyrics, positionMs) {
         lyrics.indexOfLast { it.timeMs <= positionMs }
@@ -982,204 +991,440 @@ private fun FullScreenLyricsPane(
     val listState = rememberLazyListState()
     LaunchedEffect(activeIdx) {
         if (activeIdx >= 0 && activeIdx < lyrics.size) {
-            val target = (activeIdx - 2).coerceAtLeast(0)
+            val target = (activeIdx - 1).coerceAtLeast(0)
             listState.animateScrollToItem(target)
         }
     }
 
+    var menuExpanded by remember { mutableStateOf(false) }
     val outlineColor = MaterialTheme.colorScheme.outline
-    val pillShape = RoundedCornerShape(7.dp)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(horizontal = 20.dp),
-    ) {
-        // Top Header: Close + Mini Cover/Title + Match Lyrics + Back to Vinyl
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(0.75.dp, outlineColor, CircleShape)
-                    .clickable(onClick = onClosePlayer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                    contentDescription = "返回",
-                    tint = primaryTextColor,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. Subtle Editorial Architectural Grid Lines on right margin (matching print poster reference!)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val gridColor = accentColor.copy(alpha = 0.13f)
+            val stroke = 1.2f
+            val w = size.width
+            val h = size.height
+            // Overlapping Swiss-editorial vertical & horizontal rules on right 55%
+            val left1 = w * 0.44f
+            val left2 = w * 0.56f
+            val left3 = w * 0.72f
+            val top1 = h * 0.16f
+            val top2 = h * 0.23f
+            val top3 = h * 0.44f
+            val bot1 = h * 0.62f
+            val bot2 = h * 0.74f
 
-            AlbumArtwork(
-                uri = song.albumArtUri,
-                contentDescription = song.album,
-                modifier = Modifier
-                    .size(38.dp)
-                    .clickable(onClick = onOpenCoverSearch),
-                cornerRadius = 5.dp,
-                iconSize = 16.dp,
+            drawRect(
+                color = gridColor,
+                topLeft = Offset(left1, top2),
+                size = androidx.compose.ui.geometry.Size(w - left1, bot2 - top2),
+                style = Stroke(width = stroke),
             )
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = primaryTextColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = secondaryTextColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(pillShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(0.75.dp, outlineColor, pillShape)
-                    .clickable(onClick = onOpenLyricsSearch)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    text = "匹配歌词",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = accentColor,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(pillShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(0.75.dp, outlineColor, pillShape)
-                    .clickable(onClick = onBackToVinyl)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    text = "黑胶",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = primaryTextColor,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+            drawRect(
+                color = gridColor,
+                topLeft = Offset(left3, top1),
+                size = androidx.compose.ui.geometry.Size(w - left3, bot1 - top1),
+                style = Stroke(width = stroke),
+            )
+            drawRect(
+                color = gridColor,
+                topLeft = Offset(left2, top3),
+                size = androidx.compose.ui.geometry.Size(w - left2, bot1 - top3),
+                style = Stroke(width = stroke),
+            )
+            drawLine(
+                color = gridColor,
+                start = Offset(left1, top2 + (bot2 - top2) * 0.35f),
+                end = Offset(w, top2 + (bot2 - top2) * 0.35f),
+                strokeWidth = stroke,
+            )
         }
 
-        if (lyrics.isEmpty()) {
-            Column(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+        ) {
+            // 2. Minimal Editorial Top Bar: < + Square Sleeve with Peeking Vinyl + Title/Artist + ...
+            Row(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "暂无同步歌词",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = primaryTextColor,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "可在线匹配带时间轴的 .lrc 歌词，或从本地导入。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = secondaryTextColor,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconButton(onClick = onBackToVinyl, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                        contentDescription = "返回黑胶",
+                        tint = primaryTextColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Square Album Sleeve + Peeking Miniature Vinyl Disc on right
+                Box(
+                    modifier = Modifier
+                        .size(width = 62.dp, height = 46.dp)
+                        .clickable(onClick = onBackToVinyl),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    // Peeking glossy black vinyl disc behind right edge of sleeve
                     Box(
                         modifier = Modifier
-                            .clip(pillShape)
+                            .align(Alignment.CenterEnd)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF0C0C0E))
+                            .border(0.8.dp, Color.White.copy(alpha = 0.22f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(13.dp)
+                                .clip(CircleShape)
+                                .background(accentColor.copy(alpha = 0.85f)),
+                        )
+                    }
+                    // Square Album Sleeve on top-left
+                    AlbumArtwork(
+                        uri = song.albumArtUri,
+                        contentDescription = song.album,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .shadow(4.dp, RoundedCornerShape(3.dp)),
+                        cornerRadius = 3.dp,
+                        iconSize = 18.dp,
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primaryTextColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = secondaryTextColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreHoriz,
+                            contentDescription = "歌词与封面选项",
+                            tint = primaryTextColor,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                        border = BorderStroke(0.75.dp, outlineColor),
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("在线匹配 / 导入歌词") },
+                            onClick = {
+                                menuExpanded = false
+                                onOpenLyricsSearch()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("更换歌曲封面") },
+                            onClick = {
+                                menuExpanded = false
+                                onOpenCoverSearch()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("切换回黑胶唱片") },
+                            onClick = {
+                                menuExpanded = false
+                                onBackToVinyl()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("收起播放页") },
+                            onClick = {
+                                menuExpanded = false
+                                onClosePlayer()
+                            },
+                        )
+                    }
+                }
+            }
+
+            // 3. Oversized Left-Aligned Magazine Editorial Lyrics Stream
+            if (lyrics.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 28.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.displaySmall.copy(
+                            fontFamily = lyricFamily,
+                            fontStyle = lyricStyleItalic,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 44.sp,
+                        ),
+                        color = accentColor,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "暂无同步歌词，可点击下方按钮在线匹配带时间轴的 .lrc 歌词或从本地导入。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = secondaryTextColor,
+                    )
+                    Spacer(modifier = Modifier.height(22.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
                             .background(accentColor)
                             .clickable(onClick = onOpenLyricsSearch)
-                            .padding(horizontal = 16.dp, vertical = 9.dp),
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
                     ) {
                         Text(
                             text = "在线匹配 / 导入歌词",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             color = Color.White,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
-                    Box(
-                        modifier = Modifier
-                            .clip(pillShape)
-                            .background(MaterialTheme.colorScheme.surface)
-                            .border(0.75.dp, outlineColor, pillShape)
-                            .clickable(onClick = onOpenCoverSearch)
-                            .padding(horizontal = 14.dp, vertical = 9.dp),
-                    ) {
-                        Text(
-                            text = "更换封面",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = primaryTextColor,
-                        )
-                    }
                 }
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 48.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                itemsIndexed(lyrics) { index, line ->
-                    val isActive = index == activeIdx
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                if (line.timeMs > 0L) onSeekTo(line.timeMs)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = line.primaryText,
-                            style = (if (isActive) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge).copy(
-                                fontFamily = lyricFamily,
-                                fontStyle = lyricStyleItalic,
-                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                            ),
-                            color = if (isActive) accentColor else secondaryTextColor.copy(alpha = 0.72f),
-                            textAlign = TextAlign.Center,
-                        )
-                        if (!line.secondaryText.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(3.dp))
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 56.dp, bottom = 72.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    itemsIndexed(lyrics) { index, line ->
+                        val isActive = index == activeIdx
+                        val isNear = index == activeIdx - 1 || index == activeIdx + 1
+                        val fontSizeSp = when {
+                            isActive -> 34.sp
+                            isNear -> 26.sp
+                            else -> 18.sp
+                        }
+                        val lineHeightSp = when {
+                            isActive -> 44.sp
+                            isNear -> 35.sp
+                            else -> 26.sp
+                        }
+                        val textColor = when {
+                            isActive -> accentColor
+                            isNear -> primaryTextColor
+                            else -> secondaryTextColor.copy(alpha = 0.72f)
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (line.timeMs > 0L) onSeekTo(line.timeMs)
+                                }
+                                .padding(vertical = 2.dp),
+                            horizontalAlignment = Alignment.Start,
+                        ) {
                             Text(
-                                text = line.secondaryText,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = lyricFamily),
-                                color = if (isActive) primaryTextColor.copy(alpha = 0.88f) else secondaryTextColor.copy(alpha = 0.52f),
-                                textAlign = TextAlign.Center,
+                                text = line.primaryText,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontFamily = lyricFamily,
+                                    fontStyle = lyricStyleItalic,
+                                    fontWeight = if (isActive || isNear) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = fontSizeSp,
+                                    lineHeight = lineHeightSp,
+                                ),
+                                color = textColor,
+                                textAlign = TextAlign.Start,
                             )
+                            if (!line.secondaryText.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = line.secondaryText,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = lyricFamily,
+                                        fontStyle = lyricStyleItalic,
+                                    ),
+                                    color = if (isActive) primaryTextColor.copy(alpha = 0.85f) else secondaryTextColor.copy(alpha = 0.65f),
+                                    textAlign = TextAlign.Start,
+                                )
+                            }
                         }
                     }
                 }
             }
+
+            // 4. Minimal Diamond-Thumb Progress Line + Timestamps + Clean 3-Button Footer
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
+            ) {
+                DiamondThinSeekBar(
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    activeColor = accentColor,
+                    trackColor = outlineColor,
+                    onSeekTo = onSeekTo,
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = formatDuration(positionMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondaryTextColor,
+                    )
+                    Text(
+                        text = formatDuration(durationMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondaryTextColor,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onSkipPrevious, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipPrevious,
+                            contentDescription = "上一首",
+                            tint = primaryTextColor,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                    IconButton(onClick = onTogglePlayPause, modifier = Modifier.size(56.dp)) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            tint = accentColor,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
+                    IconButton(onClick = onSkipNext, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipNext,
+                            contentDescription = "下一首",
+                            tint = primaryTextColor,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiamondThinSeekBar(
+    positionMs: Long,
+    durationMs: Long,
+    activeColor: Color,
+    trackColor: Color,
+    onSeekTo: (Long) -> Unit,
+) {
+    var widthPx by remember { mutableFloatStateOf(1f) }
+    var isDragging by remember { mutableStateOf(false) }
+    var dragFraction by remember { mutableFloatStateOf(0f) }
+
+    val progressFraction = if (isDragging) {
+        dragFraction
+    } else {
+        (positionMs.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(24.dp)
+            .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(durationMs) {
+                detectTapGestures { offset ->
+                    val fraction = (offset.x / widthPx).coerceIn(0f, 1f)
+                    onSeekTo((fraction * durationMs).toLong())
+                }
+            }
+            .pointerInput(durationMs) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        isDragging = true
+                        dragFraction = (offset.x / widthPx).coerceIn(0f, 1f)
+                    },
+                    onHorizontalDrag = { change, _ ->
+                        dragFraction = (change.position.x / widthPx).coerceIn(0f, 1f)
+                    },
+                    onDragEnd = {
+                        isDragging = false
+                        onSeekTo((dragFraction * durationMs).toLong())
+                    },
+                    onDragCancel = { isDragging = false },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(18.dp),
+        ) {
+            val y = size.height / 2f
+            val activeX = size.width * progressFraction
+            drawLine(
+                color = trackColor,
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = 2.4f,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = activeColor,
+                start = Offset(0f, y),
+                end = Offset(activeX, y),
+                strokeWidth = 2.8f,
+                cap = StrokeCap.Round,
+            )
+            // Classic Diamond Thumb
+            val r = if (isDragging) 11f else 8.5f
+            val diamond = Path().apply {
+                moveTo(activeX, y - r)
+                lineTo(activeX + r, y)
+                lineTo(activeX, y + r)
+                lineTo(activeX - r, y)
+                close()
+            }
+            drawPath(path = diamond, color = activeColor)
         }
     }
 }

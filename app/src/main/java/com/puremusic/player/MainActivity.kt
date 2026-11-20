@@ -113,6 +113,8 @@ private fun PureMusicApp(
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
     val floatingControlsEnabled by viewModel.floatingControlsEnabled.collectAsStateWithLifecycle()
     val liquidGlassLevel by viewModel.liquidGlassLevel.collectAsStateWithLifecycle()
+    val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
+    val miniPlayerHeightDp by viewModel.miniPlayerHeightDp.collectAsStateWithLifecycle()
 
     val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -156,6 +158,8 @@ private fun PureMusicApp(
         fontScale = fontScale,
         liquidGlassLevel = liquidGlassLevel,
         floatingControlsEnabled = floatingControlsEnabled,
+        miniPlayerStyle = miniPlayerStyle,
+        miniPlayerHeightDp = miniPlayerHeightDp,
     ) {
         if (!hasAudioPermission) {
             PermissionPromptScreen(
@@ -233,7 +237,7 @@ private fun PureMusicApp(
             val bottomContentPadding = PaddingValues(
                 bottom = when {
                     isTabletLayout -> 24.dp
-                    miniPlayerVisible -> 156.dp
+                    miniPlayerVisible -> (96 + miniPlayerHeightDp).dp
                     else -> 86.dp
                 },
             )
@@ -258,6 +262,8 @@ private fun PureMusicApp(
                         liquidGlassEnabled = liquidGlassEnabled,
                         floatingControlsEnabled = floatingControlsEnabled,
                         liquidGlassLevel = liquidGlassLevel,
+                        miniPlayerStyle = miniPlayerStyle,
+                        miniPlayerHeightDp = miniPlayerHeightDp,
                         accentColor = accentColor,
                         fontStyle = fontStyle,
                         lyricFontStyle = lyricFontStyle,
@@ -271,6 +277,8 @@ private fun PureMusicApp(
                         onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
                         onToggleFloatingControls = viewModel::setFloatingControlsEnabled,
                         onSelectLiquidGlassLevel = viewModel::setLiquidGlassLevel,
+                        onSelectMiniPlayerStyle = viewModel::setMiniPlayerStyle,
+                        onChangeMiniPlayerHeightDp = viewModel::setMiniPlayerHeightDp,
                         onSelectAccentColor = viewModel::setAccentColor,
                         onSelectFontStyle = viewModel::setFontStyle,
                         onSelectLyricFontStyle = viewModel::setLyricFontStyle,
@@ -340,6 +348,7 @@ private fun PureMusicApp(
                             onOpenNowPlaying = { showNowPlaying = true },
                             onTogglePlayPause = viewModel::togglePlayPause,
                             onSkipNext = viewModel::skipNext,
+                            onSkipPrevious = viewModel::skipPrevious,
                         )
                     }
                     PureMusicBottomNavBar(

@@ -23,6 +23,7 @@ import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.MinDurationFilter
+import com.puremusic.player.data.model.MiniPlayerStyle
 import com.puremusic.player.data.model.MusicFolder
 import com.puremusic.player.data.model.PlayerTheme
 import com.puremusic.player.data.model.PlayerUiState
@@ -178,6 +179,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = LiquidGlassLevel.FULL,
+    )
+
+    val miniPlayerStyle: StateFlow<MiniPlayerStyle> = playlistRepository.miniPlayerStyleFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = MiniPlayerStyle.CLASSIC_BOOK,
+    )
+
+    val miniPlayerHeightDp: StateFlow<Int> = playlistRepository.miniPlayerHeightDpFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 58,
     )
 
     val excludedFolders: StateFlow<Set<String>> = playlistRepository.excludedFoldersFlow.stateIn(
@@ -594,6 +607,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setLiquidGlassLevel(level: LiquidGlassLevel) {
         viewModelScope.launch { playlistRepository.setLiquidGlassLevel(level) }
+    }
+
+    fun setMiniPlayerStyle(style: MiniPlayerStyle) {
+        viewModelScope.launch { playlistRepository.setMiniPlayerStyle(style) }
+    }
+
+    fun setMiniPlayerHeightDp(heightDp: Int) {
+        viewModelScope.launch { playlistRepository.setMiniPlayerHeightDp(heightDp) }
     }
 
     fun toggleFolderExcluded(folderPath: String) {

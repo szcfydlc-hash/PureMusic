@@ -89,6 +89,7 @@ import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
+import com.puremusic.player.data.model.MiniPlayerStyle
 import com.puremusic.player.data.model.MusicFolder
 import com.puremusic.player.data.model.ScanStatus
 import com.puremusic.player.ui.components.liquidGlass
@@ -109,6 +110,8 @@ fun SettingsScreen(
     liquidGlassEnabled: Boolean,
     floatingControlsEnabled: Boolean,
     liquidGlassLevel: LiquidGlassLevel,
+    miniPlayerStyle: MiniPlayerStyle,
+    miniPlayerHeightDp: Int,
     accentColor: AppAccentColor,
     fontStyle: AppFontStyle,
     lyricFontStyle: LyricFontStyle,
@@ -122,6 +125,8 @@ fun SettingsScreen(
     onToggleLiquidGlass: (Boolean) -> Unit,
     onToggleFloatingControls: (Boolean) -> Unit,
     onSelectLiquidGlassLevel: (LiquidGlassLevel) -> Unit,
+    onSelectMiniPlayerStyle: (MiniPlayerStyle) -> Unit,
+    onChangeMiniPlayerHeightDp: (Int) -> Unit,
     onSelectAccentColor: (AppAccentColor) -> Unit,
     onSelectFontStyle: (AppFontStyle) -> Unit,
     onSelectLyricFontStyle: (LyricFontStyle) -> Unit,
@@ -482,6 +487,69 @@ fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+
+            // Card 2.5: 迷你播放条 (3 Styles + Custom Height Ruler)
+            SettingsSectionHeader("迷你播放条")
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = false,
+            ) {
+                Text(
+                    text = "播放条款式",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SegmentedOptionBar(
+                    items = MiniPlayerStyle.entries.map { it.label },
+                    selectedIndex = MiniPlayerStyle.entries.indexOf(miniPlayerStyle),
+                    liquidGlassEnabled = liquidGlassEnabled,
+                    onSelect = { idx -> onSelectMiniPlayerStyle(MiniPlayerStyle.entries[idx]) },
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "播放条高度",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "${miniPlayerHeightDp}dp",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("纤薄", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    VintageRulerSlider(
+                        value = miniPlayerHeightDp.toFloat(),
+                        minValue = 48f,
+                        maxValue = 68f,
+                        steps = 10,
+                        onValueChange = { onChangeMiniPlayerHeightDp(it.roundToInt()) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp),
+                    )
+                    Text("舒展", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -890,7 +958,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v8.3.1",
+                            text = "v8.4.0",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -938,6 +1006,14 @@ fun SettingsScreen(
                 showLyricFontDialog = false
             },
             onDismiss = { showLyricFontDialog = false },
+            previewFontStyle = { option ->
+                when (option) {
+                    LyricFontStyle.SERIF_ITALIC -> FontFamily.Serif to FontStyle.Italic
+                    LyricFontStyle.SERIF -> FontFamily.Serif to FontStyle.Normal
+                    LyricFontStyle.SANS -> FontFamily.SansSerif to FontStyle.Normal
+                    LyricFontStyle.MONOSPACE -> FontFamily.Monospace to FontStyle.Normal
+                }
+            },
         )
     }
 

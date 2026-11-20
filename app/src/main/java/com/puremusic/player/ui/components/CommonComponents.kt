@@ -40,7 +40,21 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlaylistAdd
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.puremusic.player.data.model.MiniPlayerStyle
+import com.puremusic.player.ui.theme.LocalMiniPlayerHeightDp
+import com.puremusic.player.ui.theme.LocalMiniPlayerStyle
+import kotlinx.coroutines.isActive
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
@@ -334,23 +348,52 @@ fun MiniPlayerBar(
     onOpenNowPlaying: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val song = playerState.currentSong ?: return
     val isFloating = LocalFloatingControls.current
-    val barShape = RoundedCornerShape(if (isFloating) 30.dp else 8.dp)
-    val bookmarkColor = MaterialTheme.colorScheme.primary
+    val style = LocalMiniPlayerStyle.current
+    val barHeightDp = LocalMiniPlayerHeightDp.current.coerceIn(48, 68)
+    val artSizeDp = (barHeightDp - 16).coerceIn(32, 50)
+    val progress = (playerState.positionMs.toFloat() / playerState.durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+
+    val barShape = when {
+        style == MiniPlayerStyle.FLOATING_PILL -> RoundedCornerShape((barHeightDp / 2).dp)
+        isFloating -> RoundedCornerShape(28.dp)
+        else -> RoundedCornerShape(8.dp)
+    }
+    val horizontalPad = when {
+        style == MiniPlayerStyle.FLOATING_PILL -> 18.dp
+        isFloating -> 20.dp
+        else -> 12.dp
+    }
+
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+
+    val spinAngle = remember { Animatable(0f) }
+    LaunchedEffect(playerState.isPlaying, style) {
+        if (playerState.isPlaying && style == MiniPlayerStyle.VINYL_DISC) {
+            while (isActive) {
+                val start = spinAngle.value % 360f
+                spinAngle.snapTo(start)
+                spinAngle.animateTo(
+                    targetValue = start + 360f,
+                    animationSpec = tween(durationMillis = 14_000, easing = LinearEasing),
+                )
+            }
+        }
+    }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val trackBgColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(
-                horizontal = if (isFloating) 20.dp else 12.dp,
-                vertical = if (isFloating) 6.dp else 5.dp,
-            )
-            .height(58.dp)
+            .padding(horizontal = horizontalPad, vertical = 5.dp)
+            .height(barHeightDp.dp)
             .liquidGlass(
                 enabled = liquidGlassEnabled,
                 shape = barShape,
@@ -362,33 +405,10 @@ fun MiniPlayerBar(
                 onClick = onOpenNowPlaying,
             ),
     ) {
-        if (!liquidGlassEnabled && !isFloating) {
-            // Classic Vintage Book Silk Ribbon Bookmark tucked at top-left edge
-            Canvas(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 12.dp)
-                    .size(width = 10.dp, height = 16.dp),
-            ) {
-                val path = Path().apply {
-                    moveTo(0f, 0f)
-                    lineTo(size.width, 0f)
-                    lineTo(size.width, size.height)
-                    lineTo(size.width / 2f, size.height * 0.74f)
-                    lineTo(0f, size.height)
-                    close()
-                }
-                drawPath(path = path, color = bookmarkColor)
-            }
-        }
-
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(
-                    start = if (!liquidGlassEnabled && !isFloating) 28.dp else 12.dp,
-                    end = 10.dp,
-                ),
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -403,26 +423,53 @@ fun MiniPlayerBar(
             ) { current ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(11.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF141312))
-                            .border(0.8.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        AlbumArtwork(
-                            uri = current.albumArtUri,
-                            contentDescription = current.album,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape),
-                            cornerRadius = 18.dp,
-                            iconSize = 11.dp,
-                        )
+                    when (style) {
+                        MiniPlayerStyle.CLASSIC_BOOK -> {
+                            AlbumArtwork(
+                                uri = current.albumArtUri,
+                                contentDescription = current.album,
+                                modifier = Modifier.size(artSizeDp.dp),
+                                cornerRadius = 6.dp,
+                                iconSize = 18.dp,
+                            )
+                        }
+
+                        MiniPlayerStyle.VINYL_DISC -> {
+                            Box(
+                                modifier = Modifier
+                                    .size(artSizeDp.dp)
+                                    .rotate(spinAngle.value)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF0E0E10))
+                                    .border(1.dp, Color.White.copy(alpha = 0.22f), CircleShape)
+                                    .padding((artSizeDp * 0.23f).dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                AlbumArtwork(
+                                    uri = current.albumArtUri,
+                                    contentDescription = current.album,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
+                                    cornerRadius = 24.dp,
+                                    iconSize = 11.dp,
+                                )
+                            }
+                        }
+
+                        MiniPlayerStyle.FLOATING_PILL -> {
+                            AlbumArtwork(
+                                uri = current.albumArtUri,
+                                contentDescription = current.album,
+                                modifier = Modifier
+                                    .size(artSizeDp.dp)
+                                    .clip(CircleShape),
+                                cornerRadius = (artSizeDp / 2).dp,
+                                iconSize = 16.dp,
+                            )
+                        }
                     }
 
                     Column(modifier = Modifier.weight(1f)) {
@@ -435,38 +482,142 @@ fun MiniPlayerBar(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            text = current.artist,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        if (barHeightDp >= 52) {
+                            Text(
+                                text = current.artist,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }
 
-            IconButton(
-                onClick = onTogglePlayPause,
-                modifier = Modifier.size(36.dp),
-            ) {
-                Icon(
-                    imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                    tint = if (liquidGlassEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(23.dp),
-                )
-            }
+            when (style) {
+                MiniPlayerStyle.CLASSIC_BOOK -> {
+                    IconButton(
+                        onClick = onTogglePlayPause,
+                        modifier = Modifier.size(34.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(23.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = onSkipNext,
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipNext,
+                            contentDescription = "下一首",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    }
+                }
 
-            IconButton(
-                onClick = onSkipNext,
-                modifier = Modifier.size(34.dp),
+                MiniPlayerStyle.VINYL_DISC -> {
+                    IconButton(
+                        onClick = onSkipPrevious,
+                        modifier = Modifier.size(30.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipPrevious,
+                            contentDescription = "上一首",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = onTogglePlayPause,
+                        modifier = Modifier.size(34.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                            tint = primaryColor,
+                            modifier = Modifier.size(23.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = onSkipNext,
+                        modifier = Modifier.size(30.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipNext,
+                            contentDescription = "下一首",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+
+                MiniPlayerStyle.FLOATING_PILL -> {
+                    val ringSize = (barHeightDp - 18).coerceIn(32, 42)
+                    Box(
+                        modifier = Modifier
+                            .size(ringSize.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onTogglePlayPause),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val strokeW = 2.2.dp.toPx()
+                            val inset = strokeW / 2f
+                            drawArc(
+                                color = trackBgColor,
+                                startAngle = 0f,
+                                sweepAngle = 360f,
+                                useCenter = false,
+                                topLeft = Offset(inset, inset),
+                                size = Size(size.width - strokeW, size.height - strokeW),
+                                style = Stroke(width = strokeW),
+                            )
+                            drawArc(
+                                color = primaryColor,
+                                startAngle = -90f,
+                                sweepAngle = 360f * progress,
+                                useCenter = false,
+                                topLeft = Offset(inset, inset),
+                                size = Size(size.width - strokeW, size.height - strokeW),
+                                style = Stroke(width = strokeW, cap = StrokeCap.Round),
+                            )
+                        }
+                        Icon(
+                            imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // Style 1 (极简书页): razor-thin 2dp progress hairline along very bottom edge
+        if (style == MiniPlayerStyle.CLASSIC_BOOK) {
+            Canvas(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(2.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.SkipNext,
-                    contentDescription = "下一首",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(21.dp),
+                drawLine(
+                    color = trackBgColor.copy(alpha = 0.45f),
+                    start = Offset(0f, size.height / 2f),
+                    end = Offset(size.width, size.height / 2f),
+                    strokeWidth = size.height,
+                )
+                drawLine(
+                    color = primaryColor,
+                    start = Offset(0f, size.height / 2f),
+                    end = Offset(size.width * progress, size.height / 2f),
+                    strokeWidth = size.height,
                 )
             }
         }

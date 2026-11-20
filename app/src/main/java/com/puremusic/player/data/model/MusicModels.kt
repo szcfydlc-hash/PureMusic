@@ -79,7 +79,7 @@ enum class AppFontStyle(val label: String) {
 }
 
 enum class LyricFontStyle(val label: String) {
-    SERIF_ITALIC("优雅斜体衬线"),
+    SERIF_ITALIC("宋体微斜"),
     SERIF("经典衬线"),
     SANS("清晰黑体"),
     MONOSPACE("等宽体"),
@@ -177,4 +177,10 @@ enum class LiquidGlassLevel(val label: String, val desc: String, val blurDp: Int
     MEDIUM("中档", "均衡磨砂与温和折射高光", 18),
     HIGH("高档", "强通透立体玻璃与双折射描边", 26),
     FULL("完全", "平时无硬边，按住后边缘泛起微光", 34),
+}
+
+enum class MiniPlayerStyle(val label: String) {
+    CLASSIC_BOOK("极简书页"),
+    VINYL_DISC("黑胶唱片"),
+    FLOATING_PILL("悬浮胶囊"),
 }

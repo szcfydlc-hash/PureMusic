@@ -20,6 +20,7 @@ import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LiquidGlassLevel
+import com.puremusic.player.data.model.MiniPlayerStyle
 
 val CinnabarRed = Color(0xFFA63429)
 val ForestGreen = Color(0xFF2F5D50)
@@ -151,6 +152,8 @@ private fun darkPaperFor(accent: AppAccentColor): PaperPalette = when (accent) {
 val LocalLayoutDensity = compositionLocalOf { LayoutDensity.STANDARD }
 val LocalLiquidGlassLevel = compositionLocalOf { LiquidGlassLevel.FULL }
 val LocalFloatingControls = compositionLocalOf { false }
+val LocalMiniPlayerStyle = compositionLocalOf { MiniPlayerStyle.CLASSIC_BOOK }
+val LocalMiniPlayerHeightDp = compositionLocalOf { 58 }
 
 fun sidebarColorFor(isDark: Boolean): Color = if (isDark) Color(0xFF1A1A1C) else Color(0xFFEEECE7)
 
@@ -163,6 +166,8 @@ fun PureMusicTheme(
     fontScale: Float = 1.0f,
     liquidGlassLevel: LiquidGlassLevel = LiquidGlassLevel.FULL,
     floatingControlsEnabled: Boolean = false,
+    miniPlayerStyle: MiniPlayerStyle = MiniPlayerStyle.CLASSIC_BOOK,
+    miniPlayerHeightDp: Int = 58,
     content: @Composable () -> Unit,
 ) {
     val useDark = when (backgroundStyle) {
@@ -323,6 +328,8 @@ fun PureMusicTheme(
         LocalLayoutDensity provides layoutDensity,
         LocalLiquidGlassLevel provides liquidGlassLevel,
         LocalFloatingControls provides floatingControlsEnabled,
+        LocalMiniPlayerStyle provides miniPlayerStyle,
+        LocalMiniPlayerHeightDp provides miniPlayerHeightDp,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

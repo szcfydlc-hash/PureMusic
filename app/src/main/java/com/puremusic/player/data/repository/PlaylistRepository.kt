@@ -20,6 +20,7 @@ import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
+import com.puremusic.player.data.model.MiniPlayerStyle
 import com.puremusic.player.data.model.PlayerTheme
 import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.data.model.SortOrder
@@ -54,6 +55,8 @@ class PlaylistRepository(private val context: Context) {
         val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
         val FLOATING_CONTROLS_ENABLED = booleanPreferencesKey("floating_controls_enabled")
         val LIQUID_GLASS_LEVEL = stringPreferencesKey("liquid_glass_level")
+        val MINI_PLAYER_STYLE = stringPreferencesKey("mini_player_style")
+        val MINI_PLAYER_HEIGHT_DP = intPreferencesKey("mini_player_height_dp")
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         val MIN_DURATION_FILTER = stringPreferencesKey("min_duration_filter")
         val ACCENT_COLOR = stringPreferencesKey("accent_color")
@@ -124,6 +127,16 @@ class PlaylistRepository(private val context: Context) {
         prefs[Keys.LIQUID_GLASS_LEVEL]?.let { name ->
             LiquidGlassLevel.entries.firstOrNull { it.name == name }
         } ?: LiquidGlassLevel.FULL
+    }
+
+    val miniPlayerStyleFlow: Flow<MiniPlayerStyle> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.MINI_PLAYER_STYLE]?.let { name ->
+            MiniPlayerStyle.entries.firstOrNull { it.name == name }
+        } ?: MiniPlayerStyle.CLASSIC_BOOK
+    }
+
+    val miniPlayerHeightDpFlow: Flow<Int> = context.pureMusicDataStore.data.map { prefs ->
+        (prefs[Keys.MINI_PLAYER_HEIGHT_DP] ?: 58).coerceIn(48, 68)
     }
 
     val excludedFoldersFlow: Flow<Set<String>> = context.pureMusicDataStore.data.map { prefs ->
@@ -245,6 +258,14 @@ class PlaylistRepository(private val context: Context) {
 
     suspend fun setLiquidGlassLevel(level: LiquidGlassLevel) {
         context.pureMusicDataStore.edit { it[Keys.LIQUID_GLASS_LEVEL] = level.name }
+    }
+
+    suspend fun setMiniPlayerStyle(style: MiniPlayerStyle) {
+        context.pureMusicDataStore.edit { it[Keys.MINI_PLAYER_STYLE] = style.name }
+    }
+
+    suspend fun setMiniPlayerHeightDp(heightDp: Int) {
+        context.pureMusicDataStore.edit { it[Keys.MINI_PLAYER_HEIGHT_DP] = heightDp.coerceIn(48, 68) }
     }
 
     suspend fun toggleFolderExcluded(folderPath: String) {
