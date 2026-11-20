@@ -11,7 +11,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +32,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
@@ -69,7 +74,9 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.puremusic.player.data.model.PlayerUiState
 import com.puremusic.player.data.model.Song
+import com.puremusic.player.ui.theme.LocalFloatingControls
 import com.puremusic.player.ui.theme.LocalLayoutDensity
+import com.puremusic.player.ui.theme.LocalLiquidGlassLevel
 import java.util.Locale
 
 fun formatDuration(durationMs: Long): String {
@@ -151,6 +158,8 @@ fun SongRowItem(
     onAddToPlaylist: () -> Unit,
     onToggleFavorite: () -> Unit,
     onShowSongInfo: (() -> Unit)? = null,
+    onReplaceCover: (() -> Unit)? = null,
+    onMatchLyrics: (() -> Unit)? = null,
     extraMenuActionLabel: String? = null,
     onExtraMenuAction: (() -> Unit)? = null,
 ) {
@@ -223,6 +232,9 @@ fun SongRowItem(
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
                 ) {
                     DropdownMenuItem(
                         text = { Text(if (isFavorite) "取消喜欢" else "添加到我喜欢") },
@@ -250,6 +262,36 @@ fun SongRowItem(
                             onAddToPlaylist()
                         },
                     )
+                    if (onReplaceCover != null) {
+                        DropdownMenuItem(
+                            text = { Text("更换封面") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Image,
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onReplaceCover()
+                            },
+                        )
+                    }
+                    if (onMatchLyrics != null) {
+                        DropdownMenuItem(
+                            text = { Text("匹配 / 导入歌词") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Lyrics,
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onMatchLyrics()
+                            },
+                        )
+                    }
                     if (onShowSongInfo != null) {
                         DropdownMenuItem(
                             text = { Text("歌曲信息") },
@@ -296,20 +338,37 @@ fun MiniPlayerBar(
 ) {
     val song = playerState.currentSong ?: return
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val barShape = RoundedCornerShape(if (liquidGlassEnabled) 22.dp else 8.dp)
+    val glassLevel = LocalLiquidGlassLevel.current
+    val floating = LocalFloatingControls.current || liquidGlassEnabled
+    val barShape = RoundedCornerShape(if (floating) 24.dp else 8.dp)
     val bookmarkColor = MaterialTheme.colorScheme.primary
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .padding(horizontal = if (floating) 16.dp else 14.dp, vertical = 6.dp)
             .height(60.dp)
-            .clip(barShape)
-            .clickable(onClick = onOpenNowPlaying),
+            .then(
+                if (liquidGlassEnabled) {
+                    Modifier.clip(barShape)
+                } else {
+                    Modifier
+                        .clip(barShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(0.8.dp, MaterialTheme.colorScheme.outline, barShape)
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onOpenNowPlaying,
+            ),
     ) {
         if (liquidGlassEnabled) {
             val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Modifier.blur(26.dp)
+                Modifier.blur(glassLevel.blurDp.dp)
             } else {
                 Modifier
             }
@@ -319,47 +378,21 @@ fun MiniPlayerBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(blurModifier)
-                    .alpha(if (isDark) 0.28f else 0.32f),
-                cornerRadius = 22.dp,
+                    .alpha(if (isDark) 0.42f else 0.46f),
+                cornerRadius = 24.dp,
                 iconSize = 18.dp,
             )
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        if (isDark) {
-                            Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color(0xFF1E1C19).copy(alpha = 0.88f),
-                                    Color(0xFF282420).copy(alpha = 0.80f),
-                                    Color(0xFF1E1C19).copy(alpha = 0.88f),
-                                ),
-                            )
-                        } else {
-                            Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color(0xFFFCFBF7).copy(alpha = 0.86f),
-                                    Color(0xFFF5F1E8).copy(alpha = 0.78f),
-                                    Color(0xFFFCFBF7).copy(alpha = 0.86f),
-                                ),
-                            )
-                        },
-                    )
-                    .border(
-                        width = 0.8.dp,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
+                    .liquidGlass(
+                        enabled = true,
                         shape = barShape,
+                        isPressed = isPressed,
                     ),
             )
         } else {
-            // Classic Vintage Book Bookmark Card (Flat archival paper + crisp hairline border + silk ribbon tab)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(0.8.dp, MaterialTheme.colorScheme.outline, barShape),
-            )
-            // Delicate Cinnabar / Accent Ribbon Bookmark tucked at top-left edge
+            // Classic Vintage Book Silk Ribbon Bookmark at top-left edge
             Canvas(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -382,7 +415,7 @@ fun MiniPlayerBar(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    start = if (liquidGlassEnabled) 10.dp else 28.dp,
+                    start = if (liquidGlassEnabled) 12.dp else 28.dp,
                     end = 10.dp,
                 ),
             verticalAlignment = Alignment.CenterVertically,
@@ -405,7 +438,7 @@ fun MiniPlayerBar(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF181614))
+                            .background(Color(0xFF141312))
                             .border(0.8.dp, MaterialTheme.colorScheme.outline, CircleShape)
                             .padding(8.dp),
                         contentAlignment = Alignment.Center,

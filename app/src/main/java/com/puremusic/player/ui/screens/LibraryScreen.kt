@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -174,6 +175,8 @@ fun LibraryScreen(
     onToggleFavorite: (Long) -> Unit,
     onRequestAddToPlaylist: (Song) -> Unit,
     onShowSongInfo: (Song) -> Unit,
+    onReplaceCover: (Song) -> Unit,
+    onMatchLyrics: (Song) -> Unit,
     onRequestCreatePlaylist: () -> Unit,
     onDeletePlaylist: (String) -> Unit,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
@@ -221,6 +224,8 @@ fun LibraryScreen(
             onToggleFavorite = onToggleFavorite,
             onRequestAddToPlaylist = onRequestAddToPlaylist,
             onShowSongInfo = onShowSongInfo,
+            onReplaceCover = onReplaceCover,
+            onMatchLyrics = onMatchLyrics,
             onRemoveFromPlaylist = if (detail is CollectionDetail.PlaylistDetail) {
                 { songId -> onRemoveSongFromPlaylist(detail.playlistId, songId) }
             } else {
@@ -363,6 +368,9 @@ fun LibraryScreen(
                                 DropdownMenu(
                                     expanded = sortMenuExpanded,
                                     onDismissRequest = { sortMenuExpanded = false },
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    tonalElevation = 0.dp,
+                                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
                                 ) {
                                     SortOrder.entries.forEach { order ->
                                         DropdownMenuItem(
@@ -623,6 +631,8 @@ fun LibraryScreen(
                                     onToggleFavorite = onToggleFavorite,
                                     onRequestAddToPlaylist = onRequestAddToPlaylist,
                                     onShowSongInfo = onShowSongInfo,
+            onReplaceCover = onReplaceCover,
+            onMatchLyrics = onMatchLyrics,
                                     onRefresh = onRefreshLibrary,
                                     bottomPadding = bottomContentPadding,
                                 )
@@ -900,6 +910,8 @@ private fun SongsTabContent(
     onToggleFavorite: (Long) -> Unit,
     onRequestAddToPlaylist: (Song) -> Unit,
     onShowSongInfo: (Song) -> Unit,
+    onReplaceCover: (Song) -> Unit,
+    onMatchLyrics: (Song) -> Unit,
     onRefresh: () -> Unit,
     bottomPadding: PaddingValues,
 ) {
@@ -998,6 +1010,8 @@ private fun SongsTabContent(
                         onAddToPlaylist = { onRequestAddToPlaylist(song) },
                         onToggleFavorite = { onToggleFavorite(song.id) },
                         onShowSongInfo = { onShowSongInfo(song) },
+                        onReplaceCover = { onReplaceCover(song) },
+                        onMatchLyrics = { onMatchLyrics(song) },
                     )
                 }
             }
@@ -1381,6 +1395,8 @@ private fun CollectionDetailView(
     onToggleFavorite: (Long) -> Unit,
     onRequestAddToPlaylist: (Song) -> Unit,
     onShowSongInfo: (Song) -> Unit,
+    onReplaceCover: (Song) -> Unit,
+    onMatchLyrics: (Song) -> Unit,
     onRemoveFromPlaylist: ((Long) -> Unit)?,
     bottomContentPadding: PaddingValues,
 ) {
@@ -1507,6 +1523,8 @@ private fun CollectionDetailView(
                         onAddToPlaylist = { onRequestAddToPlaylist(song) },
                         onToggleFavorite = { onToggleFavorite(song.id) },
                         onShowSongInfo = { onShowSongInfo(song) },
+                        onReplaceCover = { onReplaceCover(song) },
+                        onMatchLyrics = { onMatchLyrics(song) },
                         extraMenuActionLabel = if (onRemoveFromPlaylist != null) "从歌单移除" else null,
                         onExtraMenuAction = onRemoveFromPlaylist?.let { callback -> { callback(song.id) } },
                     )

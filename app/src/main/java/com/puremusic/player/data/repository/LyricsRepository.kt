@@ -15,6 +15,20 @@ class LyricsRepository(private val context: Context) {
     private val timeTagRegex = Regex("\\[(\\d{1,2}):(\\d{2})(?:[.:](\\d{1,3}))?]")
 
     suspend fun loadLyricsForSong(song: Song): List<LyricLine> = withContext(Dispatchers.IO) {
+        val customFile = File(File(context.filesDir, "custom_lyrics"), "song_${song.id}.lrc")
+        if (customFile.exists() && customFile.isFile) {
+            val customRaw = readTextWithFallback(customFile)
+            if (!customRaw.isNullOrBlank()) {
+                val parsed = parseLrc(customRaw)
+                if (parsed.isNotEmpty()) return@withContext parsed
+                return@withContext customRaw.lineSequence()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .map { LyricLine(timeMs = 0L, primaryText = it) }
+                    .toList()
+            }
+        }
+
         val externalFile = findLrcFile(song)
         if (externalFile != null) {
             val rawText = readTextWithFallback(externalFile)

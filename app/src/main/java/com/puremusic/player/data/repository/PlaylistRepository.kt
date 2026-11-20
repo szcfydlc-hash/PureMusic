@@ -17,6 +17,7 @@ import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
 import com.puremusic.player.data.model.PlayerTheme
@@ -51,6 +52,8 @@ class PlaylistRepository(private val context: Context) {
         val LAYOUT_DENSITY = stringPreferencesKey("layout_density")
         val FONT_SCALE = floatPreferencesKey("font_scale")
         val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
+        val FLOATING_CONTROLS_ENABLED = booleanPreferencesKey("floating_controls_enabled")
+        val LIQUID_GLASS_LEVEL = stringPreferencesKey("liquid_glass_level")
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         val MIN_DURATION_FILTER = stringPreferencesKey("min_duration_filter")
         val ACCENT_COLOR = stringPreferencesKey("accent_color")
@@ -111,6 +114,16 @@ class PlaylistRepository(private val context: Context) {
 
     val liquidGlassEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.LIQUID_GLASS_ENABLED] ?: false
+    }
+
+    val floatingControlsEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.FLOATING_CONTROLS_ENABLED] ?: false
+    }
+
+    val liquidGlassLevelFlow: Flow<LiquidGlassLevel> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.LIQUID_GLASS_LEVEL]?.let { name ->
+            LiquidGlassLevel.entries.firstOrNull { it.name == name }
+        } ?: LiquidGlassLevel.FULL
     }
 
     val excludedFoldersFlow: Flow<Set<String>> = context.pureMusicDataStore.data.map { prefs ->
@@ -224,6 +237,14 @@ class PlaylistRepository(private val context: Context) {
 
     suspend fun setLiquidGlassEnabled(enabled: Boolean) {
         context.pureMusicDataStore.edit { it[Keys.LIQUID_GLASS_ENABLED] = enabled }
+    }
+
+    suspend fun setFloatingControlsEnabled(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.FLOATING_CONTROLS_ENABLED] = enabled }
+    }
+
+    suspend fun setLiquidGlassLevel(level: LiquidGlassLevel) {
+        context.pureMusicDataStore.edit { it[Keys.LIQUID_GLASS_LEVEL] = level.name }
     }
 
     suspend fun toggleFolderExcluded(folderPath: String) {

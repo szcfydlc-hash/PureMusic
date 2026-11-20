@@ -19,6 +19,7 @@ import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.EqualizerState
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.MinDurationFilter
@@ -32,6 +33,10 @@ import com.puremusic.player.data.model.Song
 import com.puremusic.player.data.model.SortOrder
 import com.puremusic.player.data.repository.LyricsRepository
 import com.puremusic.player.data.repository.MusicRepository
+import android.net.Uri
+import com.puremusic.player.data.repository.OnlineCoverCandidate
+import com.puremusic.player.data.repository.OnlineLyricCandidate
+import com.puremusic.player.data.repository.OnlineMetadataRepository
 import com.puremusic.player.data.repository.PlaylistRepository
 import com.puremusic.player.service.AudioEqualizerManager
 import com.puremusic.player.service.PlaybackService
@@ -53,6 +58,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val musicRepository = MusicRepository(application)
     private val playlistRepository = PlaylistRepository(application)
     private val lyricsRepository = LyricsRepository(application)
+    private val onlineMetadataRepository = OnlineMetadataRepository(application)
     private val sleepTimerManager = SleepTimerManager()
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -73,6 +79,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _currentLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val currentLyrics: StateFlow<List<LyricLine>> = _currentLyrics.asStateFlow()
+
+    private val _customCovers = MutableStateFlow<Map<Long, Uri>>(emptyMap())
+
+    private val _lyricSearchResults = MutableStateFlow<List<OnlineLyricCandidate>>(emptyList())
+    val lyricSearchResults: StateFlow<List<OnlineLyricCandidate>> = _lyricSearchResults.asStateFlow()
+    private val _isSearchingLyrics = MutableStateFlow(false)
+    val isSearchingLyrics: StateFlow<Boolean> = _isSearchingLyrics.asStateFlow()
+    private val _lyricSearchError = MutableStateFlow<String?>(null)
+    val lyricSearchError: StateFlow<String?> = _lyricSearchError.asStateFlow()
+
+    private val _coverSearchResults = MutableStateFlow<List<OnlineCoverCandidate>>(emptyList())
+    val coverSearchResults: StateFlow<List<OnlineCoverCandidate>> = _coverSearchResults.asStateFlow()
+    private val _isSearchingCovers = MutableStateFlow(false)
+    val isSearchingCovers: StateFlow<Boolean> = _isSearchingCovers.asStateFlow()
+    private val _coverSearchError = MutableStateFlow<String?>(null)
+    val coverSearchError: StateFlow<String?> = _coverSearchError.asStateFlow()
 
     val sortOrder: StateFlow<SortOrder> = playlistRepository.sortOrderFlow.stateIn(
         scope = viewModelScope,
@@ -146,6 +168,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = false,
     )
 
+    val floatingControlsEnabled: StateFlow<Boolean> = playlistRepository.floatingControlsEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false,
+    )
+
+    val liquidGlassLevel: StateFlow<LiquidGlassLevel> = playlistRepository.liquidGlassLevelFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = LiquidGlassLevel.FULL,
+    )
+
     val excludedFolders: StateFlow<Set<String>> = playlistRepository.excludedFoldersFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -167,15 +201,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList(),
     )
 
-    // Active songs after applying folder exclusions + short-audio duration filter + sort
+    // Active songs after applying custom covers + folder exclusions + short-audio duration filter + sort
     val allSongs: StateFlow<List<Song>> = combine(
         _rawSongs,
+        _customCovers,
         excludedFolders,
         minDurationFilter,
         sortOrder,
-    ) { songs, excluded, minDur, order ->
+    ) { songs, coverMap, excluded, minDur, order ->
         val filtered = songs.filter { song ->
             song.folderPath !in excluded && song.durationMs >= minDur.minMs
+        }.map { song ->
+            val customUri = coverMap[song.id]
+            if (customUri != null) song.copy(albumArtUri = customUri) else song
         }
         musicRepository.sortSongs(filtered, order)
     }.stateIn(
@@ -274,7 +312,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        viewModelScope.launch { playlistRepository.ensureV8BookStyleEpoch() }
+        viewModelScope.launch {
+            playlistRepository.ensureV8BookStyleEpoch()
+            _customCovers.value = onlineMetadataRepository.loadAllCustomCovers()
+            syncPlayerSnapshot()
+        }
         connectMediaController()
     }
 
@@ -546,6 +588,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.setLiquidGlassEnabled(enabled) }
     }
 
+    fun setFloatingControlsEnabled(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setFloatingControlsEnabled(enabled) }
+    }
+
+    fun setLiquidGlassLevel(level: LiquidGlassLevel) {
+        viewModelScope.launch { playlistRepository.setLiquidGlassLevel(level) }
+    }
+
     fun toggleFolderExcluded(folderPath: String) {
         viewModelScope.launch { playlistRepository.toggleFolderExcluded(folderPath) }
     }
@@ -559,8 +609,100 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resolveSongsByIds(ids: List<Long>): List<Song> {
-        val lookup = _rawSongs.value.associateBy { it.id }
+        val coverMap = _customCovers.value
+        val lookup = _rawSongs.value.associate { s -> s.id to (coverMap[s.id]?.let { s.copy(albumArtUri = it) } ?: s) }
         return ids.mapNotNull { lookup[it] }
+    }
+
+    fun searchOnlineLyrics(query: String) {
+        viewModelScope.launch {
+            _isSearchingLyrics.value = true
+            _lyricSearchError.value = null
+            val res = onlineMetadataRepository.searchOnlineLyrics(query)
+            res.onSuccess { list ->
+                _lyricSearchResults.value = list
+                if (list.isEmpty()) _lyricSearchError.value = "未找到匹配歌词，可尝试精简关键词重新搜索。"
+            }.onFailure {
+                _lyricSearchResults.value = emptyList()
+                _lyricSearchError.value = "网络连接失败，请检查网络或改用本地导入 .lrc。"
+            }
+            _isSearchingLyrics.value = false
+        }
+    }
+
+    fun searchOnlineCovers(query: String) {
+        viewModelScope.launch {
+            _isSearchingCovers.value = true
+            _coverSearchError.value = null
+            val res = onlineMetadataRepository.searchOnlineCovers(query)
+            res.onSuccess { list ->
+                _coverSearchResults.value = list
+                if (list.isEmpty()) _coverSearchError.value = "未找到匹配封面，可尝试仅输入歌名或专辑名。"
+            }.onFailure {
+                _coverSearchResults.value = emptyList()
+                _coverSearchError.value = "网络连接失败，请检查网络或从手机相册选择。"
+            }
+            _isSearchingCovers.value = false
+        }
+    }
+
+    fun applyOnlineLyrics(song: Song, candidate: OnlineLyricCandidate) {
+        viewModelScope.launch {
+            val saved = onlineMetadataRepository.saveCustomLyricsText(song.id, candidate.bestLyricsText)
+            if (saved && _playerState.value.currentSong?.id == song.id) {
+                lastLoadedLyricsSongId = null
+                refreshLyricsIfNeeded(song)
+            }
+        }
+    }
+
+    fun importLocalLyrics(song: Song, uri: Uri) {
+        viewModelScope.launch {
+            val saved = onlineMetadataRepository.saveCustomLyricsFromUri(song.id, uri)
+            if (saved && _playerState.value.currentSong?.id == song.id) {
+                lastLoadedLyricsSongId = null
+                refreshLyricsIfNeeded(song)
+            }
+        }
+    }
+
+    fun clearCustomLyrics(song: Song) {
+        viewModelScope.launch {
+            onlineMetadataRepository.clearCustomLyrics(song.id)
+            if (_playerState.value.currentSong?.id == song.id) {
+                lastLoadedLyricsSongId = null
+                refreshLyricsIfNeeded(song)
+            }
+        }
+    }
+
+    fun applyOnlineCover(song: Song, candidate: OnlineCoverCandidate, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            val savedUri = onlineMetadataRepository.saveCustomCoverFromUrl(song.id, candidate.highResUrl)
+            if (savedUri != null) {
+                _customCovers.update { it + (song.id to savedUri) }
+                syncPlayerSnapshot()
+            }
+            onDone()
+        }
+    }
+
+    fun applyGalleryCover(song: Song, sourceUri: Uri) {
+        viewModelScope.launch {
+            val savedUri = onlineMetadataRepository.saveCustomCoverFromUri(song.id, sourceUri)
+            if (savedUri != null) {
+                _customCovers.update { it + (song.id to savedUri) }
+                syncPlayerSnapshot()
+            }
+        }
+    }
+
+    fun clearCustomCover(song: Song) {
+        viewModelScope.launch {
+            onlineMetadataRepository.clearCustomCover(song.id)
+            _customCovers.update { it - song.id }
+            syncPlayerSnapshot()
+        }
     }
 
     private fun refreshLyricsIfNeeded(song: Song?) {
@@ -579,7 +721,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun syncPlayerSnapshot() {
         val controller = mediaController ?: return
-        val songLookup = _rawSongs.value.associateBy { it.id }
+        val coverMap = _customCovers.value
+        val songLookup = _rawSongs.value.associate { s -> s.id to (coverMap[s.id]?.let { s.copy(albumArtUri = it) } ?: s) }
 
         val queue = buildList {
             for (i in 0 until controller.mediaItemCount) {

@@ -36,6 +36,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.shape.CircleShape
@@ -131,8 +136,13 @@ fun NowPlayingScreen(
     onOpenSleepTimer: () -> Unit,
     onOpenSettings: () -> Unit,
     onAddToPlaylist: (Song) -> Unit,
+    onOpenCoverSearch: (Song) -> Unit,
+    onOpenLyricsSearch: (Song) -> Unit,
 ) {
-    BackHandler(onBack = onClose)
+    var showFullLyrics by remember { mutableStateOf(false) }
+    BackHandler {
+        if (showFullLyrics) showFullLyrics = false else onClose()
+    }
 
     val context = LocalContext.current
     val song = playerState.currentSong ?: return
@@ -212,22 +222,48 @@ fun NowPlayingScreen(
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 1. Edge-to-Edge 4-Row Manually Swipeable & Tappable Poster Wall + Giant Straddling Glossy Vinyl
-            InteractivePosterWallHeader(
-                currentSong = song,
-                allSongs = allSongs,
-                vinylRotation = vinylAngle.value,
-                backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-                backIconTint = primaryTextColor,
-                sleepTimerRemainingMs = sleepTimerRemainingMs,
-                accentColor = activeAccentColor,
-                onClose = onClose,
-                onSelectSong = onSelectSongFromWall,
-                onOpenSleepTimer = onOpenSleepTimer,
+            // 1. Smooth Toggle between 180g Vinyl Poster Wall <-> Full-Screen Synced Scrolling Lyrics
+            AnimatedContent(
+                targetState = showFullLyrics,
+                transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(180)) },
+                label = "vinylOrFullLyrics",
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1.22f),
-            )
+            ) { fullLyricsMode ->
+                if (fullLyricsMode) {
+                    FullScreenLyricsPane(
+                        song = song,
+                        lyrics = lyrics,
+                        positionMs = playerState.positionMs,
+                        lyricFamily = lyricFamily,
+                        lyricStyleItalic = lyricStyleItalic,
+                        accentColor = activeAccentColor,
+                        primaryTextColor = primaryTextColor,
+                        secondaryTextColor = secondaryTextColor,
+                        onClosePlayer = onClose,
+                        onBackToVinyl = { showFullLyrics = false },
+                        onOpenLyricsSearch = { onOpenLyricsSearch(song) },
+                        onOpenCoverSearch = { onOpenCoverSearch(song) },
+                        onSeekTo = onSeekTo,
+                    )
+                } else {
+                    InteractivePosterWallHeader(
+                        currentSong = song,
+                        allSongs = allSongs,
+                        vinylRotation = vinylAngle.value,
+                        backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+                        backIconTint = primaryTextColor,
+                        sleepTimerRemainingMs = sleepTimerRemainingMs,
+                        accentColor = activeAccentColor,
+                        onClose = onClose,
+                        onSelectSong = onSelectSongFromWall,
+                        onOpenSleepTimer = onOpenSleepTimer,
+                        onLongPressVinyl = { onOpenCoverSearch(song) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
 
             // 2. Refined Editorial Track Metadata, Lyrics, Progress & Controls (supports swipe left/right to skip, swipe down to close)
             var dragTotalX by remember { mutableFloatStateOf(0f) }
@@ -295,7 +331,9 @@ fun NowPlayingScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showFullLyrics = !showFullLyrics },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -431,7 +469,7 @@ fun NowPlayingScreen(
                                 else -> Icons.Rounded.Repeat
                             },
                             contentDescription = "循环模式",
-                            tint = if (playerState.repeatMode != RepeatMode.OFF) animatedAccent else primaryTextColor.copy(alpha = 0.85f),
+                            tint = if (playerState.repeatMode != RepeatMode.OFF) activeAccentColor else primaryTextColor.copy(alpha = 0.85f),
                             modifier = Modifier.size(21.dp),
                         )
                     }
@@ -473,7 +511,7 @@ fun NowPlayingScreen(
                         )
                     }
 
-                    IconButton(onClick = onOpenLyrics) {
+                    IconButton(onClick = { showFullLyrics = !showFullLyrics }) {
                         Icon(
                             imageVector = Icons.Rounded.Lyrics,
                             contentDescription = "歌词",
@@ -496,6 +534,7 @@ fun NowPlayingScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun InteractivePosterWallHeader(
     currentSong: Song,
@@ -508,6 +547,7 @@ private fun InteractivePosterWallHeader(
     onClose: () -> Unit,
     onSelectSong: (Song) -> Unit,
     onOpenSleepTimer: () -> Unit,
+    onLongPressVinyl: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val wallSongs = remember(allSongs, currentSong.id) {
@@ -684,26 +724,26 @@ fun SpinningVinylDisc(
     Box(
         modifier = Modifier
             .size(discSize)
-            .shadow(30.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.48f))
+            .shadow(26.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.50f))
             .clip(CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        // Studio-grade photorealistic 12-inch LP vinyl shader
+        // 180g Audiophile Glossy Jet-Black LP Shader (dual diagonal hourglass specular sheen + 56 micro-grooves)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            // 1. Deep virgin-vinyl radial tone zones (lead-in, music grooves, glossy run-out)
+            // 1. Deep jet-black virgin vinyl radial tone zones (raised outer lip, music grooves, glossy dead-wax)
             drawCircle(
                 brush = Brush.radialGradient(
-                    0.00f to Color(0xFF0D0D0D),
-                    0.35f to Color(0xFF0A0A0A),
-                    0.41f to Color(0xFF1B1B1B),
-                    0.44f to Color(0xFF090909),
-                    0.68f to Color(0xFF131313),
-                    0.88f to Color(0xFF090909),
-                    0.96f to Color(0xFF191919),
-                    1.00f to Color(0xFF323232),
+                    0.00f to Color(0xFF060607),
+                    0.37f to Color(0xFF050506),
+                    0.44f to Color(0xFF121214),
+                    0.48f to Color(0xFF070708),
+                    0.72f to Color(0xFF101012),
+                    0.91f to Color(0xFF070708),
+                    0.96f to Color(0xFF1C1C1F),
+                    1.00f to Color(0xFF0A0A0B),
                     center = center,
                     radius = radius,
                 ),
@@ -711,37 +751,54 @@ fun SpinningVinylDisc(
                 center = center,
             )
 
-            // 2. Broad soft studio ambient anisotropic sheen
+            // 2. Broad primary diagonal studio hourglass sheen (upper-left to lower-right like studio-lit LP)
             drawCircle(
                 brush = Brush.sweepGradient(
                     0.00f to Color.Transparent,
-                    0.08f to Color.Transparent,
-                    0.18f to Color(0xFFD8D6D0).copy(alpha = 0.14f),
-                    0.23f to Color.White.copy(alpha = 0.24f),
-                    0.28f to Color(0xFFD0D6E0).copy(alpha = 0.12f),
-                    0.38f to Color.Transparent,
-                    0.58f to Color.Transparent,
-                    0.68f to Color(0xFFD8D6D0).copy(alpha = 0.14f),
-                    0.73f to Color.White.copy(alpha = 0.26f),
-                    0.78f to Color(0xFFD0D6E0).copy(alpha = 0.12f),
-                    0.88f to Color.Transparent,
+                    0.05f to Color.Transparent,
+                    0.10f to Color(0xFFDADCE2).copy(alpha = 0.16f),
+                    0.135f to Color.White.copy(alpha = 0.34f),
+                    0.17f to Color(0xFFDADCE2).copy(alpha = 0.14f),
+                    0.24f to Color.Transparent,
+                    0.55f to Color.Transparent,
+                    0.60f to Color(0xFFDADCE2).copy(alpha = 0.16f),
+                    0.635f to Color.White.copy(alpha = 0.36f),
+                    0.67f to Color(0xFFDADCE2).copy(alpha = 0.14f),
+                    0.74f to Color.Transparent,
                     1.00f to Color.Transparent,
                     center = center,
                 ),
-                radius = radius * 0.96f,
+                radius = radius * 0.965f,
                 center = center,
             )
 
-            // 3. Sharp bright specular core cones (authentic glossy LP hourglass highlight)
+            // 3. Razor-sharp secondary specular highlight core cones inside the hourglass sheen
             drawCircle(
                 brush = Brush.sweepGradient(
                     0.00f to Color.Transparent,
-                    0.205f to Color.Transparent,
-                    0.228f to Color.White.copy(alpha = 0.42f),
-                    0.250f to Color.Transparent,
-                    0.705f to Color.Transparent,
-                    0.728f to Color.White.copy(alpha = 0.44f),
-                    0.750f to Color.Transparent,
+                    0.118f to Color.Transparent,
+                    0.135f to Color.White.copy(alpha = 0.52f),
+                    0.152f to Color.Transparent,
+                    0.618f to Color.Transparent,
+                    0.635f to Color.White.copy(alpha = 0.54f),
+                    0.652f to Color.Transparent,
+                    1.00f to Color.Transparent,
+                    center = center,
+                ),
+                radius = radius * 0.955f,
+                center = center,
+            )
+
+            // 4. Subtle perpendicular ambient cross-reflection for realistic 3D vinyl sheen
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    0.00f to Color.Transparent,
+                    0.34f to Color.Transparent,
+                    0.385f to Color.White.copy(alpha = 0.10f),
+                    0.43f to Color.Transparent,
+                    0.84f to Color.Transparent,
+                    0.885f to Color.White.copy(alpha = 0.10f),
+                    0.93f to Color.Transparent,
                     1.00f to Color.Transparent,
                     center = center,
                 ),
@@ -749,60 +806,60 @@ fun SpinningVinylDisc(
                 center = center,
             )
 
-            // 4. 42 ultra-fine concentric micro-grooves + 3 glossy track-separator bands
-            for (i in 0..41) {
-                val factor = 0.425f + i * 0.0128f
-                val isTrackGap = i == 11 || i == 23 || i == 34
+            // 5. 56 ultra-fine concentric micro-grooves + 3 glossy track-separator bands
+            for (i in 0..55) {
+                val factor = 0.445f + i * 0.0091f
+                val isTrackGap = i == 15 || i == 31 || i == 46
                 val alpha = when {
-                    isTrackGap -> 0.22f
-                    i % 3 == 0 -> 0.10f
-                    i % 2 == 0 -> 0.05f
+                    isTrackGap -> 0.24f
+                    i % 4 == 0 -> 0.11f
+                    i % 2 == 0 -> 0.055f
                     else -> 0.025f
                 }
                 drawCircle(
                     color = Color.White.copy(alpha = alpha),
                     radius = radius * factor,
                     center = center,
-                    style = Stroke(width = if (isTrackGap) 1.6f else 0.75f),
+                    style = Stroke(width = if (isTrackGap) 1.5f else 0.65f),
                 )
             }
 
-            // 5. Glossy inner run-out zone ring around paper label
+            // 6. Smooth dark mirror dead-wax run-out groove ring around center label
             drawCircle(
-                color = Color.White.copy(alpha = 0.18f),
-                radius = radius * 0.395f,
+                color = Color.Black.copy(alpha = 0.45f),
+                radius = radius * 0.41f,
                 center = center,
-                style = Stroke(width = 1.4f),
+                style = Stroke(width = radius * 0.055f),
             )
             drawCircle(
-                color = Color.Black.copy(alpha = 0.75f),
-                radius = radius * 0.372f,
+                color = Color.White.copy(alpha = 0.14f),
+                radius = radius * 0.438f,
                 center = center,
-                style = Stroke(width = 2.2f),
+                style = Stroke(width = 1.0f),
             )
 
-            // 6. Precision beveled outer LP edge highlight
+            // 7. Raised beveled outer LP rim highlight
             drawCircle(
-                color = Color.White.copy(alpha = 0.34f),
-                radius = radius - 1.2f,
+                color = Color.White.copy(alpha = 0.30f),
+                radius = radius - 1.4f,
                 center = center,
-                style = Stroke(width = 2.0f),
+                style = Stroke(width = 1.6f),
             )
             drawCircle(
-                color = Color.Black.copy(alpha = 0.9f),
-                radius = radius - 3.4f,
+                color = Color.Black.copy(alpha = 0.92f),
+                radius = radius - 3.6f,
                 center = center,
-                style = Stroke(width = 2.2f),
+                style = Stroke(width = 2.4f),
             )
         }
 
-        // Authentic 35% LP paper center label with subtle stamped inner press ring
+        // Clean unobstructed 37% circular album art label (zero clutter covering artwork)
         Box(
             modifier = Modifier
-                .size(discSize * 0.35f)
+                .size(discSize * 0.37f)
                 .rotate(rotationDegrees)
                 .clip(CircleShape)
-                .border(2.dp, Color(0xFF0A0A0A), CircleShape),
+                .border(1.5.dp, Color(0xFF0A0A0B), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             AlbumArtwork(
@@ -812,23 +869,7 @@ fun SpinningVinylDisc(
                 cornerRadius = discSize,
                 iconSize = 24.dp,
             )
-            // Subtle stamped pressing ring on real 12" vinyl paper labels
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(0.46f)
-                    .clip(CircleShape)
-                    .border(0.9.dp, Color.Black.copy(alpha = 0.28f), CircleShape),
-            )
         }
-
-        // Metallic-rimmed spindle center hole
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF101010))
-                .border(1.4.dp, Color(0xFFB8B4AC).copy(alpha = 0.55f), CircleShape),
-        )
     }
 }
 
@@ -915,6 +956,230 @@ private fun ThinSeekBar(
                 radius = if (isDragging) 11f else 9f,
                 center = Offset(activeX, y),
             )
+        }
+    }
+}
+
+@Composable
+private fun FullScreenLyricsPane(
+    song: Song,
+    lyrics: List<LyricLine>,
+    positionMs: Long,
+    lyricFamily: FontFamily,
+    lyricStyleItalic: FontStyle,
+    accentColor: Color,
+    primaryTextColor: Color,
+    secondaryTextColor: Color,
+    onClosePlayer: () -> Unit,
+    onBackToVinyl: () -> Unit,
+    onOpenLyricsSearch: () -> Unit,
+    onOpenCoverSearch: () -> Unit,
+    onSeekTo: (Long) -> Unit,
+) {
+    val activeIdx = remember(lyrics, positionMs) {
+        lyrics.indexOfLast { it.timeMs <= positionMs }
+    }
+    val listState = rememberLazyListState()
+    LaunchedEffect(activeIdx) {
+        if (activeIdx >= 0 && activeIdx < lyrics.size) {
+            val target = (activeIdx - 2).coerceAtLeast(0)
+            listState.animateScrollToItem(target)
+        }
+    }
+
+    val outlineColor = MaterialTheme.colorScheme.outline
+    val pillShape = RoundedCornerShape(7.dp)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp),
+    ) {
+        // Top Header: Close + Mini Cover/Title + Match Lyrics + Back to Vinyl
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.75.dp, outlineColor, CircleShape)
+                    .clickable(onClick = onClosePlayer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                    contentDescription = "返回",
+                    tint = primaryTextColor,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+
+            AlbumArtwork(
+                uri = song.albumArtUri,
+                contentDescription = song.album,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clickable(onClick = onOpenCoverSearch),
+                cornerRadius = 5.dp,
+                iconSize = 16.dp,
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = primaryTextColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = secondaryTextColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(pillShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.75.dp, outlineColor, pillShape)
+                    .clickable(onClick = onOpenLyricsSearch)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = "匹配歌词",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = accentColor,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(pillShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.75.dp, outlineColor, pillShape)
+                    .clickable(onClick = onBackToVinyl)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = "黑胶",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = primaryTextColor,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+
+        if (lyrics.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = "暂无同步歌词",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = primaryTextColor,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "可在线匹配带时间轴的 .lrc 歌词，或从本地导入。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = secondaryTextColor,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(pillShape)
+                            .background(accentColor)
+                            .clickable(onClick = onOpenLyricsSearch)
+                            .padding(horizontal = 16.dp, vertical = 9.dp),
+                    ) {
+                        Text(
+                            text = "在线匹配 / 导入歌词",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(pillShape)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(0.75.dp, outlineColor, pillShape)
+                            .clickable(onClick = onOpenCoverSearch)
+                            .padding(horizontal = 14.dp, vertical = 9.dp),
+                    ) {
+                        Text(
+                            text = "更换封面",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = primaryTextColor,
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                itemsIndexed(lyrics) { index, line ->
+                    val isActive = index == activeIdx
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                if (line.timeMs > 0L) onSeekTo(line.timeMs)
+                            }
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = line.primaryText,
+                            style = (if (isActive) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge).copy(
+                                fontFamily = lyricFamily,
+                                fontStyle = lyricStyleItalic,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                            ),
+                            color = if (isActive) accentColor else secondaryTextColor.copy(alpha = 0.72f),
+                            textAlign = TextAlign.Center,
+                        )
+                        if (!line.secondaryText.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = line.secondaryText,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = lyricFamily),
+                                color = if (isActive) primaryTextColor.copy(alpha = 0.88f) else secondaryTextColor.copy(alpha = 0.52f),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

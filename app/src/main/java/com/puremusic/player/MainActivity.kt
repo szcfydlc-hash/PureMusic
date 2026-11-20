@@ -20,6 +20,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -74,7 +75,10 @@ import com.puremusic.player.ui.components.AddToPlaylistDialog
 import com.puremusic.player.ui.components.CreatePlaylistDialog
 import com.puremusic.player.ui.components.EqualizerBottomSheet
 import com.puremusic.player.ui.components.LyricsBottomSheet
+import com.puremusic.player.ui.components.OnlineCoverSearchSheet
+import com.puremusic.player.ui.components.OnlineLyricsSearchSheet
 import com.puremusic.player.ui.components.MiniPlayerBar
+import com.puremusic.player.ui.components.liquidGlass
 import com.puremusic.player.ui.components.QueueBottomSheet
 import com.puremusic.player.ui.components.SleepTimerDialog
 import com.puremusic.player.ui.components.SongInfoDialog
@@ -107,6 +111,8 @@ private fun PureMusicApp(
     val fontScale by viewModel.fontScale.collectAsStateWithLifecycle()
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
+    val floatingControlsEnabled by viewModel.floatingControlsEnabled.collectAsStateWithLifecycle()
+    val liquidGlassLevel by viewModel.liquidGlassLevel.collectAsStateWithLifecycle()
 
     val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -148,6 +154,8 @@ private fun PureMusicApp(
         fontStyle = fontStyle,
         layoutDensity = layoutDensity,
         fontScale = fontScale,
+        liquidGlassLevel = liquidGlassLevel,
+        floatingControlsEnabled = floatingControlsEnabled,
     ) {
         if (!hasAudioPermission) {
             PermissionPromptScreen(
@@ -174,6 +182,12 @@ private fun PureMusicApp(
         val currentLyrics by viewModel.currentLyrics.collectAsStateWithLifecycle()
         val equalizerState by viewModel.equalizerState.collectAsStateWithLifecycle()
         val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
+        val lyricSearchResults by viewModel.lyricSearchResults.collectAsStateWithLifecycle()
+        val isSearchingLyrics by viewModel.isSearchingLyrics.collectAsStateWithLifecycle()
+        val lyricSearchError by viewModel.lyricSearchError.collectAsStateWithLifecycle()
+        val coverSearchResults by viewModel.coverSearchResults.collectAsStateWithLifecycle()
+        val isSearchingCovers by viewModel.isSearchingCovers.collectAsStateWithLifecycle()
+        val coverSearchError by viewModel.coverSearchError.collectAsStateWithLifecycle()
 
         var activeMainTab by remember { mutableStateOf(MainTab.LIBRARY) }
         var showNowPlaying by remember { mutableStateOf(false) }
@@ -184,6 +198,30 @@ private fun PureMusicApp(
         var showCreatePlaylist by remember { mutableStateOf(false) }
         var pendingPlaylistSong by remember { mutableStateOf<Song?>(null) }
         var infoDialogSong by remember { mutableStateOf<Song?>(null) }
+        var lyricsSearchSong by remember { mutableStateOf<Song?>(null) }
+        var coverSearchSong by remember { mutableStateOf<Song?>(null) }
+        var pendingGalleryCoverSong by remember { mutableStateOf<Song?>(null) }
+        var pendingLocalLrcSong by remember { mutableStateOf<Song?>(null) }
+
+        val galleryCoverLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent(),
+        ) { uri ->
+            val target = pendingGalleryCoverSong
+            pendingGalleryCoverSong = null
+            if (uri != null && target != null) {
+                viewModel.applyGalleryCover(target, uri)
+            }
+        }
+
+        val localLrcLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            val target = pendingLocalLrcSong
+            pendingLocalLrcSong = null
+            if (uri != null && target != null) {
+                viewModel.importLocalLyrics(target, uri)
+            }
+        }
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val isTabletLayout = when (layoutMode) {
@@ -218,6 +256,8 @@ private fun PureMusicApp(
                         layoutDensity = layoutDensity,
                         fontScale = fontScale,
                         liquidGlassEnabled = liquidGlassEnabled,
+                        floatingControlsEnabled = floatingControlsEnabled,
+                        liquidGlassLevel = liquidGlassLevel,
                         accentColor = accentColor,
                         fontStyle = fontStyle,
                         lyricFontStyle = lyricFontStyle,
@@ -229,6 +269,8 @@ private fun PureMusicApp(
                         onSelectLayoutDensity = viewModel::setLayoutDensity,
                         onChangeFontScale = viewModel::setFontScale,
                         onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
+                        onToggleFloatingControls = viewModel::setFloatingControlsEnabled,
+                        onSelectLiquidGlassLevel = viewModel::setLiquidGlassLevel,
                         onSelectAccentColor = viewModel::setAccentColor,
                         onSelectFontStyle = viewModel::setFontStyle,
                         onSelectLyricFontStyle = viewModel::setLyricFontStyle,
@@ -270,6 +312,8 @@ private fun PureMusicApp(
                         onToggleFavorite = viewModel::toggleFavorite,
                         onRequestAddToPlaylist = { pendingPlaylistSong = it },
                         onShowSongInfo = { infoDialogSong = it },
+                        onReplaceCover = { coverSearchSong = it },
+                        onMatchLyrics = { lyricsSearchSong = it },
                         onRequestCreatePlaylist = { showCreatePlaylist = true },
                         onDeletePlaylist = viewModel::deletePlaylist,
                         onRemoveSongFromPlaylist = viewModel::removeSongFromPlaylist,
@@ -300,6 +344,8 @@ private fun PureMusicApp(
                     }
                     PureMusicBottomNavBar(
                         activeTab = activeMainTab,
+                        floating = floatingControlsEnabled,
+                        liquidGlassEnabled = liquidGlassEnabled,
                         onSelectTab = { activeMainTab = it },
                     )
                 }
@@ -341,6 +387,8 @@ private fun PureMusicApp(
                         activeMainTab = MainTab.SETTINGS
                     },
                     onAddToPlaylist = { pendingPlaylistSong = it },
+                    onOpenCoverSearch = { coverSearchSong = it },
+                    onOpenLyricsSearch = { lyricsSearchSong = it },
                 )
             }
         }
@@ -398,6 +446,44 @@ private fun PureMusicApp(
             )
         }
 
+        lyricsSearchSong?.let { song ->
+            OnlineLyricsSearchSheet(
+                song = song,
+                results = lyricSearchResults,
+                isSearching = isSearchingLyrics,
+                errorMessage = lyricSearchError,
+                onSearch = viewModel::searchOnlineLyrics,
+                onSelectCandidate = { candidate -> viewModel.applyOnlineLyrics(song, candidate) },
+                onImportLocalLrc = {
+                    pendingLocalLrcSong = song
+                    localLrcLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
+                },
+                onClearCustomLyrics = { viewModel.clearCustomLyrics(song) },
+                onDismiss = { lyricsSearchSong = null },
+            )
+        }
+
+        coverSearchSong?.let { song ->
+            OnlineCoverSearchSheet(
+                song = song,
+                results = coverSearchResults,
+                isSearching = isSearchingCovers,
+                errorMessage = coverSearchError,
+                onSearch = viewModel::searchOnlineCovers,
+                onSelectCandidate = { candidate ->
+                    viewModel.applyOnlineCover(song, candidate) {
+                        coverSearchSong = null
+                    }
+                },
+                onPickFromGallery = {
+                    pendingGalleryCoverSong = song
+                    galleryCoverLauncher.launch("image/*")
+                },
+                onRestoreOriginalCover = { viewModel.clearCustomCover(song) },
+                onDismiss = { coverSearchSong = null },
+            )
+        }
+
         if (showLyrics) {
             val lyricFamily = when (lyricFontStyle) {
                 LyricFontStyle.SERIF_ITALIC, LyricFontStyle.SERIF -> FontFamily.Serif
@@ -420,68 +506,147 @@ private fun PureMusicApp(
 @Composable
 private fun PureMusicBottomNavBar(
     activeTab: MainTab,
+    floating: Boolean,
+    liquidGlassEnabled: Boolean,
     onSelectTab: (MainTab) -> Unit,
 ) {
-    val barBg = MaterialTheme.colorScheme.surface
     val items: List<Pair<MainTab, ImageVector>> = listOf(
         MainTab.LIBRARY to Icons.Rounded.LibraryMusic,
         MainTab.ALBUMS to Icons.Rounded.Album,
         MainTab.PLAYLISTS to Icons.Rounded.QueueMusic,
         MainTab.SETTINGS to Icons.Rounded.Settings,
     )
+    val isFloatingCapsule = floating || liquidGlassEnabled
+    val barInteraction = remember { MutableInteractionSource() }
+    val barPressed by barInteraction.collectIsPressedAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(barBg)
-            .navigationBarsPadding(),
-    ) {
-        HorizontalDivider(
-            thickness = 0.75.dp,
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Row(
+    if (isFloatingCapsule) {
+        val capsuleShape = RoundedCornerShape(28.dp)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceAround,
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            items.forEach { (tab, icon) ->
-                val selected = tab == activeTab
-                val tint = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                }
-                val interactionSource = remember { MutableInteractionSource() }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null,
-                            onClick = { onSelectTab(tab) },
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp)
+                    .liquidGlass(
+                        enabled = liquidGlassEnabled,
+                        shape = capsuleShape,
+                        isPressed = barPressed,
+                    )
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceAround,
+            ) {
+                items.forEach { (tab, icon) ->
+                    val selected = tab == activeTab
+                    val tint = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                    }
+                    val tabInteraction = remember { MutableInteractionSource() }
+                    val tabPressed by tabInteraction.collectIsPressedAsState()
+                    val pillShape = RoundedCornerShape(20.dp)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(pillShape)
+                            .then(
+                                if (selected || tabPressed) {
+                                    Modifier.background(
+                                        MaterialTheme.colorScheme.primary.copy(
+                                            alpha = if (tabPressed) 0.16f else 0.10f,
+                                        ),
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .clickable(
+                                interactionSource = tabInteraction,
+                                indication = null,
+                                onClick = { onSelectTab(tab) },
+                            )
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = tab.label,
+                            tint = tint,
+                            modifier = Modifier.size(21.dp),
                         )
-                        .padding(vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = tab.label,
-                        tint = tint,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    Text(
-                        text = tab.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = tint,
-                        maxLines = 1,
-                    )
+                        Text(
+                            text = tab.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = tint,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        // Pure Flat Archival Book Footer with crisp hairline top rule
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .navigationBarsPadding(),
+        ) {
+            HorizontalDivider(
+                thickness = 0.75.dp,
+                color = MaterialTheme.colorScheme.outline,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceAround,
+            ) {
+                items.forEach { (tab, icon) ->
+                    val selected = tab == activeTab
+                    val tint = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                    }
+                    val interactionSource = remember { MutableInteractionSource() }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { onSelectTab(tab) },
+                            )
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = tab.label,
+                            tint = tint,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Text(
+                            text = tab.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = tint,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }

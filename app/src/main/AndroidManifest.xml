@@ -7,6 +7,9 @@
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
+    <!-- On-demand online lyrics & cover art search (only triggered when user taps Search) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Foreground playback & notification permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />

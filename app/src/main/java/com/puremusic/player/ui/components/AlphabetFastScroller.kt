@@ -1,6 +1,7 @@
 package com.puremusic.player.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
@@ -51,30 +50,30 @@ fun AlphabetFastScroller(
 
     Box(modifier = modifier, contentAlignment = Alignment.CenterEnd) {
         activeLetter?.let { letter ->
+            val stampShape = RoundedCornerShape(8.dp)
             Box(
                 modifier = Modifier
-                    .padding(end = 36.dp)
-                    .size(54.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
+                    .padding(end = 34.dp)
+                    .size(48.dp)
+                    .clip(stampShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, MaterialTheme.colorScheme.primary, stampShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = letter,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
 
         Column(
             modifier = Modifier
-                .width(24.dp)
+                .width(22.dp)
                 .fillMaxHeight()
                 .padding(vertical = 8.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                 .onSizeChanged { railHeightPx = it.height }
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
@@ -110,11 +109,11 @@ fun AlphabetFastScroller(
                     text = letter,
                     fontSize = 9.sp,
                     lineHeight = 10.sp,
-                    fontWeight = if (activeLetter == letter) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = if (activeLetter == letter) FontWeight.Bold else FontWeight.Normal,
                     color = if (activeLetter == letter) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
                     },
                 )
             }

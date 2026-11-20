@@ -1,9 +1,13 @@
 package com.puremusic.player.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,37 +32,50 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Dock
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,10 +84,13 @@ import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
+import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
 import com.puremusic.player.data.model.MusicFolder
 import com.puremusic.player.data.model.ScanStatus
+import com.puremusic.player.ui.components.liquidGlass
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -85,6 +105,8 @@ fun SettingsScreen(
     layoutDensity: LayoutDensity,
     fontScale: Float,
     liquidGlassEnabled: Boolean,
+    floatingControlsEnabled: Boolean,
+    liquidGlassLevel: LiquidGlassLevel,
     accentColor: AppAccentColor,
     fontStyle: AppFontStyle,
     lyricFontStyle: LyricFontStyle,
@@ -96,6 +118,8 @@ fun SettingsScreen(
     onSelectLayoutDensity: (LayoutDensity) -> Unit,
     onChangeFontScale: (Float) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
+    onToggleFloatingControls: (Boolean) -> Unit,
+    onSelectLiquidGlassLevel: (LiquidGlassLevel) -> Unit,
     onSelectAccentColor: (AppAccentColor) -> Unit,
     onSelectFontStyle: (AppFontStyle) -> Unit,
     onSelectLyricFontStyle: (LyricFontStyle) -> Unit,
@@ -113,12 +137,20 @@ fun SettingsScreen(
     var showLyricFontDialog by remember { mutableStateOf(false) }
     var showBackgroundDialog by remember { mutableStateOf(false) }
     var showFolderManagerDialog by remember { mutableStateOf(false) }
+    var glassLevelMenuExpanded by remember { mutableStateOf(false) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val canvasBg = MaterialTheme.colorScheme.background
     val cardBg = MaterialTheme.colorScheme.surface
     val outlineColor = MaterialTheme.colorScheme.outline
     val cardRadius = if (liquidGlassEnabled) 18.dp else 9.dp
+    val switchColors = SwitchDefaults.colors(
+        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+        checkedTrackColor = MaterialTheme.colorScheme.primary,
+        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+        uncheckedBorderColor = outlineColor,
+    )
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -159,7 +191,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = "纸色、排印与曲库偏好",
+                        text = "纸色、排印、悬浮玻璃与曲库偏好",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -167,7 +199,12 @@ fun SettingsScreen(
             }
 
             // Card 1: Live Typography & Density Preview Card
-            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = liquidGlassEnabled,
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -209,9 +246,171 @@ fun SettingsScreen(
                 }
             }
 
-            // Card 2: 外观与排版
+            // Card 2: 悬浮与液态玻璃 (CoolApk-inspired 3-row precision control)
+            SettingsSectionHeader("悬浮与液态玻璃")
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = liquidGlassEnabled,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Dock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "悬浮控件",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "开启后，底部导航栏与迷你播放条变为悬浮胶囊状态",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = floatingControlsEnabled,
+                        onCheckedChange = onToggleFloatingControls,
+                        colors = switchColors,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.WaterDrop,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "液态玻璃",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "关闭呈现纯粹古典书籍纸页感，开启启用折射玻璃",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = liquidGlassEnabled,
+                        onCheckedChange = onToggleLiquidGlass,
+                        colors = switchColors,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .alpha(if (liquidGlassEnabled) 1f else 0.55f)
+                            .clickable(enabled = liquidGlassEnabled) { glassLevelMenuExpanded = true }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "液态玻璃档位",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                text = "${liquidGlassLevel.label} · ${liquidGlassLevel.desc}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            text = liquidGlassLevel.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = glassLevelMenuExpanded,
+                        onDismissRequest = { glassLevelMenuExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                        border = BorderStroke(0.75.dp, outlineColor),
+                    ) {
+                        LiquidGlassLevel.entries.forEach { tier ->
+                            val selected = tier == liquidGlassLevel
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = if (selected) "✓ ${tier.label}" else tier.label,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Text(
+                                            text = tier.desc,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    glassLevelMenuExpanded = false
+                                    onSelectLiquidGlassLevel(tier)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Card 3: 外观与排版
             SettingsSectionHeader("外观与排版")
-            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = liquidGlassEnabled,
+            ) {
                 Text(
                     text = "纸色模式",
                     style = MaterialTheme.typography.labelMedium,
@@ -340,6 +539,7 @@ fun SettingsScreen(
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Custom Vintage Precision Ruler Font-Scale Slider (zero clunky M3 purple bar!)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -357,52 +557,43 @@ fun SettingsScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text("A-", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Slider(
-                        value = fontScale,
-                        onValueChange = onChangeFontScale,
-                        valueRange = 0.85f..1.25f,
-                        steps = 7,
-                        modifier = Modifier.weight(1f),
+                    Text(
+                        text = "A-",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text("A+", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "液态玻璃效果",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        Text(
-                            text = "关闭呈现纯粹古典书籍纸页感，开启叠加毛玻璃",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = liquidGlassEnabled,
-                        onCheckedChange = onToggleLiquidGlass,
+                    VintageRulerSlider(
+                        value = fontScale,
+                        minValue = 0.85f,
+                        maxValue = 1.25f,
+                        steps = 8,
+                        onValueChange = onChangeFontScale,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp),
+                    )
+                    Text(
+                        text = "A+",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            // Card 3: 字体与纸色
+            // Card 4: 字体与纸色
             SettingsSectionHeader("字体与纸色")
-            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = liquidGlassEnabled,
+            ) {
                 SettingsListRow(
                     label = "软件字体",
                     value = fontStyle.label,
@@ -422,9 +613,14 @@ fun SettingsScreen(
                 )
             }
 
-            // Card 4: 曲库管理
+            // Card 5: 曲库管理
             SettingsSectionHeader("曲库管理")
-            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = liquidGlassEnabled,
+            ) {
                 Text(
                     text = "当前显示 $songCount 首歌曲 · $albumCount 张专辑 · 已发现 ${allFolders.size} 个目录",
                     style = MaterialTheme.typography.bodySmall,
@@ -502,21 +698,47 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                val chipShape = RoundedCornerShape(7.dp)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     MinDurationFilter.entries.forEach { filter ->
-                        FilterChip(
-                            selected = minDurationFilter == filter,
-                            onClick = { onSelectMinDurationFilter(filter) },
-                            label = { Text(filter.label) },
-                        )
+                        val selected = minDurationFilter == filter
+                        Box(
+                            modifier = Modifier
+                                .clip(chipShape)
+                                .background(
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.background
+                                    },
+                                )
+                                .border(
+                                    width = 0.75.dp,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else outlineColor,
+                                    shape = chipShape,
+                                )
+                                .clickable { onSelectMinDurationFilter(filter) }
+                                .padding(horizontal = 13.dp, vertical = 7.dp),
+                        ) {
+                            Text(
+                                text = filter.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
 
                 val enabledCount = (allFolders.size - excludedFolders.size).coerceAtLeast(0)
@@ -527,13 +749,18 @@ fun SettingsScreen(
                 )
             }
 
-            // Card 5: 播放与音效
+            // Card 6: 播放与音效
             SettingsSectionHeader("播放与音效")
-            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = liquidGlassEnabled,
+            ) {
                 SettingsActionIconRow(
                     icon = Icons.Rounded.Equalizer,
                     label = "音频均衡器",
-                    subtitle = "5 段频响调节与预设音效",
+                    subtitle = "复古 Hi-Fi 5 段竖推调校与预设",
                     outlineColor = outlineColor,
                     onClick = onOpenEqualizer,
                 )
@@ -555,9 +782,14 @@ fun SettingsScreen(
                 )
             }
 
-            // Card 6: 关于
+            // Card 7: 关于
             SettingsSectionHeader("关于")
-            BookSettingsCard(cardBg = cardBg, outlineColor = outlineColor, radius = cardRadius) {
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = liquidGlassEnabled,
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -576,7 +808,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v8.0.1",
+                            text = "v8.2.0",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -585,7 +817,7 @@ fun SettingsScreen(
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "古典书籍复古版 · 专注纯粹离线音乐聆听，无广告无追踪。支持断点续播、拔出耳机自动暂停与系统音频焦点管理。",
+                    text = "古典书籍复古版 · 支持 4 档折射液态玻璃、高光微纹黑胶与 5 段竖推 Hi-Fi 均衡器，全程本地离线运行。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -603,6 +835,14 @@ fun SettingsScreen(
                 showAppFontDialog = false
             },
             onDismiss = { showAppFontDialog = false },
+            previewFontStyle = { option ->
+                when (option) {
+                    AppFontStyle.SERIF -> FontFamily.Serif to FontStyle.Normal
+                    AppFontStyle.SERIF_ITALIC -> FontFamily.Serif to FontStyle.Italic
+                    AppFontStyle.SANS -> FontFamily.SansSerif to FontStyle.Normal
+                    AppFontStyle.MONOSPACE -> FontFamily.Monospace to FontStyle.Normal
+                }
+            },
         )
     }
 
@@ -643,6 +883,104 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun VintageRulerSlider(
+    value: Float,
+    minValue: Float,
+    maxValue: Float,
+    steps: Int,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var widthPx by remember { mutableFloatStateOf(1f) }
+    val trackColor = MaterialTheme.colorScheme.outline
+    val activeColor = MaterialTheme.colorScheme.primary
+    val knobFill = MaterialTheme.colorScheme.surface
+    val knobStroke = MaterialTheme.colorScheme.onSurface
+    val range = (maxValue - minValue).coerceAtLeast(0.01f)
+    val fraction = ((value - minValue) / range).coerceIn(0f, 1f)
+
+    fun snapFromX(x: Float) {
+        val rawFrac = (x / widthPx).coerceIn(0f, 1f)
+        val snappedFrac = if (steps > 0) {
+            (rawFrac * steps).roundToInt().toFloat() / steps.toFloat()
+        } else {
+            rawFrac
+        }
+        onValueChange((minValue + snappedFrac * range).coerceIn(minValue, maxValue))
+    }
+
+    Box(
+        modifier = modifier
+            .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(minValue, maxValue, steps) {
+                detectTapGestures { offset -> snapFromX(offset.x) }
+            }
+            .pointerInput(minValue, maxValue, steps) {
+                detectHorizontalDragGestures { change, _ ->
+                    change.consume()
+                    snapFromX(change.position.x)
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val cy = size.height * 0.42f
+            val padX = 12f
+            val usableW = (size.width - padX * 2f).coerceAtLeast(1f)
+            val thumbX = padX + usableW * fraction
+
+            // Precision ruler ticks below the hairline track
+            for (i in 0..steps) {
+                val tx = padX + usableW * (i.toFloat() / steps.toFloat())
+                val isMajor = i == 0 || i == steps || i == steps / 2
+                drawLine(
+                    color = trackColor.copy(alpha = if (isMajor) 0.95f else 0.55f),
+                    start = Offset(tx, cy + 9f),
+                    end = Offset(tx, cy + if (isMajor) 17f else 14f),
+                    strokeWidth = if (isMajor) 1.5f else 1.0f,
+                )
+            }
+
+            // Thin inactive rail
+            drawLine(
+                color = trackColor,
+                start = Offset(padX, cy),
+                end = Offset(padX + usableW, cy),
+                strokeWidth = 3.6f,
+                cap = StrokeCap.Round,
+            )
+
+            // Active accent rail
+            drawLine(
+                color = activeColor,
+                start = Offset(padX, cy),
+                end = Offset(thumbX, cy),
+                strokeWidth = 4.2f,
+                cap = StrokeCap.Round,
+            )
+
+            // Precision vintage circular knob
+            drawCircle(
+                color = knobFill,
+                radius = 12f,
+                center = Offset(thumbX, cy),
+            )
+            drawCircle(
+                color = knobStroke.copy(alpha = 0.85f),
+                radius = 12f,
+                center = Offset(thumbX, cy),
+                style = Stroke(width = 2.0f),
+            )
+            drawCircle(
+                color = activeColor,
+                radius = 4f,
+                center = Offset(thumbX, cy),
+            )
+        }
+    }
+}
+
+@Composable
 private fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
@@ -658,15 +996,23 @@ private fun BookSettingsCard(
     cardBg: Color,
     outlineColor: Color,
     radius: androidx.compose.ui.unit.Dp,
+    liquidGlassEnabled: Boolean,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(radius)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(cardBg)
-            .border(0.75.dp, outlineColor, shape)
+            .then(
+                if (liquidGlassEnabled) {
+                    Modifier.liquidGlass(enabled = true, shape = shape)
+                } else {
+                    Modifier
+                        .clip(shape)
+                        .background(cardBg)
+                        .border(0.75.dp, outlineColor, shape)
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         content = content,
     )
@@ -821,7 +1167,10 @@ private fun FolderManagerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("管理扫描文件夹") },
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(12.dp),
+        title = { Text("管理扫描文件夹", fontWeight = FontWeight.SemiBold) },
         text = {
             if (allFolders.isEmpty()) {
                 Text(
@@ -893,27 +1242,47 @@ private fun <T> OptionPickerDialog(
     selected: T,
     onSelect: (T) -> Unit,
     onDismiss: () -> Unit,
+    previewFontStyle: ((T) -> Pair<FontFamily, FontStyle>)? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(12.dp),
+        title = { Text(title, fontWeight = FontWeight.SemiBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 options.forEach { (value, label) ->
+                    val isSelected = value == selected
+                    val customFont = previewFontStyle?.invoke(value)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                            )
                             .clickable { onSelect(value) }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
-                            selected = value == selected,
+                            selected = isSelected,
                             onClick = { onSelect(value) },
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(label, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = label,
+                            style = if (customFont != null) {
+                                MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = customFont.first,
+                                    fontStyle = customFont.second,
+                                )
+                            } else {
+                                MaterialTheme.typography.bodyMedium
+                            },
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        )
                     }
                 }
             }

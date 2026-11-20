@@ -73,6 +73,7 @@ enum class PlayerTheme(val label: String) {
 
 enum class AppFontStyle(val label: String) {
     SERIF("优雅衬线"),
+    SERIF_ITALIC("宋体微斜"),
     SANS("清晰黑体"),
     MONOSPACE("等宽体"),
 }
@@ -169,4 +170,11 @@ enum class LibrarySubTab(val label: String) {
     SONGS("歌曲"),
     ARTISTS("歌手"),
     FOLDERS("文件夹"),
+}
+
+enum class LiquidGlassLevel(val label: String, val desc: String, val blurDp: Int) {
+    LOW("低档", "轻盈薄雾，高可读低开销", 10),
+    MEDIUM("中档", "均衡磨砂与温和折射高光", 18),
+    HIGH("高档", "强通透立体玻璃与双折射描边", 26),
+    FULL("完全", "平时无硬边，按住后边缘泛起微光", 34),
 }
