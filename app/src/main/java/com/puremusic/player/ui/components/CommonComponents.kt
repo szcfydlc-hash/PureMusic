@@ -66,7 +66,9 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.puremusic.player.data.model.PlayerUiState
 import com.puremusic.player.data.model.Song
+import androidx.compose.material.icons.rounded.Info
 import com.puremusic.player.ui.theme.ForestGreen
+import com.puremusic.player.ui.theme.LocalLayoutDensity
 import java.util.Locale
 
 fun formatDuration(durationMs: Long): String {
@@ -145,24 +147,26 @@ fun SongRowItem(
     onClick: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onShowSongInfo: (() -> Unit)? = null,
     extraMenuActionLabel: String? = null,
     onExtraMenuAction: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val density = LocalLayoutDensity.current
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 9.dp),
+            .padding(horizontal = 16.dp, vertical = density.rowVerticalPaddingDp.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(46.dp)) {
+        Box(modifier = Modifier.size(density.artSizeDp.dp)) {
             AlbumArtwork(
                 uri = song.albumArtUri,
                 contentDescription = song.album,
                 modifier = Modifier.fillMaxSize(),
-                cornerRadius = 8.dp,
+                cornerRadius = 5.dp,
                 iconSize = 20.dp,
             )
             if (isCurrent) {
@@ -188,8 +192,8 @@ fun SongRowItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Serif),
+                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
                 color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -242,6 +246,21 @@ fun SongRowItem(
                         onAddToPlaylist()
                     },
                 )
+                if (onShowSongInfo != null) {
+                    DropdownMenuItem(
+                        text = { Text("歌曲信息") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Info,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onShowSongInfo()
+                        },
+                    )
+                }
                 if (extraMenuActionLabel != null && onExtraMenuAction != null) {
                     DropdownMenuItem(
                         text = { Text(extraMenuActionLabel) },

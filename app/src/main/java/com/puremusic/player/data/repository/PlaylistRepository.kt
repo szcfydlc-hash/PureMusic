@@ -8,11 +8,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import kotlinx.coroutines.flow.first
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
+import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
@@ -45,6 +47,8 @@ class PlaylistRepository(private val context: Context) {
         val LYRIC_FONT_STYLE = stringPreferencesKey("lyric_font_style")
         val BACKGROUND_STYLE = stringPreferencesKey("background_style")
         val LAYOUT_MODE = stringPreferencesKey("layout_mode")
+        val LAYOUT_DENSITY = stringPreferencesKey("layout_density")
+        val FONT_SCALE = floatPreferencesKey("font_scale")
         val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         val MIN_DURATION_FILTER = stringPreferencesKey("min_duration_filter")
@@ -85,6 +89,16 @@ class PlaylistRepository(private val context: Context) {
         prefs[Keys.BACKGROUND_STYLE]?.let { name ->
             BackgroundStyle.entries.firstOrNull { it.name == name }
         } ?: BackgroundStyle.WARM_PAPER
+    }
+
+    val layoutDensityFlow: Flow<LayoutDensity> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.LAYOUT_DENSITY]?.let { name ->
+            LayoutDensity.entries.firstOrNull { it.name == name }
+        } ?: LayoutDensity.STANDARD
+    }
+
+    val fontScaleFlow: Flow<Float> = context.pureMusicDataStore.data.map { prefs ->
+        (prefs[Keys.FONT_SCALE] ?: 1.0f).coerceIn(0.85f, 1.25f)
     }
 
     val layoutModeFlow: Flow<LayoutMode> = context.pureMusicDataStore.data.map { prefs ->
@@ -194,6 +208,14 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { it[Keys.BACKGROUND_STYLE] = style.name }
     }
 
+    suspend fun setLayoutDensity(density: LayoutDensity) {
+        context.pureMusicDataStore.edit { it[Keys.LAYOUT_DENSITY] = density.name }
+    }
+
+    suspend fun setFontScale(scale: Float) {
+        context.pureMusicDataStore.edit { it[Keys.FONT_SCALE] = scale.coerceIn(0.85f, 1.25f) }
+    }
+
     suspend fun setLayoutMode(mode: LayoutMode) {
         context.pureMusicDataStore.edit { it[Keys.LAYOUT_MODE] = mode.name }
     }
@@ -221,6 +243,8 @@ class PlaylistRepository(private val context: Context) {
             prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SERIF_ITALIC.name
             prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
             prefs[Keys.LAYOUT_MODE] = LayoutMode.AUTO.name
+            prefs[Keys.LAYOUT_DENSITY] = LayoutDensity.STANDARD.name
+            prefs[Keys.FONT_SCALE] = 1.0f
             prefs[Keys.LIQUID_GLASS_ENABLED] = true
             prefs[Keys.ACCENT_COLOR] = AppAccentColor.FOREST_GREEN.name
         }

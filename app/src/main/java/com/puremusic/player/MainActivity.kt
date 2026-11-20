@@ -58,6 +58,7 @@ import com.puremusic.player.ui.components.LyricsBottomSheet
 import com.puremusic.player.ui.components.MiniPlayerBar
 import com.puremusic.player.ui.components.QueueBottomSheet
 import com.puremusic.player.ui.components.SleepTimerDialog
+import com.puremusic.player.ui.components.SongInfoDialog
 import com.puremusic.player.ui.screens.LibraryScreen
 import com.puremusic.player.ui.screens.NowPlayingScreen
 import com.puremusic.player.ui.screens.SettingsScreen
@@ -83,6 +84,8 @@ private fun PureMusicApp(
     val lyricFontStyle by viewModel.lyricFontStyle.collectAsStateWithLifecycle()
     val backgroundStyle by viewModel.backgroundStyle.collectAsStateWithLifecycle()
     val layoutMode by viewModel.layoutMode.collectAsStateWithLifecycle()
+    val layoutDensity by viewModel.layoutDensity.collectAsStateWithLifecycle()
+    val fontScale by viewModel.fontScale.collectAsStateWithLifecycle()
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
 
@@ -124,6 +127,8 @@ private fun PureMusicApp(
         backgroundStyle = backgroundStyle,
         accentColor = accentColor,
         fontStyle = fontStyle,
+        layoutDensity = layoutDensity,
+        fontScale = fontScale,
     ) {
         if (!hasAudioPermission) {
             PermissionPromptScreen(
@@ -159,6 +164,7 @@ private fun PureMusicApp(
         var showLyrics by remember { mutableStateOf(false) }
         var showCreatePlaylist by remember { mutableStateOf(false) }
         var pendingPlaylistSong by remember { mutableStateOf<Song?>(null) }
+        var infoDialogSong by remember { mutableStateOf<Song?>(null) }
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val isTabletLayout = when (layoutMode) {
@@ -194,6 +200,7 @@ private fun PureMusicApp(
                 onOpenNowPlaying = { showNowPlaying = true },
                 onToggleFavorite = viewModel::toggleFavorite,
                 onRequestAddToPlaylist = { pendingPlaylistSong = it },
+                onShowSongInfo = { infoDialogSong = it },
                 onRequestCreatePlaylist = { showCreatePlaylist = true },
                 onDeletePlaylist = viewModel::deletePlaylist,
                 onRemoveSongFromPlaylist = viewModel::removeSongFromPlaylist,
@@ -266,6 +273,8 @@ private fun PureMusicApp(
                     minDurationFilter = minDurationFilter,
                     scanStatus = scanStatus,
                     layoutMode = layoutMode,
+                    layoutDensity = layoutDensity,
+                    fontScale = fontScale,
                     liquidGlassEnabled = liquidGlassEnabled,
                     accentColor = accentColor,
                     fontStyle = fontStyle,
@@ -273,6 +282,8 @@ private fun PureMusicApp(
                     backgroundStyle = backgroundStyle,
                     onClose = { showSettings = false },
                     onSelectLayoutMode = viewModel::setLayoutMode,
+                    onSelectLayoutDensity = viewModel::setLayoutDensity,
+                    onChangeFontScale = viewModel::setFontScale,
                     onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
                     onSelectAccentColor = viewModel::setAccentColor,
                     onSelectFontStyle = viewModel::setFontStyle,
@@ -331,6 +342,13 @@ private fun PureMusicApp(
                 onDismiss = { showQueue = false },
                 onSelectIndex = viewModel::playQueueIndex,
                 onRemoveIndex = viewModel::removeFromQueue,
+            )
+        }
+
+        infoDialogSong?.let { song ->
+            SongInfoDialog(
+                song = song,
+                onDismiss = { infoDialogSong = null },
             )
         }
 

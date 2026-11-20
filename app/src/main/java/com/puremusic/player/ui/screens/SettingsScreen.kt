@@ -46,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
+import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
@@ -94,6 +96,8 @@ fun SettingsScreen(
     minDurationFilter: MinDurationFilter,
     scanStatus: ScanStatus,
     layoutMode: LayoutMode,
+    layoutDensity: LayoutDensity,
+    fontScale: Float,
     liquidGlassEnabled: Boolean,
     accentColor: AppAccentColor,
     fontStyle: AppFontStyle,
@@ -101,6 +105,8 @@ fun SettingsScreen(
     backgroundStyle: BackgroundStyle,
     onClose: () -> Unit,
     onSelectLayoutMode: (LayoutMode) -> Unit,
+    onSelectLayoutDensity: (LayoutDensity) -> Unit,
+    onChangeFontScale: (Float) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onSelectAccentColor: (AppAccentColor) -> Unit,
     onSelectFontStyle: (AppFontStyle) -> Unit,
@@ -238,12 +244,16 @@ fun SettingsScreen(
                     when (activeSection) {
                         SettingsSection.APPEARANCE -> AppearanceSettingsPane(
                             layoutMode = layoutMode,
+                            layoutDensity = layoutDensity,
+                            fontScale = fontScale,
                             liquidGlassEnabled = liquidGlassEnabled,
                             accentColor = accentColor,
                             fontStyle = fontStyle,
                             lyricFontStyle = lyricFontStyle,
                             backgroundStyle = backgroundStyle,
                             onSelectLayoutMode = onSelectLayoutMode,
+                            onSelectLayoutDensity = onSelectLayoutDensity,
+                            onChangeFontScale = onChangeFontScale,
                             onToggleLiquidGlass = onToggleLiquidGlass,
                             onSelectAccentColor = onSelectAccentColor,
                             onSelectBackgroundStyle = onSelectBackgroundStyle,
@@ -395,7 +405,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "版本 5.2.0\n\n专注极致体验的本地离线音乐播放器，围绕「唱片海报墙」与封面动态取色打造，采用 Kotlin + Jetpack Compose + Media3 独立编写，无广告、无联网追踪。",
+                                text = "版本 5.4.0\n\n专注极致体验的本地离线音乐播放器，围绕「唱片海报墙」与封面动态取色打造，采用 Kotlin + Jetpack Compose + Media3 独立编写，无广告、无联网追踪。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -449,12 +459,16 @@ fun SettingsScreen(
 @Composable
 private fun AppearanceSettingsPane(
     layoutMode: LayoutMode,
+    layoutDensity: LayoutDensity,
+    fontScale: Float,
     liquidGlassEnabled: Boolean,
     accentColor: AppAccentColor,
     fontStyle: AppFontStyle,
     lyricFontStyle: LyricFontStyle,
     backgroundStyle: BackgroundStyle,
     onSelectLayoutMode: (LayoutMode) -> Unit,
+    onSelectLayoutDensity: (LayoutDensity) -> Unit,
+    onChangeFontScale: (Float) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onSelectAccentColor: (AppAccentColor) -> Unit,
     onSelectBackgroundStyle: (BackgroundStyle) -> Unit,
@@ -463,6 +477,118 @@ private fun AppearanceSettingsPane(
     onOpenBackgroundPicker: () -> Unit,
     onResetAppearance: () -> Unit,
 ) {
+    // Live Preview Card reacting in real-time to LayoutDensity & FontScale
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(0.8.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = layoutDensity.rowVerticalPaddingDp.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(layoutDensity.artSizeDp.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "春日序曲",
+                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif),
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+            Text(
+                text = "实时排版预览 · ${layoutDensity.label} · ${(fontScale * 100).toInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+
+    // 排版密度 3 档：紧凑 / 标准 / 宽松
+    Text(
+        text = "排版密度",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(3.dp),
+    ) {
+        LayoutDensity.entries.forEach { density ->
+            val selected = density == layoutDensity
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .clickable { onSelectLayoutDensity(density) }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = density.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    // 全局字体大小滑块 (85% - 125%)
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "全局字体大小",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "${(fontScale * 100).toInt()}%",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("A-", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Slider(
+                value = fontScale,
+                onValueChange = onChangeFontScale,
+                valueRange = 0.85f..1.25f,
+                steps = 7,
+                modifier = Modifier.weight(1f),
+            )
+            Text("A+", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
     Text(
         text = "外观模式",
         style = MaterialTheme.typography.labelMedium,

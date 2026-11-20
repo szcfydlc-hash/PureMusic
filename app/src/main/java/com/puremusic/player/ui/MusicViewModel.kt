@@ -17,6 +17,7 @@ import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.Artist
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.EqualizerState
+import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
@@ -113,6 +114,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = BackgroundStyle.WARM_PAPER,
+    )
+
+    val layoutDensity: StateFlow<LayoutDensity> = playlistRepository.layoutDensityFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = LayoutDensity.STANDARD,
+    )
+
+    val fontScale: StateFlow<Float> = playlistRepository.fontScaleFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 1.0f,
     )
 
     val layoutMode: StateFlow<LayoutMode> = playlistRepository.layoutModeFlow.stateIn(
@@ -510,6 +523,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setBackgroundStyle(style: BackgroundStyle) {
         viewModelScope.launch { playlistRepository.setBackgroundStyle(style) }
+    }
+
+    fun setLayoutDensity(density: LayoutDensity) {
+        viewModelScope.launch { playlistRepository.setLayoutDensity(density) }
+    }
+
+    fun setFontScale(scale: Float) {
+        viewModelScope.launch { playlistRepository.setFontScale(scale) }
     }
 
     fun setLayoutMode(mode: LayoutMode) {

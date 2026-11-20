@@ -178,6 +178,7 @@ fun LibraryScreen(
     onOpenNowPlaying: () -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onRequestAddToPlaylist: (Song) -> Unit,
+    onShowSongInfo: (Song) -> Unit,
     onRequestCreatePlaylist: () -> Unit,
     onDeletePlaylist: (String) -> Unit,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
@@ -222,6 +223,7 @@ fun LibraryScreen(
             onPlaySongs = onPlaySongs,
             onToggleFavorite = onToggleFavorite,
             onRequestAddToPlaylist = onRequestAddToPlaylist,
+            onShowSongInfo = onShowSongInfo,
             onRemoveFromPlaylist = if (detail is CollectionDetail.PlaylistDetail) {
                 { songId -> onRemoveSongFromPlaylist(detail.playlistId, songId) }
             } else {
@@ -469,45 +471,49 @@ fun LibraryScreen(
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(18.dp))
-                                    .background(MaterialTheme.colorScheme.primary)
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(
+                                        0.8.dp,
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+                                        RoundedCornerShape(18.dp),
+                                    )
                                     .clickable { onPlaySongs(songs, 0, false) }
-                                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                                    .padding(horizontal = 13.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.PlayArrow,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(16.dp),
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "播放全部 (${songs.size})",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Serif),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Medium,
                                 )
                             }
 
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(18.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .clickable { onPlaySongs(songs, 0, true) }
-                                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Shuffle,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(15.dp),
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "随机",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -604,6 +610,7 @@ fun LibraryScreen(
                             onSelectFeaturedAlbum = { activeDetail = CollectionDetail.AlbumDetail(it) },
                             onToggleFavorite = onToggleFavorite,
                             onRequestAddToPlaylist = onRequestAddToPlaylist,
+            onShowSongInfo = onShowSongInfo,
                             onRefresh = onRefreshLibrary,
                             bottomPadding = bottomContentPadding,
                         )
@@ -780,6 +787,7 @@ private fun SongsTabContent(
     onSelectFeaturedAlbum: (Album) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onRequestAddToPlaylist: (Song) -> Unit,
+    onShowSongInfo: (Song) -> Unit,
     onRefresh: () -> Unit,
     bottomPadding: PaddingValues,
 ) {
@@ -819,7 +827,7 @@ private fun SongsTabContent(
                             uri = song.albumArtUri,
                             contentDescription = song.album,
                             modifier = Modifier.fillMaxSize(),
-                            cornerRadius = 8.dp,
+                            cornerRadius = 5.dp,
                             iconSize = 28.dp,
                         )
                         if (isCurrent) {
@@ -882,6 +890,7 @@ private fun SongsTabContent(
                         onClick = { onPlaySongs(songs, index, false) },
                         onAddToPlaylist = { onRequestAddToPlaylist(song) },
                         onToggleFavorite = { onToggleFavorite(song.id) },
+                        onShowSongInfo = { onShowSongInfo(song) },
                     )
                 }
             }
@@ -944,7 +953,7 @@ private fun AlbumsTabContent(
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .shadow(3.dp, RoundedCornerShape(8.dp)),
-                    cornerRadius = 8.dp,
+                    cornerRadius = 5.dp,
                     iconSize = 30.dp,
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -1169,6 +1178,7 @@ private fun CollectionDetailView(
     onPlaySongs: (List<Song>, Int, Boolean) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onRequestAddToPlaylist: (Song) -> Unit,
+    onShowSongInfo: (Song) -> Unit,
     onRemoveFromPlaylist: ((Long) -> Unit)?,
     bottomContentPadding: PaddingValues,
 ) {
@@ -1254,6 +1264,7 @@ private fun CollectionDetailView(
                         onClick = { onPlaySongs(songs, index, false) },
                         onAddToPlaylist = { onRequestAddToPlaylist(song) },
                         onToggleFavorite = { onToggleFavorite(song.id) },
+                        onShowSongInfo = { onShowSongInfo(song) },
                         extraMenuActionLabel = if (onRemoveFromPlaylist != null) "从歌单移除" else null,
                         onExtraMenuAction = onRemoveFromPlaylist?.let { callback -> { callback(song.id) } },
                     )

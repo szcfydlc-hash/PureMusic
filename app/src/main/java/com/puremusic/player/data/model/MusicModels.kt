@@ -146,3 +146,14 @@ enum class AppAccentColor(val label: String, val colorHex: Long) {
     ROSE_RED("绯红", 0xFFC2185B),
     VIOLET("星河紫", 0xFF6A1B9A),
 }
+
+enum class LayoutDensity(
+    val label: String,
+    val artSizeDp: Int,
+    val rowVerticalPaddingDp: Int,
+    val gridSpacingDp: Int,
+) {
+    COMPACT("紧凑", 42, 5, 7),
+    STANDARD("标准", 50, 9, 10),
+    SPACIOUS("宽松", 58, 14, 14),
+}

@@ -509,3 +509,51 @@ fun LyricsBottomSheet(
         }
     }
 }
+
+@Composable
+fun SongInfoDialog(
+    song: Song,
+    onDismiss: () -> Unit,
+) {
+    val formatExt = song.filePath
+        .substringAfterLast('.', "")
+        .uppercase(Locale.getDefault())
+        .ifBlank { "LOCAL AUDIO" }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("歌曲信息") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoMetaRow("歌名", song.title)
+                InfoMetaRow("歌手", song.artist)
+                InfoMetaRow("专辑", song.album)
+                InfoMetaRow("时长", formatDuration(song.durationMs))
+                InfoMetaRow("格式", formatExt)
+                InfoMetaRow("文件夹", song.folderName)
+                if (song.filePath.isNotBlank()) {
+                    InfoMetaRow("路径", song.filePath)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("知道了") }
+        },
+    )
+}
+
+@Composable
+private fun InfoMetaRow(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}

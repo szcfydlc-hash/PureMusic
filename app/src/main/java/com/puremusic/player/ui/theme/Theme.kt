@@ -7,6 +7,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
@@ -15,6 +17,7 @@ import androidx.core.view.WindowCompat
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.BackgroundStyle
+import com.puremusic.player.data.model.LayoutDensity
 
 val ForestGreen = Color(0xFF11553B)
 
@@ -28,6 +31,8 @@ val InkMuted = Color(0xFF6E6860)
 val DeepInkBg = Color(0xFF111316)
 val DeepInkSidebar = Color(0xFF1A1C20)
 
+val LocalLayoutDensity = compositionLocalOf { LayoutDensity.STANDARD }
+
 fun sidebarColorFor(isDark: Boolean): Color = if (isDark) DeepInkSidebar else WarmPaperSidebar
 
 @Composable
@@ -35,6 +40,8 @@ fun PureMusicTheme(
     backgroundStyle: BackgroundStyle,
     accentColor: AppAccentColor,
     fontStyle: AppFontStyle,
+    layoutDensity: LayoutDensity = LayoutDensity.STANDARD,
+    fontScale: Float = 1.0f,
     content: @Composable () -> Unit,
 ) {
     val useDark = when (backgroundStyle) {
@@ -98,23 +105,29 @@ fun PureMusicTheme(
         AppFontStyle.MONOSPACE -> FontFamily.Monospace
     }
 
+    val scale = fontScale.coerceIn(0.85f, 1.25f)
+    fun androidx.compose.ui.text.TextStyle.scaled() = copy(
+        fontFamily = family,
+        fontSize = fontSize * scale,
+        lineHeight = lineHeight * scale,
+    )
     val base = Typography()
     val customTypography = Typography(
-        displayLarge = base.displayLarge.copy(fontFamily = family),
-        displayMedium = base.displayMedium.copy(fontFamily = family),
-        displaySmall = base.displaySmall.copy(fontFamily = family),
-        headlineLarge = base.headlineLarge.copy(fontFamily = family),
-        headlineMedium = base.headlineMedium.copy(fontFamily = family),
-        headlineSmall = base.headlineSmall.copy(fontFamily = family),
-        titleLarge = base.titleLarge.copy(fontFamily = family),
-        titleMedium = base.titleMedium.copy(fontFamily = family),
-        titleSmall = base.titleSmall.copy(fontFamily = family),
-        bodyLarge = base.bodyLarge.copy(fontFamily = family),
-        bodyMedium = base.bodyMedium.copy(fontFamily = family),
-        bodySmall = base.bodySmall.copy(fontFamily = family),
-        labelLarge = base.labelLarge.copy(fontFamily = family),
-        labelMedium = base.labelMedium.copy(fontFamily = family),
-        labelSmall = base.labelSmall.copy(fontFamily = family),
+        displayLarge = base.displayLarge.scaled(),
+        displayMedium = base.displayMedium.scaled(),
+        displaySmall = base.displaySmall.scaled(),
+        headlineLarge = base.headlineLarge.scaled(),
+        headlineMedium = base.headlineMedium.scaled(),
+        headlineSmall = base.headlineSmall.scaled(),
+        titleLarge = base.titleLarge.scaled(),
+        titleMedium = base.titleMedium.scaled(),
+        titleSmall = base.titleSmall.scaled(),
+        bodyLarge = base.bodyLarge.scaled(),
+        bodyMedium = base.bodyMedium.scaled(),
+        bodySmall = base.bodySmall.scaled(),
+        labelLarge = base.labelLarge.scaled(),
+        labelMedium = base.labelMedium.scaled(),
+        labelSmall = base.labelSmall.scaled(),
     )
 
     val view = LocalView.current
@@ -129,9 +142,11 @@ fun PureMusicTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = customTypography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalLayoutDensity provides layoutDensity) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = customTypography,
+            content = content,
+        )
+    }
 }

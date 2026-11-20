@@ -16,6 +16,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -211,10 +212,33 @@ fun NowPlayingScreen(
                     .weight(1.22f),
             )
 
-            // 2. Refined Editorial Track Metadata, Lyrics, Progress & Controls
+            // 2. Refined Editorial Track Metadata, Lyrics, Progress & Controls (supports swipe left/right to skip, swipe down to close)
+            var dragTotalX by remember { mutableFloatStateOf(0f) }
+            var dragTotalY by remember { mutableFloatStateOf(0f) }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .pointerInput(song.id) {
+                        detectDragGestures(
+                            onDragStart = {
+                                dragTotalX = 0f
+                                dragTotalY = 0f
+                            },
+                            onDrag = { _, dragAmount ->
+                                dragTotalX += dragAmount.x
+                                dragTotalY += dragAmount.y
+                            },
+                            onDragEnd = {
+                                val absX = kotlin.math.abs(dragTotalX)
+                                val absY = kotlin.math.abs(dragTotalY)
+                                when {
+                                    absX > absY && dragTotalX < -85f -> onSkipNext()
+                                    absX > absY && dragTotalX > 85f -> onSkipPrevious()
+                                    absY > absX && dragTotalY > 110f -> onClose()
+                                }
+                            },
+                        )
+                    }
                     .padding(horizontal = 26.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -483,8 +507,8 @@ private fun InteractivePosterWallHeader(
     }
 
     BoxWithConstraints(modifier = modifier) {
-        val gridHeight = maxHeight * 0.72f
-        val discSize = min(maxWidth * 0.64f, maxHeight * 0.62f)
+        val gridHeight = maxHeight * 0.68f
+        val discSize = min(maxWidth * 0.74f, maxHeight * 0.72f)
 
         Box(modifier = Modifier.fillMaxSize()) {
             LazyHorizontalGrid(
@@ -552,7 +576,7 @@ private fun InteractivePosterWallHeader(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .offset(y = gridHeight - discSize * 0.56f),
+                    .offset(y = gridHeight - discSize * 0.58f),
             ) {
                 AnimatedContent(
                     targetState = currentSong.id to currentSong.albumArtUri,
@@ -646,21 +670,26 @@ fun SpinningVinylDisc(
     Box(
         modifier = Modifier
             .size(discSize)
-            .shadow(24.dp, CircleShape)
+            .shadow(30.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.48f))
             .clip(CircleShape),
         contentAlignment = Alignment.Center,
     ) {
+        // Studio-grade photorealistic 12-inch LP vinyl shader
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
+            // 1. Deep virgin-vinyl radial tone zones (lead-in, music grooves, glossy run-out)
             drawCircle(
                 brush = Brush.radialGradient(
-                    0.00f to Color(0xFF121212),
-                    0.42f to Color(0xFF090909),
-                    0.75f to Color(0xFF161616),
-                    0.95f to Color(0xFF0A0A0A),
-                    1.00f to Color(0xFF242424),
+                    0.00f to Color(0xFF0D0D0D),
+                    0.35f to Color(0xFF0A0A0A),
+                    0.41f to Color(0xFF1B1B1B),
+                    0.44f to Color(0xFF090909),
+                    0.68f to Color(0xFF131313),
+                    0.88f to Color(0xFF090909),
+                    0.96f to Color(0xFF191919),
+                    1.00f to Color(0xFF323232),
                     center = center,
                     radius = radius,
                 ),
@@ -668,19 +697,20 @@ fun SpinningVinylDisc(
                 center = center,
             )
 
+            // 2. Broad soft studio ambient anisotropic sheen
             drawCircle(
                 brush = Brush.sweepGradient(
                     0.00f to Color.Transparent,
-                    0.12f to Color.Transparent,
-                    0.20f to Color.White.copy(alpha = 0.16f),
-                    0.24f to Color.White.copy(alpha = 0.38f),
-                    0.28f to Color.White.copy(alpha = 0.14f),
-                    0.36f to Color.Transparent,
-                    0.62f to Color.Transparent,
-                    0.70f to Color.White.copy(alpha = 0.16f),
-                    0.74f to Color.White.copy(alpha = 0.40f),
-                    0.78f to Color.White.copy(alpha = 0.14f),
-                    0.86f to Color.Transparent,
+                    0.08f to Color.Transparent,
+                    0.18f to Color(0xFFD8D6D0).copy(alpha = 0.14f),
+                    0.23f to Color.White.copy(alpha = 0.24f),
+                    0.28f to Color(0xFFD0D6E0).copy(alpha = 0.12f),
+                    0.38f to Color.Transparent,
+                    0.58f to Color.Transparent,
+                    0.68f to Color(0xFFD8D6D0).copy(alpha = 0.14f),
+                    0.73f to Color.White.copy(alpha = 0.26f),
+                    0.78f to Color(0xFFD0D6E0).copy(alpha = 0.12f),
+                    0.88f to Color.Transparent,
                     1.00f to Color.Transparent,
                     center = center,
                 ),
@@ -688,60 +718,102 @@ fun SpinningVinylDisc(
                 center = center,
             )
 
-            for (i in 0..22) {
-                val factor = 0.43f + i * 0.023f
-                val isTrackGap = i == 7 || i == 15
+            // 3. Sharp bright specular core cones (authentic glossy LP hourglass highlight)
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    0.00f to Color.Transparent,
+                    0.205f to Color.Transparent,
+                    0.228f to Color.White.copy(alpha = 0.42f),
+                    0.250f to Color.Transparent,
+                    0.705f to Color.Transparent,
+                    0.728f to Color.White.copy(alpha = 0.44f),
+                    0.750f to Color.Transparent,
+                    1.00f to Color.Transparent,
+                    center = center,
+                ),
+                radius = radius * 0.95f,
+                center = center,
+            )
+
+            // 4. 42 ultra-fine concentric micro-grooves + 3 glossy track-separator bands
+            for (i in 0..41) {
+                val factor = 0.425f + i * 0.0128f
+                val isTrackGap = i == 11 || i == 23 || i == 34
                 val alpha = when {
-                    isTrackGap -> 0.17f
-                    i % 2 == 0 -> 0.09f
-                    else -> 0.04f
+                    isTrackGap -> 0.22f
+                    i % 3 == 0 -> 0.10f
+                    i % 2 == 0 -> 0.05f
+                    else -> 0.025f
                 }
                 drawCircle(
                     color = Color.White.copy(alpha = alpha),
                     radius = radius * factor,
                     center = center,
-                    style = Stroke(width = if (isTrackGap) 1.5f else 0.95f),
+                    style = Stroke(width = if (isTrackGap) 1.6f else 0.75f),
                 )
             }
 
+            // 5. Glossy inner run-out zone ring around paper label
             drawCircle(
-                color = Color.White.copy(alpha = 0.14f),
-                radius = radius * 0.405f,
+                color = Color.White.copy(alpha = 0.18f),
+                radius = radius * 0.395f,
                 center = center,
-                style = Stroke(width = 1.6f),
+                style = Stroke(width = 1.4f),
             )
             drawCircle(
-                color = Color.White.copy(alpha = 0.28f),
-                radius = radius - 1.5f,
+                color = Color.Black.copy(alpha = 0.75f),
+                radius = radius * 0.372f,
                 center = center,
-                style = Stroke(width = 2.4f),
+                style = Stroke(width = 2.2f),
+            )
+
+            // 6. Precision beveled outer LP edge highlight
+            drawCircle(
+                color = Color.White.copy(alpha = 0.34f),
+                radius = radius - 1.2f,
+                center = center,
+                style = Stroke(width = 2.0f),
             )
             drawCircle(
-                color = Color.Black.copy(alpha = 0.85f),
-                radius = radius - 3.6f,
+                color = Color.Black.copy(alpha = 0.9f),
+                radius = radius - 3.4f,
                 center = center,
-                style = Stroke(width = 1.8f),
+                style = Stroke(width = 2.2f),
             )
         }
 
-        AlbumArtwork(
-            uri = albumArtUri,
-            contentDescription = null,
-            modifier = Modifier
-                .size(discSize * 0.38f)
-                .rotate(rotationDegrees)
-                .clip(CircleShape)
-                .border(2.dp, Color(0xFF0E0E0E), CircleShape),
-            cornerRadius = discSize,
-            iconSize = 24.dp,
-        )
-
+        // Authentic 35% LP paper center label with subtle stamped inner press ring
         Box(
             modifier = Modifier
-                .size(9.dp)
+                .size(discSize * 0.35f)
+                .rotate(rotationDegrees)
                 .clip(CircleShape)
-                .background(Color(0xFF141414))
-                .border(1.2.dp, Color.White.copy(alpha = 0.4f), CircleShape),
+                .border(2.dp, Color(0xFF0A0A0A), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            AlbumArtwork(
+                uri = albumArtUri,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = discSize,
+                iconSize = 24.dp,
+            )
+            // Subtle stamped pressing ring on real 12" vinyl paper labels
+            Box(
+                modifier = Modifier
+                    .fillMaxSize(0.46f)
+                    .clip(CircleShape)
+                    .border(0.9.dp, Color.Black.copy(alpha = 0.28f), CircleShape),
+            )
+        }
+
+        // Metallic-rimmed spindle center hole
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF101010))
+                .border(1.4.dp, Color(0xFFB8B4AC).copy(alpha = 0.55f), CircleShape),
         )
     }
 }
