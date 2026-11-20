@@ -95,6 +95,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
@@ -228,20 +229,51 @@ fun NowPlayingScreen(
     val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
     val activeAccentColor = if (liquidGlassEnabled) animatedAccent else MaterialTheme.colorScheme.primary
-    val dynamicDarkSolidBg by animateColorAsState(
-        targetValue = if (isDarkTheme) {
-            lerp(Color(0xFF101113), extractedPalette.accent, 0.26f)
-        } else {
-            baseCanvas
-        },
+    val darkBgTop by animateColorAsState(
+        targetValue = lerp(Color(0xFF141011), extractedPalette.accent, 0.28f),
         animationSpec = tween(durationMillis = 550),
-        label = "darkSolidDynamicBg",
+        label = "darkAmbientTop",
+    )
+    val darkBgMid by animateColorAsState(
+        targetValue = lerp(Color(0xFF0E0B0C), extractedPalette.accent, 0.14f),
+        animationSpec = tween(durationMillis = 550),
+        label = "darkAmbientMid",
+    )
+    val darkBgBottom by animateColorAsState(
+        targetValue = lerp(Color(0xFF090809), extractedPalette.accent, 0.04f),
+        animationSpec = tween(durationMillis = 550),
+        label = "darkAmbientBottom",
     )
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDarkTheme) dynamicDarkSolidBg else baseCanvas),
+            .then(
+                if (isDarkTheme) {
+                    Modifier.background(
+                        Brush.verticalGradient(
+                            0.0f to darkBgTop,
+                            0.46f to darkBgMid,
+                            1.0f to darkBgBottom,
+                        ),
+                    )
+                } else {
+                    Modifier.background(baseCanvas)
+                },
+            ),
     ) {
+        if (isDarkTheme) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        0.0f to animatedAccent.copy(alpha = 0.22f),
+                        0.45f to animatedAccent.copy(alpha = 0.08f),
+                        1.0f to Color.Transparent,
+                        center = Offset(size.width * 0.88f, size.height * 0.14f),
+                        radius = size.maxDimension * 0.62f,
+                    ),
+                )
+            }
+        }
         if (showFullLyrics) {
             EditorialFullScreenLyricsView(
                 song = song,
@@ -318,10 +350,8 @@ fun NowPlayingScreen(
                             onDragEnd = {
                                 val absX = kotlin.math.abs(dragTotalX)
                                 val absY = kotlin.math.abs(dragTotalY)
-                                when {
-                                    absX > absY && dragTotalX < -85f -> onSkipNext()
-                                    absX > absY && dragTotalX > 85f -> onSkipPrevious()
-                                    absY > absX && dragTotalY > 110f -> onClose()
+                                if (absY > absX && dragTotalY > 110f) {
+                                    onClose()
                                 }
                             },
                         )
@@ -493,8 +523,16 @@ fun NowPlayingScreen(
                         onClick = onTogglePlayPause,
                         shape = CircleShape,
                         colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = if (liquidGlassEnabled) activeAccentColor else primaryTextColor,
-                            contentColor = if (liquidGlassEnabled) Color.White else baseCanvas,
+                            containerColor = when {
+                                liquidGlassEnabled -> activeAccentColor
+                                isDarkTheme -> Color(0xFFF2ECE1)
+                                else -> primaryTextColor
+                            },
+                            contentColor = when {
+                                liquidGlassEnabled -> Color.White
+                                isDarkTheme -> Color(0xFF141110)
+                                else -> baseCanvas
+                            },
                         ),
                         modifier = Modifier
                             .size(66.dp)
@@ -605,10 +643,12 @@ private fun InteractivePosterWallHeader(
     modifier: Modifier = Modifier,
 ) {
     val wallSongs = remember(allSongs, currentSong.id) {
-        if (allSongs.size >= 24) {
-            allSongs
-        } else if (allSongs.isNotEmpty()) {
-            List(24) { idx -> allSongs[idx % allSongs.size] }
+        val distinctAlbums = allSongs.distinctBy { it.albumId }
+        val pool = if (distinctAlbums.size >= 24) distinctAlbums else allSongs
+        if (pool.size >= 24) {
+            pool
+        } else if (pool.isNotEmpty()) {
+            List(24) { idx -> pool[idx % pool.size] }
         } else {
             List(24) { currentSong }
         }
@@ -625,9 +665,9 @@ private fun InteractivePosterWallHeader(
                     .fillMaxWidth()
                     .height(gridHeight)
                     .align(Alignment.TopCenter),
-                contentPadding = PaddingValues(horizontal = 3.dp, vertical = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(0.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 items(wallSongs.size) { index ->
                     val tileSong = wallSongs[index]
@@ -723,8 +763,10 @@ private fun PosterWallTile(
         modifier = Modifier
             .fillMaxHeight()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick),
+            .clip(RectangleShape)
+            .background(Color.White.copy(alpha = if (isCurrent) 1f else 0.92f))
+            .clickable(onClick = onClick)
+            .padding(if (isCurrent) 1.5.dp else 1.dp),
     ) {
         SubcomposeAsyncImage(
             model = request,
@@ -734,13 +776,6 @@ private fun PosterWallTile(
             loading = { DarkVinylTileFallback() },
             error = { DarkVinylTileFallback() },
         )
-        if (isCurrent) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(6.dp)),
-            )
-        }
     }
 }
 
@@ -782,19 +817,21 @@ fun SpinningVinylDisc(
             .clip(CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        // 180g Matte-Satin Jet-Black LP Shader (glare-free, refined dark micro-grooves)
+        // 180g Audiophile Brushed-Luster LP Shader (96 dense micro-grooves + silky upper-right/lower-left conical sheen)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            // 1. Deep matte jet-black virgin vinyl radial base (zero harsh specular glare)
+            // 1. Deep virgin jet-black vinyl radial tone zones
             drawCircle(
                 brush = Brush.radialGradient(
-                    0.00f to Color(0xFF0A0A0C),
-                    0.38f to Color(0xFF09090B),
-                    0.46f to Color(0xFF131316),
-                    0.68f to Color(0xFF0F0F12),
-                    0.92f to Color(0xFF141417),
+                    0.00f to Color(0xFF070709),
+                    0.38f to Color(0xFF060608),
+                    0.44f to Color(0xFF131316),
+                    0.50f to Color(0xFF0B0B0D),
+                    0.74f to Color(0xFF121215),
+                    0.93f to Color(0xFF0C0C0E),
+                    0.97f to Color(0xFF19191C),
                     1.00f to Color(0xFF0A0A0C),
                     center = center,
                     radius = radius,
@@ -803,50 +840,109 @@ fun SpinningVinylDisc(
                 center = center,
             )
 
-            // 2. 56 understated matte dark-graphite concentric micro-grooves + 3 subtle track bands
-            for (i in 0..55) {
-                val factor = 0.445f + i * 0.0091f
-                val isTrackGap = i == 15 || i == 31 || i == 46
-                val alpha = when {
-                    isTrackGap -> 0.085f
-                    i % 4 == 0 -> 0.048f
-                    i % 2 == 0 -> 0.028f
-                    else -> 0.015f
-                }
-                drawCircle(
-                    color = Color.White.copy(alpha = alpha),
-                    radius = radius * factor,
+            // 2. Broad silky brushed-silver conical reflections (upper-right ~0.875 & lower-left ~0.375)
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    0.00f to Color.Transparent,
+                    0.24f to Color.Transparent,
+                    0.31f to Color(0xFFDCE0E6).copy(alpha = 0.14f),
+                    0.375f to Color(0xFFEAECEF).copy(alpha = 0.34f),
+                    0.44f to Color(0xFFDCE0E6).copy(alpha = 0.14f),
+                    0.51f to Color.Transparent,
+                    0.74f to Color.Transparent,
+                    0.81f to Color(0xFFDCE0E6).copy(alpha = 0.15f),
+                    0.875f to Color(0xFFEAECEF).copy(alpha = 0.36f),
+                    0.94f to Color(0xFFDCE0E6).copy(alpha = 0.14f),
+                    1.00f to Color.Transparent,
                     center = center,
-                    style = Stroke(width = if (isTrackGap) 1.1f else 0.55f),
-                )
+                ),
+                radius = radius * 0.965f,
+                center = center,
+            )
+
+            // 3. Soft inner satin sheen core (refined, never harsh or washed out)
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    0.00f to Color.Transparent,
+                    0.335f to Color.Transparent,
+                    0.375f to Color.White.copy(alpha = 0.24f),
+                    0.415f to Color.Transparent,
+                    0.835f to Color.Transparent,
+                    0.875f to Color.White.copy(alpha = 0.26f),
+                    0.915f to Color.Transparent,
+                    1.00f to Color.Transparent,
+                    center = center,
+                ),
+                radius = radius * 0.955f,
+                center = center,
+            )
+
+            // 4. 96 ultra-dense alternating etched micro-grooves + 3 dark track-separator bands
+            for (i in 0..95) {
+                val factor = 0.435f + i * 0.00545f
+                val isTrackGap = i == 26 || i == 54 || i == 80
+                when {
+                    isTrackGap -> {
+                        drawCircle(
+                            color = Color.Black.copy(alpha = 0.46f),
+                            radius = radius * factor,
+                            center = center,
+                            style = Stroke(width = 2.0f),
+                        )
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.10f),
+                            radius = radius * (factor + 0.002f),
+                            center = center,
+                            style = Stroke(width = 0.7f),
+                        )
+                    }
+                    i % 2 == 0 -> {
+                        val lightAlpha = if (i % 6 == 0) 0.11f else 0.055f
+                        drawCircle(
+                            color = Color.White.copy(alpha = lightAlpha),
+                            radius = radius * factor,
+                            center = center,
+                            style = Stroke(width = 0.55f),
+                        )
+                    }
+                    else -> {
+                        val darkAlpha = if (i % 5 == 0) 0.34f else 0.20f
+                        drawCircle(
+                            color = Color.Black.copy(alpha = darkAlpha),
+                            radius = radius * factor,
+                            center = center,
+                            style = Stroke(width = 0.75f),
+                        )
+                    }
+                }
             }
 
-            // 3. Soft matte dead-wax run-out groove around center label (no bright white ring)
+            // 5. Recessed dark dead-wax run-out band around center label
             drawCircle(
-                color = Color.Black.copy(alpha = 0.42f),
-                radius = radius * 0.41f,
+                color = Color.Black.copy(alpha = 0.52f),
+                radius = radius * 0.405f,
                 center = center,
-                style = Stroke(width = radius * 0.055f),
+                style = Stroke(width = radius * 0.06f),
             )
             drawCircle(
-                color = Color.White.copy(alpha = 0.05f),
-                radius = radius * 0.438f,
+                color = Color.White.copy(alpha = 0.08f),
+                radius = radius * 0.432f,
                 center = center,
                 style = Stroke(width = 0.8f),
             )
 
-            // 4. Clean matte dark outer LP bevel (no bright white outer halo)
+            // 6. Clean matte dark outer LP bevel (no bright white halo ring)
             drawCircle(
-                color = Color.White.copy(alpha = 0.07f),
+                color = Color.White.copy(alpha = 0.10f),
                 radius = radius - 1.2f,
                 center = center,
-                style = Stroke(width = 1.2f),
+                style = Stroke(width = 1.1f),
             )
             drawCircle(
-                color = Color.Black.copy(alpha = 0.88f),
+                color = Color.Black.copy(alpha = 0.90f),
                 radius = radius - 3.2f,
                 center = center,
-                style = Stroke(width = 2.2f),
+                style = Stroke(width = 2.4f),
             )
         }
 
