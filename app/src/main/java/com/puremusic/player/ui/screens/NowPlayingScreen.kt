@@ -65,7 +65,6 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.graphics.Path
@@ -191,8 +190,6 @@ fun NowPlayingScreen(
     onSelectImmersionStyle: (ImmersionLyricStyle) -> Unit = {},
     onAdjustLyricOffset: (Long) -> Unit = {},
     onResetLyricOffset: () -> Unit = {},
-    currentImmersionStyle: ImmersionLyricStyle = ImmersionLyricStyle.ARCHITECTURAL_GRID,
-    onSelectImmersionStyle: (ImmersionLyricStyle) -> Unit = {},
 ) {
     var showFullLyrics by remember { mutableStateOf(false) }
     BackHandler {
@@ -1757,6 +1754,8 @@ private fun EditorialFullScreenLyricsView(
     lyricOffsetMs: Long = 0L,
     onAdjustLyricOffset: (Long) -> Unit = {},
     onResetLyricOffset: () -> Unit = {},
+    currentImmersionStyle: ImmersionLyricStyle = ImmersionLyricStyle.ARCHITECTURAL_GRID,
+    onSelectImmersionStyle: (ImmersionLyricStyle) -> Unit = {},
 ) {
     val effectivePosMs = (positionMs + lyricOffsetMs).coerceAtLeast(0L)
     val activeIdx = remember(lyrics, effectivePosMs) {
