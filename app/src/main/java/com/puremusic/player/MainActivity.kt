@@ -472,8 +472,6 @@ private fun PureMusicApp(
                         hapticEnabled = hapticEnabled,
                         carModeEnabled = carModeEnabled,
                         keepScreenOn = keepScreenOn,
-                    carModeEnabled = carModeEnabled,
-                    onToggleCarMode = viewModel::setCarModeEnabled,
                         liquidGlassEnabled = liquidGlassEnabled,
                         floatingControlsEnabled = floatingControlsEnabled,
                         liquidGlassLevel = liquidGlassLevel,
@@ -664,6 +662,8 @@ private fun PureMusicApp(
                     audioSpec = currentAudioSpec,
                     lyricOffsetMs = currentSong?.let { lyricOffsets[it.id] } ?: 0L,
                     keepScreenOn = keepScreenOn,
+                    carModeEnabled = carModeEnabled,
+                    onToggleCarMode = viewModel::setCarModeEnabled,
                     onAdjustLyricOffset = viewModel::adjustCurrentLyricOffset,
                     onResetLyricOffset = viewModel::resetCurrentLyricOffset,
                 )

@@ -2322,7 +2322,9 @@ private fun MinimalistCarModeView(
             .navigationBarsPadding()
             .padding(horizontal = 22.dp, vertical = 12.dp),
     ) {
-        val isWide = maxWidth > maxHeight
+        val carMaxWidth = maxWidth
+        val carMaxHeight = maxHeight
+        val isWide = carMaxWidth > carMaxHeight
         Column(modifier = Modifier.fillMaxSize()) {
             // Top bar: "车机模式" badge + "退出" pill
             Row(
@@ -2375,7 +2377,7 @@ private fun MinimalistCarModeView(
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        val artSize = min(maxWidth * 0.34f, maxHeight * 0.72f)
+                        val artSize = min(carMaxWidth * 0.34f, carMaxHeight * 0.72f)
                         AlbumArtwork(
                             uri = song.albumArtUri,
                             contentDescription = song.album,
@@ -2497,7 +2499,7 @@ private fun MinimalistCarModeView(
                         uri = song.albumArtUri,
                         contentDescription = song.album,
                         modifier = Modifier
-                            .size(min(maxWidth * 0.62f, maxHeight * 0.34f))
+                            .size(min(carMaxWidth * 0.62f, carMaxHeight * 0.34f))
                             .shadow(18.dp, RoundedCornerShape(16.dp)),
                         cornerRadius = 16.dp,
                         iconSize = 48.dp,
