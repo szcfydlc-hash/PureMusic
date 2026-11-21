@@ -883,6 +883,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.setCarModeEnabled(enabled) }
     }
 
+    fun setImmersionStyle(style: ImmersionLyricStyle) {
+        viewModelScope.launch { playlistRepository.setImmersionStyle(style) }
+    }
+
     fun adjustCurrentLyricOffset(deltaMs: Long) {
         val song = _playerState.value.currentSong ?: return
         val current = lyricOffsets.value[song.id] ?: 0L

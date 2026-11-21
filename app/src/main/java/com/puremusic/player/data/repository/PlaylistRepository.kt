@@ -419,6 +419,10 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { it[Keys.CAR_MODE_ENABLED] = enabled }
     }
 
+    suspend fun setImmersionStyle(style: ImmersionLyricStyle) {
+        context.pureMusicDataStore.edit { it[Keys.IMMERSION_STYLE] = style.name }
+    }
+
     suspend fun recordSongPlayed(songId: Long) {
         context.pureMusicDataStore.edit { prefs ->
             val currentRecent = prefs[Keys.RECENT_SONG_IDS]

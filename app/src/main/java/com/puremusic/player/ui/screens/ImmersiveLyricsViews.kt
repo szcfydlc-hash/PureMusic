@@ -495,10 +495,10 @@ private fun VinylStudyImmersiveView(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (!curLine.translatedText.isNullOrBlank()) {
+                    if (!curLine.secondaryText.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = curLine.translatedText,
+                            text = curLine.secondaryText,
                             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = lyricFamily),
                             color = inkSecondary,
                             maxLines = 1,
@@ -892,10 +892,10 @@ private fun SpatialGalleryImmersiveView(
                         overflow = TextOverflow.Ellipsis,
                     )
 
-                    if (!curLine.translatedText.isNullOrBlank()) {
+                    if (!curLine.secondaryText.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = curLine.translatedText,
+                            text = curLine.secondaryText,
                             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = lyricFamily),
                             color = mutedInk,
                             textAlign = TextAlign.Center,
@@ -1257,10 +1257,10 @@ private fun VinylLightfieldImmersiveView(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (!curLine.translatedText.isNullOrBlank()) {
+                    if (!curLine.secondaryText.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = curLine.translatedText,
+                            text = curLine.secondaryText,
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontFamily = lyricFamily,
                                 fontWeight = FontWeight.Normal,

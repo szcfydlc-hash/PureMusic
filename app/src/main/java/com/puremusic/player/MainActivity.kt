@@ -166,6 +166,8 @@ private fun PureMusicApp(
     val gaplessEnabled by viewModel.gaplessEnabled.collectAsStateWithLifecycle()
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
     val carModeEnabled by viewModel.carModeEnabled.collectAsStateWithLifecycle()
+
+    val immersionStyle by viewModel.immersionStyle.collectAsStateWithLifecycle()
     val customFontName by viewModel.customFontName.collectAsStateWithLifecycle()
     val customFontVersion by viewModel.customFontVersion.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
