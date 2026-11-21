@@ -223,3 +223,10 @@ enum class ImmersionLyricStyle(val label: String) {
     SPATIAL_GALLERY("空间唱片廊"),
     VINYL_LIGHTFIELD("黑胶光场"),
 }
+
+enum class SpectrumStyle(val label: String) {
+    SILK_RIBBON("丝带微胶囊"),
+    HARMONIC_STRINGS("极简弦波"),
+    DOT_MATRIX("点阵峰标"),
+    INK_MOUNTAIN("水墨声山"),
+}

@@ -168,6 +168,9 @@ private fun PureMusicApp(
     val carModeEnabled by viewModel.carModeEnabled.collectAsStateWithLifecycle()
 
     val immersionStyle by viewModel.immersionStyle.collectAsStateWithLifecycle()
+
+
+    val spectrumStyle by viewModel.spectrumStyle.collectAsStateWithLifecycle()
     val customFontName by viewModel.customFontName.collectAsStateWithLifecycle()
     val customFontVersion by viewModel.customFontVersion.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
@@ -668,6 +671,8 @@ private fun PureMusicApp(
                     onToggleCarMode = viewModel::setCarModeEnabled,
                     immersionStyle = immersionStyle,
                     onSelectImmersionStyle = viewModel::setImmersionStyle,
+                    spectrumStyle = spectrumStyle,
+                    onSelectSpectrumStyle = viewModel::setSpectrumStyle,
                     onAdjustLyricOffset = viewModel::adjustCurrentLyricOffset,
                     onResetLyricOffset = viewModel::resetCurrentLyricOffset,
                 )

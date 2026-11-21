@@ -137,6 +137,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.puremusic.player.data.model.ImmersionLyricStyle
+import com.puremusic.player.data.model.SpectrumStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.PlayerUiState
@@ -188,6 +189,8 @@ fun NowPlayingScreen(
     onToggleCarMode: (Boolean) -> Unit = {},
     immersionStyle: ImmersionLyricStyle = ImmersionLyricStyle.VINYL_STUDY,
     onSelectImmersionStyle: (ImmersionLyricStyle) -> Unit = {},
+    spectrumStyle: SpectrumStyle = SpectrumStyle.SILK_RIBBON,
+    onSelectSpectrumStyle: (SpectrumStyle) -> Unit = {},
     onAdjustLyricOffset: (Long) -> Unit = {},
     onResetLyricOffset: () -> Unit = {},
 ) {
@@ -329,6 +332,8 @@ fun NowPlayingScreen(
             ImmersiveLyricsHost(
                 style = immersionStyle,
                 onSelectStyle = onSelectImmersionStyle,
+                spectrumStyle = spectrumStyle,
+                onSelectSpectrumStyle = onSelectSpectrumStyle,
                 song = song,
                 allSongs = allSongs,
                 lyrics = lyrics,

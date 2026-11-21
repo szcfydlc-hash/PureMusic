@@ -20,6 +20,7 @@ import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.ImmersionLyricStyle
+import com.puremusic.player.data.model.SpectrumStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
 import com.puremusic.player.data.model.MiniPlayerStyle
@@ -68,6 +69,7 @@ class PlaylistRepository(private val context: Context) {
         val HAPTIC_ENABLED = booleanPreferencesKey("haptic_enabled")
         val CAR_MODE_ENABLED = booleanPreferencesKey("car_mode_enabled")
         val IMMERSION_STYLE = stringPreferencesKey("immersion_style")
+        val SPECTRUM_STYLE = stringPreferencesKey("spectrum_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val RECENT_SONG_IDS = stringPreferencesKey("recent_song_ids")
         val PLAY_COUNTS_JSON = stringPreferencesKey("play_counts_json")
@@ -203,6 +205,11 @@ class PlaylistRepository(private val context: Context) {
     val immersionStyleFlow: Flow<ImmersionLyricStyle> = context.pureMusicDataStore.data.map { prefs ->
         val raw = prefs[Keys.IMMERSION_STYLE]
         ImmersionLyricStyle.entries.firstOrNull { it.name == raw } ?: ImmersionLyricStyle.VINYL_STUDY
+    }
+
+    val spectrumStyleFlow: Flow<SpectrumStyle> = context.pureMusicDataStore.data.map { prefs ->
+        val raw = prefs[Keys.SPECTRUM_STYLE]
+        SpectrumStyle.entries.firstOrNull { it.name == raw } ?: SpectrumStyle.SILK_RIBBON
     }
 
     val recentSongIdsFlow: Flow<List<Long>> = context.pureMusicDataStore.data.map { prefs ->
@@ -421,6 +428,10 @@ class PlaylistRepository(private val context: Context) {
 
     suspend fun setImmersionStyle(style: ImmersionLyricStyle) {
         context.pureMusicDataStore.edit { it[Keys.IMMERSION_STYLE] = style.name }
+    }
+
+    suspend fun setSpectrumStyle(style: SpectrumStyle) {
+        context.pureMusicDataStore.edit { it[Keys.SPECTRUM_STYLE] = style.name }
     }
 
     suspend fun recordSongPlayed(songId: Long) {

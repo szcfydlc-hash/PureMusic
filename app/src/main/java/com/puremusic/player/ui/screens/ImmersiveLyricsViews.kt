@@ -78,9 +78,11 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -102,6 +104,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import com.puremusic.player.data.model.ImmersionLyricStyle
+import com.puremusic.player.data.model.SpectrumStyle
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.Song
 import com.puremusic.player.service.AudioSpectrumBus
@@ -118,6 +121,8 @@ import kotlin.math.sin
 fun ImmersiveLyricsHost(
     style: ImmersionLyricStyle,
     onSelectStyle: (ImmersionLyricStyle) -> Unit,
+    spectrumStyle: SpectrumStyle = SpectrumStyle.SILK_RIBBON,
+    onSelectSpectrumStyle: (SpectrumStyle) -> Unit = {},
     song: Song,
     allSongs: List<Song>,
     lyrics: List<LyricLine>,
@@ -200,6 +205,8 @@ fun ImmersiveLyricsHost(
                     lyricOffsetMs = lyricOffsetMs,
                     onToggleOffsetBar = { showOffsetBar = !showOffsetBar },
                     onSelectStyle = onSelectStyle,
+                    spectrumStyle = spectrumStyle,
+                    onSelectSpectrumStyle = onSelectSpectrumStyle,
                     onBackToVinyl = onBackToVinyl,
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipPrevious = onSkipPrevious,
@@ -233,6 +240,8 @@ fun ImmersiveLyricsHost(
                     lyricOffsetMs = lyricOffsetMs,
                     onToggleOffsetBar = { showOffsetBar = !showOffsetBar },
                     onSelectStyle = onSelectStyle,
+                    spectrumStyle = spectrumStyle,
+                    onSelectSpectrumStyle = onSelectSpectrumStyle,
                     onBackToVinyl = onBackToVinyl,
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipPrevious = onSkipPrevious,
@@ -266,6 +275,8 @@ fun ImmersiveLyricsHost(
                     lyricOffsetMs = lyricOffsetMs,
                     onToggleOffsetBar = { showOffsetBar = !showOffsetBar },
                     onSelectStyle = onSelectStyle,
+                    spectrumStyle = spectrumStyle,
+                    onSelectSpectrumStyle = onSelectSpectrumStyle,
                     onBackToVinyl = onBackToVinyl,
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipPrevious = onSkipPrevious,
@@ -305,6 +316,8 @@ private fun VinylStudyImmersiveView(
     lyricOffsetMs: Long,
     onToggleOffsetBar: () -> Unit,
     onSelectStyle: (ImmersionLyricStyle) -> Unit,
+    spectrumStyle: SpectrumStyle,
+    onSelectSpectrumStyle: (SpectrumStyle) -> Unit,
     onBackToVinyl: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -354,6 +367,8 @@ private fun VinylStudyImmersiveView(
                 isDarkSurface = isDarkTheme,
                 isTranslatingLyrics = isTranslatingLyrics,
                 onSelectStyle = onSelectStyle,
+                currentSpectrumStyle = spectrumStyle,
+                onSelectSpectrumStyle = onSelectSpectrumStyle,
                 onBack = onBackToVinyl,
                 onTranslateLyrics = onTranslateLyrics,
                 onToggleOffsetBar = onToggleOffsetBar,
@@ -525,6 +540,7 @@ private fun VinylStudyImmersiveView(
                 durationMs = durationMs,
                 isPlaying = isPlaying,
                 spectrumBands = spectrumBands,
+                spectrumStyle = spectrumStyle,
                 playedColor = inkPrimary,
                 unplayedColor = inkMuted.copy(alpha = 0.45f),
                 needleColor = cinnabar,
@@ -561,6 +577,8 @@ private fun SpatialGalleryImmersiveView(
     lyricOffsetMs: Long,
     onToggleOffsetBar: () -> Unit,
     onSelectStyle: (ImmersionLyricStyle) -> Unit,
+    spectrumStyle: SpectrumStyle,
+    onSelectSpectrumStyle: (SpectrumStyle) -> Unit,
     onBackToVinyl: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -649,6 +667,8 @@ private fun SpatialGalleryImmersiveView(
                 currentStyle = currentStyle,
                 isTranslatingLyrics = isTranslatingLyrics,
                 onSelectStyle = onSelectStyle,
+                currentSpectrumStyle = spectrumStyle,
+                onSelectSpectrumStyle = onSelectSpectrumStyle,
                 onBack = onBackToVinyl,
                 onTranslateLyrics = onTranslateLyrics,
                 onToggleOffsetBar = onToggleOffsetBar,
@@ -858,6 +878,7 @@ private fun SpatialGalleryImmersiveView(
                 durationMs = durationMs,
                 isPlaying = isPlaying,
                 spectrumBands = spectrumBands,
+                spectrumStyle = spectrumStyle,
                 playedColor = ivoryInk,
                 unplayedColor = Color.White.copy(alpha = 0.24f),
                 needleColor = cinnabar,
@@ -894,6 +915,8 @@ private fun VinylLightfieldImmersiveView(
     lyricOffsetMs: Long,
     onToggleOffsetBar: () -> Unit,
     onSelectStyle: (ImmersionLyricStyle) -> Unit,
+    spectrumStyle: SpectrumStyle,
+    onSelectSpectrumStyle: (SpectrumStyle) -> Unit,
     onBackToVinyl: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -956,6 +979,8 @@ private fun VinylLightfieldImmersiveView(
                     currentStyle = currentStyle,
                     isTranslatingLyrics = isTranslatingLyrics,
                     onSelectStyle = onSelectStyle,
+                    spectrumStyle = spectrumStyle,
+                    onSelectSpectrumStyle = onSelectSpectrumStyle,
                     onBack = onBackToVinyl,
                     onTranslateLyrics = onTranslateLyrics,
                     onToggleOffsetBar = onToggleOffsetBar,
@@ -1206,6 +1231,7 @@ private fun VinylLightfieldImmersiveView(
                     durationMs = durationMs,
                     isPlaying = isPlaying,
                     spectrumBands = spectrumBands,
+                    spectrumStyle = spectrumStyle,
                     playedColor = ivoryInk,
                     unplayedColor = ivoryInk.copy(alpha = 0.24f),
                     needleColor = brassNeedle,
@@ -1230,6 +1256,7 @@ fun LiveSpectrumWaveformSeekBar(
     durationMs: Long,
     isPlaying: Boolean,
     spectrumBands: FloatArray,
+    spectrumStyle: SpectrumStyle = SpectrumStyle.SILK_RIBBON,
     playedColor: Color,
     unplayedColor: Color,
     needleColor: Color,
@@ -1237,58 +1264,70 @@ fun LiveSpectrumWaveformSeekBar(
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val barCount = 52
-    val baseProfile = remember(songId) {
+    val barCount = 54
+    val beatEnergy by AudioSpectrumBus.beatEnergy.collectAsState()
+    val restingContour = remember(songId) {
         FloatArray(barCount) { idx ->
             val t = idx.toFloat() / (barCount - 1)
-            val arch = 0.34f + 0.28f * sin(t * Math.PI).toFloat()
-            val ripple = 0.16f * sin(idx * 0.45f + (songId % 11)).toFloat()
-            (arch + ripple).coerceIn(0.18f, 0.74f)
+            val arch = 0.22f + 0.22f * sin(t * Math.PI).toFloat()
+            val detail = 0.08f * sin(idx * 0.52f + (songId % 9)).toFloat()
+            (arch + detail).coerceIn(0.14f, 0.48f)
         }
     }
 
-    val animatedLevels = remember { FloatArray(barCount) { 0.22f } }
+    val animatedLevels = remember { FloatArray(barCount) { 0.16f } }
+    val peakHoldLevels = remember { FloatArray(barCount) { 0.16f } }
     var frameTick by remember { mutableIntStateOf(0) }
-    var animPhase by remember { mutableFloatStateOf(0f) }
+    var wavePhase by remember { mutableFloatStateOf(0f) }
 
-    // 60fps silky per-bar interpolation & gentle acoustic motion
     LaunchedEffect(isPlaying) {
         var lastNs = 0L
         while (isActive) {
             withFrameNanos { nowNs ->
                 val dt = if (lastNs == 0L) 0.016f else ((nowNs - lastNs) / 1_000_000_000f).coerceIn(0.004f, 0.05f)
                 lastNs = nowNs
-                if (isPlaying) animPhase += dt * 5.2f
+                if (isPlaying) wavePhase += dt * (3.6f + beatEnergy * 3.2f)
 
                 val bandCount = spectrumBands.size.coerceAtLeast(1)
                 var energySum = 0f
                 for (b in spectrumBands) energySum += b
-                val hasLivePcm = energySum > 0.04f
+                val hasLivePcm = energySum > 0.03f
 
                 var changed = false
                 for (i in 0 until barCount) {
+                    val t = i.toFloat() / (barCount - 1)
+                    val ribbonTaper = 0.42f + 0.58f * sin(t * Math.PI).toFloat()
                     val target = if (isPlaying) {
                         val live = spectrumBands[(i * bandCount) / barCount]
-                        val harmonicPulse = 0.14f * (0.5f + 0.5f * sin(animPhase + i * 0.34f)) +
-                            0.10f * (0.5f + 0.5f * sin(animPhase * 1.7f - i * 0.21f))
+                        val travelWave = 0.5f + 0.5f * sin(wavePhase - i * 0.24f)
                         if (hasLivePcm) {
-                            (live * 0.88f + baseProfile[i] * 0.20f + harmonicPulse * 0.45f).coerceIn(0.14f, 0.98f)
+                            val dynamicPeak = (live * 1.12f + beatEnergy * 0.22f * travelWave) * ribbonTaper
+                            (0.10f + dynamicPeak * 0.90f).coerceIn(0.10f, 0.98f)
                         } else {
-                            (baseProfile[i] * 0.65f + harmonicPulse * 1.35f).coerceIn(0.16f, 0.92f)
+                            val organic = (0.28f + 0.52f * travelWave * (0.65f + 0.35f * sin(wavePhase * 0.6f + i * 0.11f))) * ribbonTaper
+                            organic.coerceIn(0.12f, 0.88f)
                         }
                     } else {
-                        (baseProfile[i] * 0.42f).coerceIn(0.12f, 0.42f)
+                        restingContour[i] * 0.58f
                     }
+
                     val cur = animatedLevels[i]
-                    val speed = if (target > cur) 18f else 7.5f
+                    val speed = if (target > cur) 24f else 6.8f
                     val next = cur + (target - cur) * (dt * speed).coerceAtMost(1f)
-                    if (abs(next - cur) > 0.0015f) changed = true
+                    if (abs(next - cur) > 0.001f) changed = true
                     animatedLevels[i] = next
+
+                    // Gravity-falling peak hold for Dot Matrix mode
+                    val prevPeak = peakHoldLevels[i]
+                    peakHoldLevels[i] = if (next >= prevPeak) {
+                        next
+                    } else {
+                        (prevPeak - dt * 0.38f).coerceAtLeast(next)
+                    }
                 }
                 if (changed || isPlaying) frameTick++
             }
-            if (!isPlaying && animatedLevels.all { abs(it - (baseProfile[0] * 0.42f)) < 0.35f }) {
-                // Keep ticking smoothly until fully settled, then yield
+            if (!isPlaying) {
                 kotlinx.coroutines.delay(16L)
             }
         }
@@ -1311,7 +1350,7 @@ fun LiveSpectrumWaveformSeekBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(54.dp)
                 .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
                 .pointerInput(durationMs) {
                     detectTapGestures { offset ->
@@ -1344,42 +1383,309 @@ fun LiveSpectrumWaveformSeekBar(
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp),
+                    .height(48.dp),
             ) {
-                // Read frameTick so Canvas redraws smoothly at 60fps
                 val _tick = frameTick
                 val totalW = size.width
                 val totalH = size.height
-                val midY = totalH / 2f
-                val step = totalW / barCount
-                val barW = (step * 0.50f).coerceIn(2.4f, 4.8f)
-                val playheadX = totalW * progress
+                val playheadX = (totalW * progress).coerceIn(2f, totalW - 2f)
 
-                for (i in 0 until barCount) {
-                    val cx = i * step + step / 2f
-                    val isPlayed = cx <= playheadX
-                    val level = if (isPlayed) {
-                        animatedLevels[i]
-                    } else {
-                        (baseProfile[i] * 0.44f + animatedLevels[i] * 0.22f).coerceIn(0.12f, 0.58f)
+                when (spectrumStyle) {
+                    SpectrumStyle.SILK_RIBBON -> {
+                        val step = totalW / barCount
+                        val barW = (step * 0.46f).coerceIn(2.2f, 4.2f)
+                        val baseY = totalH - 2f
+                        val crestPath = Path()
+                        var prevX = 0f
+                        var prevY = baseY
+
+                        for (i in 0 until barCount) {
+                            val cx = i * step + step / 2f
+                            val isPlayed = cx <= playheadX
+                            val rawLevel = animatedLevels[i]
+                            val level = if (isPlayed) rawLevel else (restingContour[i] * 0.28f + rawLevel * 0.62f).coerceIn(0.10f, 0.78f)
+                            val barH = ((totalH - 6f) * level).coerceAtLeast(4f)
+                            val topY = baseY - barH
+
+                            // Vertical bottom-to-top mist fade inside each slender bar
+                            val barBrush = Brush.verticalGradient(
+                                0.0f to (if (isPlayed) playedColor else unplayedColor),
+                                0.72f to (if (isPlayed) playedColor.copy(alpha = 0.72f) else unplayedColor.copy(alpha = 0.55f)),
+                                1.0f to Color.Transparent,
+                                startY = topY,
+                                endY = baseY,
+                            )
+                            drawRoundRect(
+                                brush = barBrush,
+                                topLeft = Offset(cx - barW / 2f, topY),
+                                size = Size(barW, barH),
+                                cornerRadius = CornerRadius(barW / 2f, barW / 2f),
+                            )
+
+                            val crestY = (topY - 2f).coerceAtLeast(2f)
+                            if (i == 0) {
+                                crestPath.moveTo(cx, crestY)
+                            } else {
+                                crestPath.quadraticTo(prevX, prevY, (prevX + cx) / 2f, (prevY + crestY) / 2f)
+                            }
+                            prevX = cx
+                            prevY = crestY
+                        }
+                        crestPath.lineTo(prevX, prevY)
+
+                        clipRect(left = 0f, top = 0f, right = playheadX, bottom = totalH) {
+                            drawPath(crestPath, color = playedColor.copy(alpha = 0.22f), style = Stroke(width = 5.5f, cap = StrokeCap.Round))
+                            drawPath(crestPath, color = playedColor.copy(alpha = 0.90f), style = Stroke(width = 2.0f, cap = StrokeCap.Round))
+                        }
+                        clipRect(left = playheadX, top = 0f, right = totalW, bottom = totalH) {
+                            drawPath(crestPath, color = unplayedColor.copy(alpha = 0.80f), style = Stroke(width = 1.6f, cap = StrokeCap.Round))
+                        }
+
+                        // Tapered cinnabar needle + glowing top jewel dot
+                        drawLine(
+                            color = needleColor.copy(alpha = 0.26f + beatEnergy * 0.24f),
+                            start = Offset(playheadX, 3f),
+                            end = Offset(playheadX, baseY),
+                            strokeWidth = if (isDragging) 7.5f else 5.5f,
+                            cap = StrokeCap.Round,
+                        )
+                        drawLine(
+                            color = needleColor,
+                            start = Offset(playheadX, 3f),
+                            end = Offset(playheadX, baseY),
+                            strokeWidth = if (isDragging) 3.2f else 2.2f,
+                            cap = StrokeCap.Round,
+                        )
+                        drawCircle(color = needleColor.copy(alpha = 0.35f), radius = 5.5f, center = Offset(playheadX, 3.5f))
+                        drawCircle(color = needleColor, radius = 2.6f, center = Offset(playheadX, 3.5f))
                     }
-                    val barH = (totalH * level).coerceAtLeast(5f)
-                    drawRoundRect(
-                        color = if (isPlayed) playedColor else unplayedColor,
-                        topLeft = Offset(cx - barW / 2f, midY - barH / 2f),
-                        size = Size(barW, barH),
-                        cornerRadius = CornerRadius(barW / 2f, barW / 2f),
-                    )
-                }
 
-                val needleX = playheadX.coerceIn(2f, totalW - 2f)
-                drawLine(
-                    color = needleColor,
-                    start = Offset(needleX, 1f),
-                    end = Offset(needleX, totalH - 1f),
-                    strokeWidth = if (isDragging) 3.8f else 2.6f,
-                    cap = StrokeCap.Round,
-                )
+                    SpectrumStyle.HARMONIC_STRINGS -> {
+                        val midY = totalH / 2f
+                        val pts = 72
+                        // Center reference hairline
+                        drawLine(
+                            color = unplayedColor.copy(alpha = 0.35f),
+                            start = Offset(0f, midY),
+                            end = Offset(totalW, midY),
+                            strokeWidth = 0.8f,
+                        )
+
+                        val bassEnergy = animatedLevels[barCount / 2]
+                        val midEnergy = animatedLevels[barCount / 3]
+                        val highEnergy = animatedLevels[(barCount * 3) / 4]
+                        val maxAmp = totalH * 0.42f
+
+                        var primaryAtPlayheadY = midY
+                        val stringSpecs = listOf(
+                            Triple(0.0f, 2.2f, playedColor),
+                            Triple(1.35f, 1.5f, Color(0xFFD8B888)),
+                            Triple(2.6f, 1.2f, needleColor.copy(alpha = 0.85f)),
+                        )
+                        val amps = listOf(
+                            (0.22f + bassEnergy * 0.78f) * maxAmp,
+                            (0.18f + midEnergy * 0.62f) * maxAmp,
+                            (0.14f + highEnergy * 0.46f) * maxAmp,
+                        )
+                        val freqs = listOf(2.4f, 3.2f, 4.1f)
+
+                        for (sIdx in 0..2) {
+                            val path = Path()
+                            val phaseShift = stringSpecs[sIdx].first
+                            val strokeW = stringSpecs[sIdx].second
+                            val col = stringSpecs[sIdx].third
+                            val amp = if (isPlaying) amps[sIdx] else maxAmp * (0.16f - sIdx * 0.04f)
+                            val freq = freqs[sIdx]
+
+                            for (p in 0..pts) {
+                                val t = p.toFloat() / pts
+                                val x = t * totalW
+                                // Pin both ends cleanly to 0 amplitude like real acoustic strings
+                                val pinWindow = sin(t * Math.PI).toFloat()
+                                val y = midY + sin(t * freq * Math.PI.toFloat() * 2f + wavePhase * (1f + sIdx * 0.25f) + phaseShift) * amp * pinWindow
+                                if (p == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                                if (sIdx == 0 && abs(x - playheadX) <= (totalW / pts)) {
+                                    primaryAtPlayheadY = y
+                                }
+                            }
+                            clipRect(left = 0f, top = 0f, right = playheadX, bottom = totalH) {
+                                if (sIdx == 0) {
+                                    drawPath(path, color = col.copy(alpha = 0.22f), style = Stroke(width = 6f, cap = StrokeCap.Round))
+                                }
+                                drawPath(path, color = col.copy(alpha = if (sIdx == 0) 0.95f else 0.72f), style = Stroke(width = strokeW, cap = StrokeCap.Round))
+                            }
+                            clipRect(left = playheadX, top = 0f, right = totalW, bottom = totalH) {
+                                drawPath(path, color = col.copy(alpha = if (sIdx == 0) 0.30f else 0.20f), style = Stroke(width = strokeW * 0.85f, cap = StrokeCap.Round))
+                            }
+                        }
+
+                        // Delicate vertical playhead hairline + glowing intersection bead on primary string
+                        drawLine(
+                            color = playedColor.copy(alpha = 0.45f),
+                            start = Offset(playheadX, 2f),
+                            end = Offset(playheadX, totalH - 2f),
+                            strokeWidth = 1.2f,
+                        )
+                        drawCircle(color = playedColor.copy(alpha = 0.28f), radius = 7.5f, center = Offset(playheadX, primaryAtPlayheadY))
+                        drawCircle(color = playedColor, radius = 3.4f, center = Offset(playheadX, primaryAtPlayheadY))
+                    }
+
+                    SpectrumStyle.DOT_MATRIX -> {
+                        val cols = 34
+                        val rows = 8
+                        val colStep = totalW / cols
+                        val matrixBottom = totalH - 7f
+                        val rowStep = (matrixBottom - 3f) / rows
+                        val dotRadius = (minOf(colStep, rowStep) * 0.31f).coerceIn(1.6f, 3.0f)
+
+                        for (c in 0 until cols) {
+                            val cx = c * colStep + colStep / 2f
+                            val isPlayed = cx <= playheadX
+                            val mappedIdx = (c * barCount) / cols
+                            val level = if (isPlayed) {
+                                animatedLevels[mappedIdx]
+                            } else {
+                                (restingContour[mappedIdx] * 0.25f + animatedLevels[mappedIdx] * 0.55f).coerceIn(0.08f, 0.75f)
+                            }
+                            val litRows = (level * rows).roundToInt().coerceIn(1, rows)
+                            val peakRow = (peakHoldLevels[mappedIdx] * rows).roundToInt().coerceIn(litRows, rows)
+
+                            for (r in 0 until rows) {
+                                val cy = matrixBottom - r * rowStep - rowStep / 2f
+                                val rowFade = 0.58f + (r.toFloat() / rows) * 0.42f
+                                val isLit = r < litRows
+                                val color = when {
+                                    isLit && isPlayed -> playedColor.copy(alpha = rowFade)
+                                    isLit -> unplayedColor.copy(alpha = rowFade * 0.85f)
+                                    else -> unplayedColor.copy(alpha = 0.14f)
+                                }
+                                drawCircle(color = color, radius = dotRadius, center = Offset(cx, cy))
+                            }
+
+                            // Floating gravity-falling cinnabar peak-hold jewel dot on played columns
+                            if (isPlayed && peakRow in 1..rows) {
+                                val py = matrixBottom - (peakRow - 1) * rowStep - rowStep / 2f
+                                drawCircle(color = needleColor.copy(alpha = 0.30f), radius = dotRadius * 2.1f, center = Offset(cx, py))
+                                drawCircle(color = needleColor, radius = dotRadius * 1.05f, center = Offset(cx, py))
+                            }
+                        }
+
+                        // Ultra-fine vintage hardware hairline ticks along bottom baseline
+                        for (tIdx in 0..40) {
+                            val tx = (tIdx / 40f) * totalW
+                            val tickH = if (tIdx % 5 == 0) 4.5f else 2.2f
+                            drawLine(
+                                color = unplayedColor.copy(alpha = 0.45f),
+                                start = Offset(tx, totalH - tickH),
+                                end = Offset(tx, totalH),
+                                strokeWidth = 0.9f,
+                            )
+                        }
+
+                        drawLine(
+                            color = playedColor.copy(alpha = 0.42f),
+                            start = Offset(playheadX, 2f),
+                            end = Offset(playheadX, matrixBottom),
+                            strokeWidth = 1.4f,
+                        )
+                    }
+
+                    SpectrumStyle.INK_MOUNTAIN -> {
+                        val step = totalW / (barCount - 1)
+                        val baseY = totalH - 2f
+                        val frontRidge = Path()
+                        val frontFill = Path()
+                        val backRidge = Path()
+                        val backFill = Path()
+
+                        var prevFx = 0f
+                        var prevFy = baseY
+                        var prevBx = 0f
+                        var prevBy = baseY
+                        var playheadRidgeY = baseY * 0.5f
+
+                        for (i in 0 until barCount) {
+                            val cx = i * step
+                            val level = animatedLevels[i]
+                            val fy = (baseY - (totalH - 8f) * level).coerceIn(4f, baseY - 3f)
+                            val shiftedIdx = (i + 7) % barCount
+                            val backLevel = (animatedLevels[shiftedIdx] * 0.72f + restingContour[i] * 0.25f).coerceIn(0.12f, 0.86f)
+                            val by = (baseY - (totalH - 10f) * backLevel).coerceIn(6f, baseY - 4f)
+
+                            if (abs(cx - playheadX) <= step) {
+                                playheadRidgeY = fy
+                            }
+
+                            if (i == 0) {
+                                frontRidge.moveTo(cx, fy)
+                                frontFill.moveTo(cx, baseY)
+                                frontFill.lineTo(cx, fy)
+                                backRidge.moveTo(cx, by)
+                                backFill.moveTo(cx, baseY)
+                                backFill.lineTo(cx, by)
+                            } else {
+                                val mx = (prevFx + cx) / 2f
+                                frontRidge.quadraticTo(prevFx, prevFy, mx, (prevFy + fy) / 2f)
+                                frontFill.quadraticTo(prevFx, prevFy, mx, (prevFy + fy) / 2f)
+                                backRidge.quadraticTo(prevBx, prevBy, mx, (prevBy + by) / 2f)
+                                backFill.quadraticTo(prevBx, prevBy, mx, (prevBy + by) / 2f)
+                            }
+                            prevFx = cx; prevFy = fy
+                            prevBx = cx; prevBy = by
+                        }
+                        frontRidge.lineTo(prevFx, prevFy)
+                        frontFill.lineTo(prevFx, prevFy)
+                        frontFill.lineTo(totalW, baseY)
+                        frontFill.close()
+
+                        backRidge.lineTo(prevBx, prevBy)
+                        backFill.lineTo(prevBx, prevBy)
+                        backFill.lineTo(totalW, baseY)
+                        backFill.close()
+
+                        // Distant translucent parallax mountain ridge behind
+                        drawPath(
+                            path = backFill,
+                            brush = Brush.verticalGradient(
+                                0.0f to unplayedColor.copy(alpha = 0.24f),
+                                1.0f to Color.Transparent,
+                                startY = 4f,
+                                endY = baseY,
+                            ),
+                        )
+                        drawPath(backRidge, color = unplayedColor.copy(alpha = 0.35f), style = Stroke(width = 1.1f))
+
+                        // Foreground mountain: misty gradient fill on played left, whisper-thin contour on unplayed right
+                        clipRect(left = 0f, top = 0f, right = playheadX, bottom = totalH) {
+                            drawPath(
+                                path = frontFill,
+                                brush = Brush.verticalGradient(
+                                    0.0f to playedColor.copy(alpha = 0.56f),
+                                    0.78f to playedColor.copy(alpha = 0.14f),
+                                    1.0f to Color.Transparent,
+                                    startY = 2f,
+                                    endY = baseY,
+                                ),
+                            )
+                            drawPath(frontRidge, color = playedColor.copy(alpha = 0.92f), style = Stroke(width = 2.0f, cap = StrokeCap.Round))
+                        }
+                        clipRect(left = playheadX, top = 0f, right = totalW, bottom = totalH) {
+                            drawPath(frontRidge, color = unplayedColor.copy(alpha = 0.72f), style = Stroke(width = 1.3f, cap = StrokeCap.Round))
+                        }
+
+                        // Glowing antique-brass diamond marker riding smoothly on the ridge crest
+                        val d = if (isDragging) 6.5f else 5.0f
+                        val diamond = Path().apply {
+                            moveTo(playheadX, playheadRidgeY - d)
+                            lineTo(playheadX + d, playheadRidgeY)
+                            lineTo(playheadX, playheadRidgeY + d)
+                            lineTo(playheadX - d, playheadRidgeY)
+                            close()
+                        }
+                        drawCircle(color = needleColor.copy(alpha = 0.30f), radius = d * 1.9f, center = Offset(playheadX, playheadRidgeY))
+                        drawPath(path = diamond, color = needleColor)
+                    }
+                }
             }
         }
 
@@ -1411,6 +1717,8 @@ private fun ImmersiveTopBar(
     isDarkSurface: Boolean = true,
     isTranslatingLyrics: Boolean,
     onSelectStyle: (ImmersionLyricStyle) -> Unit,
+    currentSpectrumStyle: SpectrumStyle = SpectrumStyle.SILK_RIBBON,
+    onSelectSpectrumStyle: (SpectrumStyle) -> Unit = {},
     onBack: () -> Unit,
     onTranslateLyrics: () -> Unit,
     onToggleOffsetBar: () -> Unit,
@@ -1517,6 +1825,39 @@ private fun ImmersiveTopBar(
                             onClick = {
                                 menuExpanded = false
                                 onSelectStyle(option)
+                            },
+                        )
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        thickness = 0.5.dp,
+                        color = menuBorder,
+                    )
+                    SpectrumStyle.entries.forEach { spOpt ->
+                        val spSelected = spOpt == currentSpectrumStyle
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "频谱 · ${spOpt.label}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (spSelected) menuAccent else menuText,
+                                )
+                            },
+                            trailingIcon = if (spSelected) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        tint = menuAccent,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onSelectSpectrumStyle(spOpt)
                             },
                         )
                     }

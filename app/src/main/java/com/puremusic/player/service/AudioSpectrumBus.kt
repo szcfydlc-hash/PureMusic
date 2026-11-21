@@ -18,9 +18,9 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Zero-permission live audio spectrum bus fed directly by ExoPlayer's decoded PCM-16 stream.
- * Uses Automatic Gain Control (AGC) + spatial smoothing so both quiet ambient tracks and loud
- * tracks drive expressive, fluid 48-band spectrum motion in [0f, 1f].
+ * Zero-permission beat-reactive live audio spectrum bus fed directly by ExoPlayer's decoded PCM-16 stream.
+ * Computes bass-flux beat punch + 48 Gaussian-smoothed dynamic-contrast bands in [0f, 1f] so quiet
+ * passages stay serene and drum kicks / vocal swells create unmistakable graceful waves.
  */
 object AudioSpectrumBus {
     const val BAND_COUNT = 48
@@ -28,19 +28,27 @@ object AudioSpectrumBus {
     private val _bands = MutableStateFlow(FloatArray(BAND_COUNT))
     val bands: StateFlow<FloatArray> = _bands.asStateFlow()
 
+    private val _beatEnergy = MutableStateFlow(0f)
+    val beatEnergy: StateFlow<Float> = _beatEnergy.asStateFlow()
+
     private val smoothed = FloatArray(BAND_COUNT)
-    private var runningPeak = 0.08f
+    private var runningPeak = 0.06f
+    private var runningBassAvg = 0.04f
+    private var smoothedBeat = 0f
     private var lastEmitMs = 0L
 
     fun resetToIdle() {
         smoothed.fill(0f)
-        runningPeak = 0.08f
+        runningPeak = 0.06f
+        runningBassAvg = 0.04f
+        smoothedBeat = 0f
+        _beatEnergy.value = 0f
         _bands.value = FloatArray(BAND_COUNT)
     }
 
     fun updateFromPcm16(buffer: ByteBuffer, startPos: Int, limit: Int, channelCount: Int) {
         val now = SystemClock.uptimeMillis()
-        if (now - lastEmitMs < 20L) return // ~50 fps fluid updates
+        if (now - lastEmitMs < 18L) return // ~55 fps fluid tracking
         lastEmitMs = now
 
         val channels = channelCount.coerceAtLeast(1)
@@ -62,18 +70,20 @@ object AudioSpectrumBus {
             } else {
                 ((b0 shl 8) or (b1 and 0xFF)).toShort()
             }
-            // Hann window for clean spectral peaks
             val hann = 0.5f * (1f - cos((2.0 * Math.PI * i) / (sampleCount - 1)).toFloat())
             mono[i] = (s / 32768f) * hann
         }
 
-        val rawMags = FloatArray(BAND_COUNT)
+        // Compute 24 musical frequency bins, then mirror gracefully around center for a sculpted ribbon feel
+        val halfBands = BAND_COUNT / 2
+        val rawHalf = FloatArray(halfBands)
         var frameMax = 0.001f
+        var bassSum = 0f
         val twoPiOverN = (2.0 * Math.PI) / sampleCount
-        for (b in 0 until BAND_COUNT) {
-            val t = b.toDouble() / (BAND_COUNT - 1)
-            // Log-spaced musical frequency bins from sub-bass to crisp treble
-            val freqBin = 1.0 + t.pow(1.65) * 48.0
+
+        for (b in 0 until halfBands) {
+            val t = b.toDouble() / (halfBands - 1)
+            val freqBin = 1.0 + t.pow(1.75) * 44.0
             var re = 0.0
             var im = 0.0
             var idx = 0
@@ -85,37 +95,61 @@ object AudioSpectrumBus {
                 idx += 2
             }
             val mag = (sqrt(re * re + im * im) / (sampleCount / 2.0)).toFloat()
-            // Gentle perceptual tilt so mids & highs remain lively alongside bass
-            val weighted = mag * (1.0f + t.toFloat() * 1.4f)
-            rawMags[b] = weighted
+            val weighted = mag * (1.0f + t.toFloat() * 1.15f)
+            rawHalf[b] = weighted
+            if (b < 5) bassSum += weighted
             if (weighted > frameMax) frameMax = weighted
         }
 
-        // Automatic Gain Control (AGC): fast rise, slow decay so ambient tracks stay expressive
-        runningPeak = if (frameMax > runningPeak) {
-            runningPeak + (frameMax - runningPeak) * 0.45f
+        // Bass-flux beat detector: detects drum kicks & rhythm transients clearly
+        val bassNow = bassSum / 5f
+        runningBassAvg = runningBassAvg * 0.90f + bassNow * 0.10f
+        val rawBeat = ((bassNow - runningBassAvg * 0.78f) / runningBassAvg.coerceAtLeast(0.008f)).coerceIn(0f, 1.4f)
+        smoothedBeat = if (rawBeat > smoothedBeat) {
+            smoothedBeat + (rawBeat - smoothedBeat) * 0.72f
         } else {
-            (runningPeak * 0.965f).coerceAtLeast(0.025f)
+            smoothedBeat * 0.82f
         }
-        val normScale = 1f / runningPeak.coerceAtLeast(0.025f)
+        _beatEnergy.value = smoothedBeat.coerceIn(0f, 1f)
 
-        // Spatial 3-tap smoothing so bars form sculptural undulating waves
+        // Adaptive peak AGC with slower decay so dynamic contrast stays punchy
+        runningPeak = if (frameMax > runningPeak) {
+            runningPeak + (frameMax - runningPeak) * 0.38f
+        } else {
+            (runningPeak * 0.985f).coerceAtLeast(0.02f)
+        }
+        val normScale = 1f / runningPeak.coerceAtLeast(0.02f)
+
+        // Arrange bins into a graceful organic contour (low-mid energy rich near center, shimmering highs toward edges)
+        val rawFull = FloatArray(BAND_COUNT)
+        for (i in 0 until BAND_COUNT) {
+            val distFromCenter = abs(i - (BAND_COUNT - 1) / 2f) / ((BAND_COUNT - 1) / 2f)
+            val binIdx = (distFromCenter * (halfBands - 1)).toInt().coerceIn(0, halfBands - 1)
+            val norm = (rawHalf[binIdx] * normScale).coerceIn(0f, 1.25f)
+            // Dynamic contrast expansion (power 1.35) + rhythmic beat boost so beats visually pop
+            val beatBoost = (1f - distFromCenter * 0.55f) * smoothedBeat * 0.34f
+            val contrasted = (norm.pow(1.35f) * 0.88f + beatBoost).coerceIn(0f, 1f)
+            rawFull[i] = contrasted
+        }
+
+        // 5-tap Gaussian spatial smoothing for liquid, graceful ribbon curves (never spiky noise)
         val next = FloatArray(BAND_COUNT)
-        for (b in 0 until BAND_COUNT) {
-            val left = rawMags[(b - 1).coerceAtLeast(0)]
-            val cur = rawMags[b]
-            val right = rawMags[(b + 1).coerceAtMost(BAND_COUNT - 1)]
-            val spatial = (left * 0.22f + cur * 0.56f + right * 0.22f) * normScale
-            // Perceptual compression curve (sqrt) for vivid musical dynamics
-            val target = sqrt(spatial.coerceIn(0f, 1.2f)).coerceIn(0f, 1f)
-            val prev = smoothed[b]
-            val damped = if (target > prev) {
-                prev + (target - prev) * 0.65f
+        for (i in 0 until BAND_COUNT) {
+            val m2 = rawFull[(i - 2).coerceAtLeast(0)]
+            val m1 = rawFull[(i - 1).coerceAtLeast(0)]
+            val c0 = rawFull[i]
+            val p1 = rawFull[(i + 1).coerceAtMost(BAND_COUNT - 1)]
+            val p2 = rawFull[(i + 2).coerceAtMost(BAND_COUNT - 1)]
+            val graceful = m2 * 0.10f + m1 * 0.22f + c0 * 0.36f + p1 * 0.22f + p2 * 0.10f
+
+            val prev = smoothed[i]
+            val damped = if (graceful > prev) {
+                prev + (graceful - prev) * 0.72f
             } else {
-                prev + (target - prev) * 0.22f
+                prev + (graceful - prev) * 0.20f
             }
-            smoothed[b] = if (abs(damped) < 0.005f) 0f else damped
-            next[b] = smoothed[b]
+            smoothed[i] = if (abs(damped) < 0.004f) 0f else damped
+            next[i] = smoothed[i]
         }
         _bands.value = next
     }
