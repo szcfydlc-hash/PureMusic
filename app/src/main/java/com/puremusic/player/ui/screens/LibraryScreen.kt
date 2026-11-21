@@ -1211,7 +1211,7 @@ private fun SongsTabContent(
                     },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 2.dp, bottom = bottomPadding.calculateBottomPadding()),
+                        .padding(end = 2.dp, bottom = bottomPadding.calculateBottomPadding() + 56.dp),
                 )
             }
         }
@@ -1365,7 +1365,7 @@ private fun SongsTabContent(
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 22.dp, bottom = bottomPadding.calculateBottomPadding() + 14.dp)
+                        .padding(end = 32.dp, bottom = bottomPadding.calculateBottomPadding() + 14.dp)
                         .size(40.dp)
                         .shadow(4.dp, CircleShape)
                         .clip(CircleShape)
@@ -1405,7 +1405,7 @@ private fun SongsTabContent(
                     },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 2.dp, bottom = bottomPadding.calculateBottomPadding()),
+                        .padding(end = 2.dp, bottom = bottomPadding.calculateBottomPadding() + 56.dp),
                 )
             }
         }

@@ -178,6 +178,7 @@ fun PureMusicTheme(
     layoutDensity: LayoutDensity = LayoutDensity.STANDARD,
     fontScale: Float = 1.0f,
     fontWeight: AppFontWeight = AppFontWeight.NORMAL,
+    fontWeightValue: Int = fontWeight.weightValue,
     fontSlantDegrees: Float = 0f,
     liquidGlassLevel: LiquidGlassLevel = LiquidGlassLevel.FULL,
     floatingControlsEnabled: Boolean = false,
@@ -311,7 +312,7 @@ fun PureMusicTheme(
     } else {
         null
     }
-    val baseWeight = FontWeight(fontWeight.weightValue)
+    val baseWeight = FontWeight(fontWeightValue.coerceIn(200, 900))
 
     val scale = fontScale.coerceIn(0.85f, 1.25f)
     fun androidx.compose.ui.text.TextStyle.scaled() = copy(

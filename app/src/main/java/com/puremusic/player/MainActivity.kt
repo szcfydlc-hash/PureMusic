@@ -159,6 +159,7 @@ private fun PureMusicApp(
     val miniPlayerStyle by viewModel.miniPlayerStyle.collectAsStateWithLifecycle()
     val miniPlayerHeightDp by viewModel.miniPlayerHeightDp.collectAsStateWithLifecycle()
     val fontWeight by viewModel.fontWeight.collectAsStateWithLifecycle()
+    val fontWeightValue by viewModel.fontWeightValue.collectAsStateWithLifecycle()
     val fontSlantDegrees by viewModel.fontSlantDegrees.collectAsStateWithLifecycle()
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val fadeInSeconds by viewModel.fadeInSeconds.collectAsStateWithLifecycle()
@@ -210,6 +211,7 @@ private fun PureMusicApp(
         layoutDensity = layoutDensity,
         fontScale = fontScale,
         fontWeight = fontWeight,
+        fontWeightValue = fontWeightValue,
         fontSlantDegrees = fontSlantDegrees,
         liquidGlassLevel = liquidGlassLevel,
         floatingControlsEnabled = floatingControlsEnabled,
@@ -461,6 +463,7 @@ private fun PureMusicApp(
                         layoutDensity = layoutDensity,
                         fontScale = fontScale,
                         fontWeight = fontWeight,
+                        fontWeightValue = fontWeightValue,
                         fontSlantDegrees = fontSlantDegrees,
                         playbackSpeed = playbackSpeed,
                         fadeInSeconds = fadeInSeconds,
@@ -483,6 +486,7 @@ private fun PureMusicApp(
                         onSelectLayoutDensity = viewModel::setLayoutDensity,
                         onChangeFontScale = viewModel::setFontScale,
                         onSelectFontWeight = viewModel::setFontWeight,
+                        onChangeFontWeightValue = viewModel::setFontWeightValue,
                         onChangeFontSlantDegrees = viewModel::setFontSlantDegrees,
                         onSelectPlaybackSpeed = viewModel::setPlaybackSpeed,
                         onSelectFadeInSeconds = viewModel::setFadeInSeconds,

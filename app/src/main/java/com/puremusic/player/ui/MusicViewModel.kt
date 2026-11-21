@@ -221,6 +221,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = AppFontWeight.NORMAL,
     )
 
+    val fontWeightValue: StateFlow<Int> = playlistRepository.fontWeightValueFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 400,
+    )
+
     val fontSlantDegrees: StateFlow<Float> = playlistRepository.fontSlantDegreesFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -828,6 +834,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setFontWeight(weight: AppFontWeight) {
         viewModelScope.launch { playlistRepository.setFontWeight(weight) }
+    }
+
+    fun setFontWeightValue(value: Int) {
+        viewModelScope.launch { playlistRepository.setFontWeightValue(value) }
     }
 
     fun setFontSlantDegrees(degrees: Float) {

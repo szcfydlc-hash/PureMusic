@@ -59,6 +59,7 @@ class PlaylistRepository(private val context: Context) {
         val MINI_PLAYER_STYLE = stringPreferencesKey("mini_player_style")
         val MINI_PLAYER_HEIGHT_DP = intPreferencesKey("mini_player_height_dp")
         val FONT_WEIGHT = stringPreferencesKey("font_weight")
+        val FONT_WEIGHT_VALUE = intPreferencesKey("font_weight_value")
         val FONT_SLANT_DEGREES = floatPreferencesKey("font_slant_degrees")
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         val FADE_IN_SECONDS = intPreferencesKey("fade_in_seconds")
@@ -154,6 +155,18 @@ class PlaylistRepository(private val context: Context) {
         prefs[Keys.FONT_WEIGHT]?.let { name ->
             AppFontWeight.entries.firstOrNull { it.name == name }
         } ?: AppFontWeight.NORMAL
+    }
+
+    val fontWeightValueFlow: Flow<Int> = context.pureMusicDataStore.data.map { prefs ->
+        val stored = prefs[Keys.FONT_WEIGHT_VALUE]
+        if (stored != null) {
+            stored.coerceIn(200, 900)
+        } else {
+            val fw = prefs[Keys.FONT_WEIGHT]?.let { name ->
+                AppFontWeight.entries.firstOrNull { it.name == name }
+            } ?: AppFontWeight.NORMAL
+            fw.weightValue
+        }
     }
 
     val fontSlantDegreesFlow: Flow<Float> = context.pureMusicDataStore.data.map { prefs ->
@@ -351,7 +364,19 @@ class PlaylistRepository(private val context: Context) {
     }
 
     suspend fun setFontWeight(weight: AppFontWeight) {
-        context.pureMusicDataStore.edit { it[Keys.FONT_WEIGHT] = weight.name }
+        context.pureMusicDataStore.edit {
+            it[Keys.FONT_WEIGHT] = weight.name
+            it[Keys.FONT_WEIGHT_VALUE] = weight.weightValue
+        }
+    }
+
+    suspend fun setFontWeightValue(value: Int) {
+        val clamped = value.coerceIn(200, 900)
+        val closest = AppFontWeight.entries.minByOrNull { kotlin.math.abs(it.weightValue - clamped) } ?: AppFontWeight.NORMAL
+        context.pureMusicDataStore.edit {
+            it[Keys.FONT_WEIGHT_VALUE] = clamped
+            it[Keys.FONT_WEIGHT] = closest.name
+        }
     }
 
     suspend fun setFontSlantDegrees(degrees: Float) {

@@ -59,6 +59,10 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.puremusic.player.ui.theme.resolveLyricFontFamily
 import com.puremusic.player.ui.theme.resolveAppFontFamily
 import androidx.compose.ui.platform.LocalContext
@@ -131,6 +135,7 @@ fun SettingsScreen(
     layoutDensity: LayoutDensity,
     fontScale: Float,
     fontWeight: AppFontWeight,
+    fontWeightValue: Int = fontWeight.weightValue,
     fontSlantDegrees: Float,
     playbackSpeed: Float,
     fadeInSeconds: Int,
@@ -153,6 +158,7 @@ fun SettingsScreen(
     onSelectLayoutDensity: (LayoutDensity) -> Unit,
     onChangeFontScale: (Float) -> Unit,
     onSelectFontWeight: (AppFontWeight) -> Unit,
+    onChangeFontWeightValue: (Int) -> Unit = {},
     onChangeFontSlantDegrees: (Float) -> Unit,
     onSelectPlaybackSpeed: (Float) -> Unit,
     onSelectFadeInSeconds: (Int) -> Unit,
@@ -189,10 +195,9 @@ fun SettingsScreen(
     var showFadeInDialog by remember { mutableStateOf(false) }
     var showFolderManagerDialog by remember { mutableStateOf(false) }
     var glassLevelMenuExpanded by remember { mutableStateOf(false) }
-    var currentPage by remember { mutableStateOf(SettingsPage.HUB) }
-    BackHandler(enabled = currentPage != SettingsPage.HUB) {
-        currentPage = SettingsPage.HUB
-    }
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    var activeAnchor by remember { mutableStateOf(0) }
 
     val settingsContext = LocalContext.current
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -220,203 +225,83 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 680.dp)
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 14.dp,
-                    bottom = 24.dp + bottomContentPadding.calculateBottomPadding(),
-                ),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .statusBarsPadding(),
         ) {
-            // Two-Level Hierarchical Settings Header
-            Row(
+            // Sticky Header + 4-Pill Quick-Jump Bar
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 10.dp),
             ) {
-                if (currentPage != SettingsPage.HUB) {
-                    IconButton(onClick = { currentPage = SettingsPage.HUB }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回设置主页")
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                } else if (isTabletLayout) {
-                    IconButton(onClick = onBackToLibrary) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回曲库")
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                Text(
-                    text = currentPage.title,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-
-            if (currentPage == SettingsPage.HUB) {
-                // Compact Library Status Strip + Scan Pill
-                BookSettingsCard(
-                    cardBg = cardBg,
-                    outlineColor = outlineColor,
-                    radius = cardRadius,
-                    liquidGlassEnabled = liquidGlassEnabled,
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "本地曲库 · $songCount 首音乐 · $albumCount 张专辑",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            val statusMsg = scanStatus.message
-                            if (!statusMsg.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = statusMsg,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+                    if (isTabletLayout) {
+                        IconButton(onClick = onBackToLibrary) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回曲库")
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = "设置",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                val quickTabs = listOf("外观" to 0, "排印" to 1, "曲库" to 2, "音效" to 3)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    quickTabs.forEach { (label, idx) ->
+                        val selected = activeAnchor == idx
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .border(0.85.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
-                                .clickable(enabled = !scanStatus.isScanning, onClick = onRescanLibrary)
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                                .weight(1f)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                                .border(
+                                    width = if (selected) 0.dp else 0.75.dp,
+                                    color = if (selected) Color.Transparent else outlineColor,
+                                    shape = RoundedCornerShape(18.dp),
+                                )
+                                .clickable {
+                                    activeAnchor = idx
+                                    coroutineScope.launch { listState.animateScrollToItem(idx) }
+                                }
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = if (scanStatus.isScanning) "扫描中" else "扫描",
+                                text = label,
                                 style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                }
-
-                SettingsSectionHeader("视觉与排印")
-                BookSettingsCard(
-                    cardBg = cardBg,
-                    outlineColor = outlineColor,
-                    radius = cardRadius,
-                    liquidGlassEnabled = liquidGlassEnabled,
-                ) {
-                    val glassSummary = if (liquidGlassEnabled) "液态玻璃${liquidGlassLevel.label}" else "液态玻璃关"
-                    SettingsActionIconRow(
-                        icon = Icons.Rounded.Palette,
-                        label = "外观与纸色",
-                        subtitle = "${backgroundStyle.label} · ${accentColor.label} · $glassSummary",
-                        outlineColor = outlineColor,
-                        onClick = { currentPage = SettingsPage.APPEARANCE },
-                    )
-                    HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
-                    SettingsActionIconRow(
-                        icon = Icons.Rounded.TextFields,
-                        label = "排印与布局",
-                        subtitle = "${fontStyle.label} · ${(fontScale * 100).toInt()}% · 迷你条 ${miniPlayerHeightDp}dp",
-                        outlineColor = outlineColor,
-                        onClick = { currentPage = SettingsPage.TYPOGRAPHY },
-                    )
-                }
-
-                SettingsSectionHeader("声音与曲库")
-                BookSettingsCard(
-                    cardBg = cardBg,
-                    outlineColor = outlineColor,
-                    radius = cardRadius,
-                    liquidGlassEnabled = liquidGlassEnabled,
-                ) {
-                    val fadeLabel = if (fadeInSeconds <= 0) "交叉淡化关" else "交叉淡化 ${fadeInSeconds} 秒"
-                    val gapLabel = if (gaplessEnabled) "无缝开" else "无缝关"
-                    SettingsActionIconRow(
-                        icon = Icons.Rounded.Tune,
-                        label = "播放与音效",
-                        subtitle = "${playbackSpeed}× · $gapLabel · $fadeLabel",
-                        outlineColor = outlineColor,
-                        onClick = { currentPage = SettingsPage.AUDIO },
-                    )
-                    HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
-                    val enabledFolders = (allFolders.size - excludedFolders.size).coerceAtLeast(0)
-                    SettingsActionIconRow(
-                        icon = Icons.Rounded.FolderCopy,
-                        label = "曲库与备份",
-                        subtitle = "$enabledFolders 个目录 · 歌单 JSON 备份",
-                        outlineColor = outlineColor,
-                        onClick = { currentPage = SettingsPage.LIBRARY },
-                    )
-                }
-
-                SettingsSectionHeader("关于")
-                BookSettingsCard(
-                    cardBg = cardBg,
-                    outlineColor = outlineColor,
-                    radius = cardRadius,
-                    liquidGlassEnabled = liquidGlassEnabled,
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Info,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Column {
-                                Text(
-                                    text = "简约音乐 (PureMusic)",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    text = "纯正本地无损音乐播放器 · 零广告零追踪",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .border(0.6.dp, outlineColor, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 9.dp, vertical = 3.dp),
-                        ) {
-                            Text(
-                                text = "v1.5.3 正式版",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     }
                 }
             }
 
-
-
-            if (currentPage == SettingsPage.APPEARANCE) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 6.dp,
+                    bottom = 24.dp + bottomContentPadding.calculateBottomPadding(),
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item(key = "sec_appearance") {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Card 2: 悬浮与液态玻璃 (with live press-testable crystal glass preview!)
             SettingsSectionHeader("悬浮与液态玻璃")
             BookSettingsCard(
@@ -518,7 +403,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(
                             text = "悬浮控件",
                             style = MaterialTheme.typography.bodyMedium,
@@ -554,7 +439,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(
                             text = "液态玻璃",
                             style = MaterialTheme.typography.bodyMedium,
@@ -654,8 +539,10 @@ fun SettingsScreen(
                 }
             }
 
-            }
-            if (currentPage == SettingsPage.TYPOGRAPHY) {
+                    }
+                }
+                item(key = "sec_typography") {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Card 2.5: 迷你播放条 (3 Styles + Custom Height Ruler)
             SettingsSectionHeader("迷你播放条")
             BookSettingsCard(
@@ -902,8 +789,7 @@ fun SettingsScreen(
                 }
             }
 
-            }
-            if (currentPage == SettingsPage.APPEARANCE || currentPage == SettingsPage.TYPOGRAPHY) {
+
             // Card 4: 字体与纸色
             SettingsSectionHeader("字体与纸色")
             BookSettingsCard(
@@ -991,7 +877,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${fontWeight.label} · ${(fontScale * 100).toInt()}% · 倾斜 ${fontSlantDegrees.roundToInt()}°",
+                        text = "${fontWeight.label}($fontWeightValue) · ${(fontScale * 100).toInt()}% · 倾斜 ${fontSlantDegrees.roundToInt()}°",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1009,6 +895,43 @@ fun SettingsScreen(
                     liquidGlassEnabled = liquidGlassEnabled,
                     onSelect = { idx -> onSelectFontWeight(AppFontWeight.entries[idx]) },
                 )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "自定义字重微调",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "$fontWeightValue",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("200", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    VintageRulerSlider(
+                        value = fontWeightValue.toFloat(),
+                        minValue = 200f,
+                        maxValue = 900f,
+                        steps = 14,
+                        onValueChange = { onChangeFontWeightValue(it.roundToInt()) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp),
+                    )
+                    Text("900", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
@@ -1052,8 +975,10 @@ fun SettingsScreen(
                 }
             }
 
-            }
-            if (currentPage == SettingsPage.LIBRARY) {
+                    }
+                }
+                item(key = "sec_library") {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Card 5: 曲库管理
             SettingsSectionHeader("曲库管理")
             BookSettingsCard(
@@ -1202,8 +1127,10 @@ fun SettingsScreen(
                 )
             }
 
-            }
-            if (currentPage == SettingsPage.AUDIO) {
+                    }
+                }
+                item(key = "sec_audio") {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Card 6: 播放与音效
             SettingsSectionHeader("播放与音效")
             BookSettingsCard(
@@ -1247,7 +1174,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(
                             text = "无缝衔接播放 (Gapless)",
                             style = MaterialTheme.typography.bodyMedium,
@@ -1273,7 +1200,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(
                             text = "细腻触觉反馈",
                             style = MaterialTheme.typography.bodyMedium,
@@ -1299,7 +1226,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(
                             text = "播放页屏幕常亮",
                             style = MaterialTheme.typography.bodyMedium,
@@ -1327,8 +1254,7 @@ fun SettingsScreen(
                 )
             }
 
-            }
-            if (false) {
+
             // Card 7: 关于
             SettingsSectionHeader("关于")
             BookSettingsCard(
@@ -1355,7 +1281,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.5.3 正式版",
+                            text = "v1.5.4 正式版",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -1368,6 +1294,8 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                    }
+                }
             }
             }
         }
@@ -1559,13 +1487,25 @@ private fun VintageRulerSlider(
 
 @Composable
 private fun SettingsSectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-    )
+    Row(
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(14.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.primary),
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+    }
 }
 
 @Composable
