@@ -205,7 +205,7 @@ fun ImmersiveLyricsHost(
                     lyricOffsetMs = lyricOffsetMs,
                     onToggleOffsetBar = { showOffsetBar = !showOffsetBar },
                     onSelectStyle = onSelectStyle,
-                    spectrumStyle = spectrumStyle,
+                    currentSpectrumStyle = spectrumStyle,
                     onSelectSpectrumStyle = onSelectSpectrumStyle,
                     onBackToVinyl = onBackToVinyl,
                     onTogglePlayPause = onTogglePlayPause,
