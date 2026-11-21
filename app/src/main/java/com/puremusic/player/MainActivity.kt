@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import android.provider.OpenableColumns
 import com.puremusic.player.ui.components.SingleTrackRepeatDialog
 import android.widget.Toast
 import androidx.compose.animation.core.Spring
@@ -158,6 +159,8 @@ private fun PureMusicApp(
     val fadeInSeconds by viewModel.fadeInSeconds.collectAsStateWithLifecycle()
     val gaplessEnabled by viewModel.gaplessEnabled.collectAsStateWithLifecycle()
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
+    val customFontName by viewModel.customFontName.collectAsStateWithLifecycle()
+    val customFontVersion by viewModel.customFontVersion.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
     val singleRepeatRemaining by viewModel.singleRepeatRemaining.collectAsStateWithLifecycle()
 
@@ -208,6 +211,7 @@ private fun PureMusicApp(
         miniPlayerStyle = miniPlayerStyle,
         miniPlayerHeightDp = miniPlayerHeightDp,
         hapticEnabled = hapticEnabled,
+        customFontVersion = customFontVersion,
     ) {
         if (!hasAudioPermission) {
             PermissionPromptScreen(
@@ -391,6 +395,24 @@ private fun PureMusicApp(
             }
         }
 
+        val importFontLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri != null) {
+                var displayName = "自定义字体.ttf"
+                runCatching {
+                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) {
+                            c.getString(0)?.takeIf { it.isNotBlank() }?.let { displayName = it }
+                        }
+                    }
+                }
+                viewModel.importCustomFont(uri, displayName) { msg ->
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val isTabletLayout = when (layoutMode) {
                 LayoutMode.TABLET -> true
@@ -479,6 +501,12 @@ private fun PureMusicApp(
                         onOpenSleepTimer = { showSleepTimer = true },
                         onExportBackup = { exportBackupLauncher.launch("PureMusic_Backup.json") },
                         onImportBackup = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) },
+                        customFontName = customFontName,
+                        onImportCustomFont = { importFontLauncher.launch(arrayOf("font/*", "application/octet-stream", "*/*")) },
+                        onClearCustomFont = {
+                            viewModel.clearCustomFont()
+                            Toast.makeText(context, "已清除自定义字体", Toast.LENGTH_SHORT).show()
+                        },
                     )
                 } else {
                     LibraryScreen(

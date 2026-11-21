@@ -62,33 +62,61 @@ class OnlineMetadataRepository(private val context: Context) {
     private val lyricsDir: File
         get() = File(context.filesDir, "custom_lyrics").apply { if (!exists()) mkdirs() }
 
+    private fun normalizeLyricQuery(raw: String): String {
+        return raw
+            .replace(Regex("[(\[（【][^)\]）】]*(?:live|伴奏|纯音乐|remaster|remix|ver\.?|版|主题曲|插曲|片尾曲|片头曲|feat\.?|ft\.?)[^)\]）】]*[)\]）】]", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("[(\[（【][^)\]）】]{1,28}[)\]）】]"), " ")
+            .replace(Regex("\b(?:feat\.?|ft\.?)\s+.*$", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\s+"), " ")
+            .trim()
+    }
+
+    private fun parseLrclibResponse(body: String, fallbackTitle: String): List<OnlineLyricCandidate> {
+        val arr = JSONArray(body)
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val synced = obj.optString("syncedLyrics").takeIf { it.isNotBlank() && it != "null" }
+                val plain = obj.optString("plainLyrics").takeIf { it.isNotBlank() && it != "null" }
+                if (synced.isNullOrBlank() && plain.isNullOrBlank()) continue
+                add(
+                    OnlineLyricCandidate(
+                        id = obj.optLong("id", i.toLong()),
+                        trackName = obj.optString("trackName").ifBlank { fallbackTitle },
+                        artistName = obj.optString("artistName").ifBlank { "未知歌手" },
+                        albumName = obj.optString("albumName").orEmpty(),
+                        durationSec = obj.optDouble("duration", 0.0).toInt(),
+                        syncedLyrics = synced,
+                        plainLyrics = plain,
+                    ),
+                )
+            }
+        }
+    }
+
     suspend fun searchOnlineLyrics(query: String): Result<List<OnlineLyricCandidate>> = withContext(Dispatchers.IO) {
-        val cleanQuery = query.trim()
-        if (cleanQuery.isEmpty()) return@withContext Result.success(emptyList())
+        val rawQuery = query.trim()
+        if (rawQuery.isEmpty()) return@withContext Result.success(emptyList())
+        val cleaned = normalizeLyricQuery(rawQuery).ifBlank { rawQuery }
         runCatching {
-            val encoded = URLEncoder.encode(cleanQuery, "UTF-8")
-            val endpoint = "https://lrclib.net/api/search?q=$encoded"
-            val body = httpGetText(endpoint)
-            val arr = JSONArray(body)
-            buildList {
-                for (i in 0 until arr.length()) {
-                    val obj = arr.optJSONObject(i) ?: continue
-                    val synced = obj.optString("syncedLyrics").takeIf { it.isNotBlank() && it != "null" }
-                    val plain = obj.optString("plainLyrics").takeIf { it.isNotBlank() && it != "null" }
-                    if (synced.isNullOrBlank() && plain.isNullOrBlank()) continue
-                    add(
-                        OnlineLyricCandidate(
-                            id = obj.optLong("id", i.toLong()),
-                            trackName = obj.optString("trackName").ifBlank { cleanQuery },
-                            artistName = obj.optString("artistName").ifBlank { "未知歌手" },
-                            albumName = obj.optString("albumName").orEmpty(),
-                            durationSec = obj.optDouble("duration", 0.0).toInt(),
-                            syncedLyrics = synced,
-                            plainLyrics = plain,
-                        ),
-                    )
+            val merged = LinkedHashMap<Long, OnlineLyricCandidate>()
+            // Pass 1: Cleaned full query ("Title Artist")
+            val primaryUrl = "https://lrclib.net/api/search?q=${URLEncoder.encode(cleaned, "UTF-8")}"
+            parseLrclibResponse(httpGetText(primaryUrl), cleaned).forEach { merged[it.id] = it }
+
+            // Pass 2: Fallback title-only fuzzy match for Chinese/mixed tracks when full query misses
+            val syncedHits = merged.values.count { it.hasSynced }
+            val titleOnly = cleaned.split(Regex("\s+[-–—]\s+|\s+")).firstOrNull()?.trim().orEmpty()
+            if (syncedHits < 2 && titleOnly.isNotBlank() && titleOnly != cleaned) {
+                runCatching {
+                    val fallbackUrl = "https://lrclib.net/api/search?track_name=${URLEncoder.encode(titleOnly, "UTF-8")}"
+                    parseLrclibResponse(httpGetText(fallbackUrl), titleOnly).forEach { merged.putIfAbsent(it.id, it) }
                 }
-            }.sortedByDescending { it.hasSynced }.take(15)
+            }
+
+            merged.values
+                .sortedWith(compareByDescending<OnlineLyricCandidate> { it.hasSynced })
+                .take(18)
         }
     }
 

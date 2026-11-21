@@ -7,6 +7,12 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import android.content.Context
+import android.graphics.Typeface
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import com.puremusic.player.data.model.LyricFontStyle
+import java.io.File
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -160,6 +166,7 @@ val LocalFloatingControls = compositionLocalOf { false }
 val LocalMiniPlayerStyle = compositionLocalOf { MiniPlayerStyle.CLASSIC_BOOK }
 val LocalMiniPlayerHeightDp = compositionLocalOf { 58 }
 val LocalHapticEnabled = compositionLocalOf { true }
+val LocalCustomFontVersion = compositionLocalOf { 0 }
 
 fun sidebarColorFor(isDark: Boolean): Color = if (isDark) Color(0xFF1A1A1C) else Color(0xFFEEECE7)
 
@@ -177,6 +184,7 @@ fun PureMusicTheme(
     miniPlayerStyle: MiniPlayerStyle = MiniPlayerStyle.CLASSIC_BOOK,
     miniPlayerHeightDp: Int = 58,
     hapticEnabled: Boolean = true,
+    customFontVersion: Int = 0,
     content: @Composable () -> Unit,
 ) {
     val useDark = when (backgroundStyle) {
@@ -288,10 +296,9 @@ fun PureMusicTheme(
         )
     }
 
-    val family = when (fontStyle) {
-        AppFontStyle.SERIF, AppFontStyle.SERIF_ITALIC -> FontFamily.Serif
-        AppFontStyle.SANS -> FontFamily.SansSerif
-        AppFontStyle.MONOSPACE -> FontFamily.Monospace
+    val themeContext = LocalContext.current
+    val family = remember(fontStyle, customFontVersion) {
+        resolveAppFontFamily(themeContext, fontStyle)
     }
     val clampedSlant = fontSlantDegrees.coerceIn(0f, 16f)
     val textFontStyle = if (fontStyle == AppFontStyle.SERIF_ITALIC && clampedSlant < 0.5f) {
@@ -353,6 +360,7 @@ fun PureMusicTheme(
         LocalMiniPlayerStyle provides miniPlayerStyle,
         LocalMiniPlayerHeightDp provides miniPlayerHeightDp,
         LocalHapticEnabled provides hapticEnabled,
+        LocalCustomFontVersion provides customFontVersion,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
@@ -360,4 +368,45 @@ fun PureMusicTheme(
             content = content,
         )
     }
+}
+
+fun resolveAppFontFamily(context: Context, style: AppFontStyle): FontFamily {
+    return when (style) {
+        AppFontStyle.SERIF, AppFontStyle.SERIF_ITALIC -> FontFamily.Serif
+        AppFontStyle.SANS -> FontFamily.SansSerif
+        AppFontStyle.MONOSPACE -> FontFamily.Monospace
+        AppFontStyle.WENKAI -> loadAssetFontOrFallback(context, "fonts/lxgw_wenkai_lite.ttf", FontFamily.Serif)
+        AppFontStyle.PLAYFAIR -> loadAssetFontOrFallback(context, "fonts/playfair_italic.ttf", FontFamily.Serif)
+        AppFontStyle.INTER -> loadAssetFontOrFallback(context, "fonts/inter_regular.ttf", FontFamily.SansSerif)
+        AppFontStyle.CUSTOM -> loadCustomUserFontOrFallback(context, FontFamily.Serif)
+    }
+}
+
+fun resolveLyricFontFamily(context: Context, style: LyricFontStyle): FontFamily {
+    return when (style) {
+        LyricFontStyle.SERIF, LyricFontStyle.SERIF_ITALIC -> FontFamily.Serif
+        LyricFontStyle.SANS -> FontFamily.SansSerif
+        LyricFontStyle.MONOSPACE -> FontFamily.Monospace
+        LyricFontStyle.WENKAI -> loadAssetFontOrFallback(context, "fonts/lxgw_wenkai_lite.ttf", FontFamily.Serif)
+        LyricFontStyle.PLAYFAIR -> loadAssetFontOrFallback(context, "fonts/playfair_italic.ttf", FontFamily.Serif)
+        LyricFontStyle.CUSTOM -> loadCustomUserFontOrFallback(context, FontFamily.Serif)
+    }
+}
+
+private fun loadAssetFontOrFallback(context: Context, assetPath: String, fallback: FontFamily): FontFamily {
+    return runCatching {
+        val tf = Typeface.createFromAsset(context.assets, assetPath)
+        FontFamily(tf)
+    }.getOrDefault(fallback)
+}
+
+private fun loadCustomUserFontOrFallback(context: Context, fallback: FontFamily): FontFamily {
+    return runCatching {
+        val fontFile = File(File(context.filesDir, "custom_fonts"), "user_font.ttf")
+        if (fontFile.exists() && fontFile.length() > 1024L) {
+            FontFamily(Typeface.createFromFile(fontFile))
+        } else {
+            fallback
+        }
+    }.getOrDefault(fallback)
 }

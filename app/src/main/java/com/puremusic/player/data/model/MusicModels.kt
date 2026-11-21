@@ -74,15 +74,22 @@ enum class PlayerTheme(val label: String) {
 enum class AppFontStyle(val label: String) {
     SERIF("优雅衬线"),
     SERIF_ITALIC("宋体微斜"),
+    WENKAI("霞鹜文楷"),
+    PLAYFAIR("Playfair"),
+    INTER("Inter"),
     SANS("清晰黑体"),
     MONOSPACE("等宽体"),
+    CUSTOM("自定义字体"),
 }
 
 enum class LyricFontStyle(val label: String) {
     SERIF_ITALIC("宋体微斜"),
+    WENKAI("霞鹜文楷"),
+    PLAYFAIR("Playfair"),
     SERIF("经典衬线"),
     SANS("清晰黑体"),
     MONOSPACE("等宽体"),
+    CUSTOM("自定义字体"),
 }
 
 enum class BackgroundStyle(val label: String) {

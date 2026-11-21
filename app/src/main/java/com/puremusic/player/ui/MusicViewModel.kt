@@ -37,6 +37,7 @@ import com.puremusic.player.widget.PureMusicWidgetProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.io.File
 import com.puremusic.player.data.model.SortOrder
 import com.puremusic.player.data.repository.LyricsRepository
 import com.puremusic.player.data.repository.MusicRepository
@@ -392,9 +393,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val equalizerState: StateFlow<EqualizerState> = AudioEqualizerManager.state
     val sleepTimerRemainingMs: StateFlow<Long?> = sleepTimerManager.remainingMs
 
+    private val _customFontName = MutableStateFlow<String?>(null)
+    val customFontName: StateFlow<String?> = _customFontName.asStateFlow()
+    private val _customFontVersion = MutableStateFlow(0)
+    val customFontVersion: StateFlow<Int> = _customFontVersion.asStateFlow()
+
     private val _singleRepeatRemaining = MutableStateFlow(0)
     val singleRepeatRemaining: StateFlow<Int> = _singleRepeatRemaining.asStateFlow()
     private var repeatRestoreMode: Int = Player.REPEAT_MODE_OFF
+    private var singleRepeatSongId: Long? = null
+    private var lastRepeatDecrementAtMs: Long = 0L
+    private var lastTickerSongId: Long? = null
+    private var lastTickerPosMs: Long = 0L
     private var activeQueueSongs: List<Song> = emptyList()
     private var hasRestoredPlayback = false
 
@@ -409,29 +419,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION &&
+                oldPosition.mediaItemIndex == newPosition.mediaItemIndex &&
+                _singleRepeatRemaining.value > 0
+            ) {
+                consumeSingleRepeatPass()
+            }
+        }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            val controller = mediaController
+            val newId = mediaItem?.mediaId?.toLongOrNull()
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT && _singleRepeatRemaining.value > 0) {
-                val nextRem = (_singleRepeatRemaining.value - 1).coerceAtLeast(0)
-                _singleRepeatRemaining.value = nextRem
-                if (nextRem <= 1 && controller != null) {
-                    // Last repeat pass started; restore repeat mode so next end advances naturally
-                    controller.repeatMode = if (repeatRestoreMode == Player.REPEAT_MODE_ONE) {
-                        Player.REPEAT_MODE_OFF
-                    } else {
-                        repeatRestoreMode
-                    }
-                    if (nextRem == 0) _singleRepeatRemaining.value = 0
-                }
+                consumeSingleRepeatPass()
             } else if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT && _singleRepeatRemaining.value > 0) {
-                // User manually switched track or playlist changed -> cancel active single-repeat counter
-                _singleRepeatRemaining.value = 0
-                if (controller != null) {
-                    controller.repeatMode = if (repeatRestoreMode == Player.REPEAT_MODE_ONE) {
-                        Player.REPEAT_MODE_OFF
-                    } else {
-                        repeatRestoreMode
-                    }
+                if (newId != singleRepeatSongId) {
+                    cancelSingleTrackRepeat(restoreControllerMode = true)
                 }
             }
             syncPlayerSnapshot()
@@ -457,6 +464,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             playlistRepository.ensureV8BookStyleEpoch()
             _customCovers.value = onlineMetadataRepository.loadAllCustomCovers()
             _playlistCovers.value = onlineMetadataRepository.loadAllPlaylistCovers()
+            val fontNameFile = File(File(getApplication<Application>().filesDir, "custom_fonts"), "font_name.txt")
+            if (fontNameFile.exists()) {
+                _customFontName.value = runCatching { fontNameFile.readText().trim().takeIf { it.isNotBlank() } }.getOrNull()
+            }
             _metaOverrides.value = onlineMetadataRepository.loadAllMetaOverrides()
             syncPlayerSnapshot()
         }
@@ -642,19 +653,52 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setSingleTrackRepeatCount(count: Int) {
-        val controller = mediaController ?: return
-        if (count <= 1) {
-            _singleRepeatRemaining.value = 0
+    private fun consumeSingleRepeatPass() {
+        val now = System.currentTimeMillis()
+        if (now - lastRepeatDecrementAtMs < 1_500L) return
+        val currentRem = _singleRepeatRemaining.value
+        if (currentRem <= 0) return
+        lastRepeatDecrementAtMs = now
+        val nextRem = (currentRem - 1).coerceAtLeast(0)
+        _singleRepeatRemaining.value = nextRem
+        val controller = mediaController
+        if (nextRem <= 1 && controller != null) {
+            // Final pass has begun -> restore normal repeat mode so finishing advances to next track
             controller.repeatMode = if (repeatRestoreMode == Player.REPEAT_MODE_ONE) {
                 Player.REPEAT_MODE_OFF
             } else {
                 repeatRestoreMode
             }
+        }
+        if (nextRem == 0) {
+            singleRepeatSongId = null
+        }
+    }
+
+    private fun cancelSingleTrackRepeat(restoreControllerMode: Boolean) {
+        _singleRepeatRemaining.value = 0
+        singleRepeatSongId = null
+        if (restoreControllerMode) {
+            mediaController?.let { controller ->
+                controller.repeatMode = if (repeatRestoreMode == Player.REPEAT_MODE_ONE) {
+                    Player.REPEAT_MODE_OFF
+                } else {
+                    repeatRestoreMode
+                }
+            }
+        }
+    }
+
+    fun setSingleTrackRepeatCount(count: Int) {
+        val controller = mediaController ?: return
+        if (count <= 1) {
+            cancelSingleTrackRepeat(restoreControllerMode = true)
         } else {
             if (_singleRepeatRemaining.value == 0) {
                 repeatRestoreMode = controller.repeatMode
             }
+            singleRepeatSongId = _playerState.value.currentSong?.id
+            lastRepeatDecrementAtMs = 0L
             _singleRepeatRemaining.value = count
             controller.repeatMode = Player.REPEAT_MODE_ONE
         }
@@ -1135,6 +1179,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (controller != null && controller.isPlaying) {
                     val pos = controller.currentPosition.coerceAtLeast(0L)
                     val dur = controller.duration.takeIf { it > 0L } ?: _playerState.value.durationMs
+                    val curId = _playerState.value.currentSong?.id
+                    if (_singleRepeatRemaining.value > 0 &&
+                        curId != null &&
+                        curId == lastTickerSongId &&
+                        dur > 4_000L &&
+                        lastTickerPosMs >= dur - 2_500L &&
+                        pos < 2_000L
+                    ) {
+                        consumeSingleRepeatPass()
+                    }
+                    lastTickerSongId = curId
+                    lastTickerPosMs = pos
                     _playerState.update { it.copy(positionMs = pos, durationMs = dur) }
                     val fadeMs = fadeInSeconds.value * 1000L
                     if (fadeMs > 0L && dur > fadeMs * 2L && fadeInJob?.isActive != true) {
@@ -1268,6 +1324,47 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 "已恢复 $restoredPlaylists 个歌单与 $restoredFavs 首新增喜欢"
             }.getOrElse { "备份文件格式无效，无法恢复" }
             onResult(msg)
+        }
+    }
+
+    fun importCustomFont(uri: Uri, displayName: String, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val ok = runCatching {
+                val dir = File(app.filesDir, "custom_fonts").apply { if (!exists()) mkdirs() }
+                val target = File(dir, "user_font.ttf")
+                app.contentResolver.openInputStream(uri)?.use { input ->
+                    target.outputStream().use { out -> input.copyTo(out) }
+                } ?: return@runCatching false
+                // Validate Typeface before activating
+                android.graphics.Typeface.createFromFile(target)
+                File(dir, "font_name.txt").writeText(displayName)
+                true
+            }.getOrDefault(false)
+            if (ok) {
+                _customFontName.value = displayName
+                _customFontVersion.value += 1
+                playlistRepository.setFontStyle(AppFontStyle.CUSTOM)
+                onResult("已导入并应用字体：$displayName")
+            } else {
+                onResult("字体文件无效，请选择 .ttf 或 .otf 字体")
+            }
+        }
+    }
+
+    fun clearCustomFont() {
+        viewModelScope.launch {
+            val dir = File(getApplication<Application>().filesDir, "custom_fonts")
+            runCatching { File(dir, "user_font.ttf").delete() }
+            runCatching { File(dir, "font_name.txt").delete() }
+            _customFontName.value = null
+            _customFontVersion.value += 1
+            if (fontStyle.value == AppFontStyle.CUSTOM) {
+                playlistRepository.setFontStyle(AppFontStyle.SERIF)
+            }
+            if (lyricFontStyle.value == LyricFontStyle.CUSTOM) {
+                playlistRepository.setLyricFontStyle(LyricFontStyle.SERIF_ITALIC)
+            }
         }
     }
 

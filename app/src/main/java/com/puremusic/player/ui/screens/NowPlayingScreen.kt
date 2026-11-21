@@ -81,6 +81,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.puremusic.player.ui.theme.LocalCustomFontVersion
+import com.puremusic.player.ui.theme.resolveLyricFontFamily
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -241,26 +243,25 @@ fun NowPlayingScreen(
         }
     }
 
-    val lyricFamily = when (lyricFontStyle) {
-        LyricFontStyle.SERIF_ITALIC, LyricFontStyle.SERIF -> FontFamily.Serif
-        LyricFontStyle.SANS -> FontFamily.SansSerif
-        LyricFontStyle.MONOSPACE -> FontFamily.Monospace
+    val customFontVer = LocalCustomFontVersion.current
+    val lyricFamily = remember(lyricFontStyle, customFontVer) {
+        resolveLyricFontFamily(context, lyricFontStyle)
     }
     val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
     val activeAccentColor = if (liquidGlassEnabled) animatedAccent else MaterialTheme.colorScheme.primary
     val darkBgTop by animateColorAsState(
-        targetValue = lerp(Color(0xFF141011), extractedPalette.accent, 0.28f),
+        targetValue = lerp(Color(0xFF231F20), extractedPalette.accent, 0.56f),
         animationSpec = tween(durationMillis = 550),
         label = "darkAmbientTop",
     )
     val darkBgMid by animateColorAsState(
-        targetValue = lerp(Color(0xFF0E0B0C), extractedPalette.accent, 0.14f),
+        targetValue = lerp(Color(0xFF1A1718), extractedPalette.accent, 0.38f),
         animationSpec = tween(durationMillis = 550),
         label = "darkAmbientMid",
     )
     val darkBgBottom by animateColorAsState(
-        targetValue = lerp(Color(0xFF090809), extractedPalette.accent, 0.04f),
+        targetValue = lerp(Color(0xFF121011), extractedPalette.accent, 0.22f),
         animationSpec = tween(durationMillis = 550),
         label = "darkAmbientBottom",
     )
@@ -285,8 +286,8 @@ fun NowPlayingScreen(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawRect(
                     brush = Brush.radialGradient(
-                        0.0f to animatedAccent.copy(alpha = 0.22f),
-                        0.45f to animatedAccent.copy(alpha = 0.08f),
+                        0.0f to animatedAccent.copy(alpha = 0.36f),
+                        0.45f to animatedAccent.copy(alpha = 0.16f),
                         1.0f to Color.Transparent,
                         center = Offset(size.width * 0.88f, size.height * 0.14f),
                         radius = size.maxDimension * 0.62f,
