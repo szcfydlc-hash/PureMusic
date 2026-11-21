@@ -22,6 +22,7 @@ import com.puremusic.player.data.model.EqualizerState
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
+import com.puremusic.player.data.model.ImmersionLyricStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.MinDurationFilter
@@ -267,6 +268,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = false,
+    )
+
+    val immersionStyle: StateFlow<ImmersionLyricStyle> = playlistRepository.immersionStyleFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = ImmersionLyricStyle.VINYL_STUDY,
     )
 
     val lyricOffsets: StateFlow<Map<Long, Long>> = playlistRepository.lyricOffsetsFlow.stateIn(

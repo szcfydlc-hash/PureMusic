@@ -664,6 +664,8 @@ private fun PureMusicApp(
                     keepScreenOn = keepScreenOn,
                     carModeEnabled = carModeEnabled,
                     onToggleCarMode = viewModel::setCarModeEnabled,
+                    immersionStyle = immersionStyle,
+                    onSelectImmersionStyle = viewModel::setImmersionStyle,
                     onAdjustLyricOffset = viewModel::adjustCurrentLyricOffset,
                     onResetLyricOffset = viewModel::resetCurrentLyricOffset,
                 )

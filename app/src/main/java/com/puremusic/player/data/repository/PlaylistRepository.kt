@@ -19,6 +19,7 @@ import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
+import com.puremusic.player.data.model.ImmersionLyricStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
 import com.puremusic.player.data.model.MiniPlayerStyle
@@ -66,6 +67,7 @@ class PlaylistRepository(private val context: Context) {
         val GAPLESS_ENABLED = booleanPreferencesKey("gapless_enabled")
         val HAPTIC_ENABLED = booleanPreferencesKey("haptic_enabled")
         val CAR_MODE_ENABLED = booleanPreferencesKey("car_mode_enabled")
+        val IMMERSION_STYLE = stringPreferencesKey("immersion_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val RECENT_SONG_IDS = stringPreferencesKey("recent_song_ids")
         val PLAY_COUNTS_JSON = stringPreferencesKey("play_counts_json")
@@ -196,6 +198,11 @@ class PlaylistRepository(private val context: Context) {
 
     val carModeEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.CAR_MODE_ENABLED] ?: false
+    }
+
+    val immersionStyleFlow: Flow<ImmersionLyricStyle> = context.pureMusicDataStore.data.map { prefs ->
+        val raw = prefs[Keys.IMMERSION_STYLE]
+        ImmersionLyricStyle.entries.firstOrNull { it.name == raw } ?: ImmersionLyricStyle.VINYL_STUDY
     }
 
     val recentSongIdsFlow: Flow<List<Long>> = context.pureMusicDataStore.data.map { prefs ->

@@ -134,6 +134,7 @@ import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.puremusic.player.data.model.ImmersionLyricStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.PlayerUiState
@@ -183,6 +184,8 @@ fun NowPlayingScreen(
     keepScreenOn: Boolean = false,
     carModeEnabled: Boolean = false,
     onToggleCarMode: (Boolean) -> Unit = {},
+    immersionStyle: ImmersionLyricStyle = ImmersionLyricStyle.VINYL_STUDY,
+    onSelectImmersionStyle: (ImmersionLyricStyle) -> Unit = {},
     onAdjustLyricOffset: (Long) -> Unit = {},
     onResetLyricOffset: () -> Unit = {},
 ) {
@@ -319,32 +322,31 @@ fun NowPlayingScreen(
         }
 
         if (showFullLyrics) {
-            EditorialFullScreenLyricsView(
+            ImmersiveLyricsHost(
+                style = immersionStyle,
+                onSelectStyle = onSelectImmersionStyle,
                 song = song,
+                allSongs = allSongs,
                 lyrics = lyrics,
                 positionMs = playerState.positionMs,
                 durationMs = durationMs,
                 isPlaying = playerState.isPlaying,
+                vinylRotationProvider = { vinylAngle.value },
                 lyricFamily = lyricFamily,
                 lyricStyleItalic = lyricStyleItalic,
-                accentColor = activeAccentColor,
-                primaryTextColor = primaryTextColor,
-                secondaryTextColor = secondaryTextColor,
+                dynamicAccent = extractedPalette.accent,
+                isDarkTheme = isDarkTheme,
+                isTranslatingLyrics = isTranslatingLyrics,
+                lyricOffsetMs = lyricOffsetMs,
                 onBackToVinyl = { showFullLyrics = false },
-                onClosePlayer = onClose,
                 onTogglePlayPause = onTogglePlayPause,
                 onSkipPrevious = onSkipPrevious,
                 onSkipNext = onSkipNext,
                 onSeekTo = onSeekTo,
+                onTranslateLyrics = onTranslateLyrics,
                 onOpenLyricsSearch = { onOpenLyricsSearch(song) },
                 onOpenCoverSearch = { onOpenCoverSearch(song) },
-                isTranslatingLyrics = isTranslatingLyrics,
-                onTranslateLyrics = onTranslateLyrics,
-                onAddToPlaylist = { onAddToPlaylist(song) },
-                isDarkTheme = isDarkTheme,
                 onOpenFullLyricsSheet = onOpenLyrics,
-                audioSpec = audioSpec,
-                lyricOffsetMs = lyricOffsetMs,
                 onAdjustLyricOffset = onAdjustLyricOffset,
                 onResetLyricOffset = onResetLyricOffset,
             )

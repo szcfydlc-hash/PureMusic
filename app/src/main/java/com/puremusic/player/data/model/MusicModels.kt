@@ -216,3 +216,9 @@ data class AudioTechSpec(
             if (bitrateKbps > 0) add("${bitrateKbps}kbps")
         }.joinToString(" · ")
 }
+
+enum class ImmersionLyricStyle(val label: String) {
+    VINYL_STUDY("黑胶书房"),
+    SPATIAL_GALLERY("空间唱片廊"),
+    VINYL_LIGHTFIELD("黑胶光场"),
+}
