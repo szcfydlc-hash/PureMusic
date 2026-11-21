@@ -50,6 +50,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -1204,15 +1205,27 @@ private fun InteractivePosterWallHeader(
     onLongPressVinyl: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val wallSongs = remember(allSongs, currentSong.id) {
-        val distinctAlbums = allSongs.distinctBy { it.albumId }
-        val pool = if (distinctAlbums.size >= 24) distinctAlbums else allSongs
-        if (pool.size >= 24) {
-            pool
-        } else if (pool.isNotEmpty()) {
-            List(24) { idx -> pool[idx % pool.size] }
+    val wallSongs = remember(allSongs) {
+        if (allSongs.size >= 24) {
+            allSongs
+        } else if (allSongs.isNotEmpty()) {
+            List(24) { idx -> allSongs[idx % allSongs.size] }
         } else {
             List(24) { currentSong }
+        }
+    }
+    val initialIdx = remember(wallSongs) {
+        val idx = wallSongs.indexOfFirst { it.id == currentSong.id }
+        if (idx >= 0) (idx - 4).coerceAtLeast(0) else 0
+    }
+    val wallGridState = rememberLazyGridState(initialFirstVisibleItemIndex = initialIdx)
+    LaunchedEffect(currentSong.id, wallSongs) {
+        val target = wallSongs.indexOfFirst { it.id == currentSong.id }
+        if (target >= 0) {
+            val visible = wallGridState.layoutInfo.visibleItemsInfo.any { it.index == target }
+            if (!visible) {
+                wallGridState.animateScrollToItem((target - 4).coerceAtLeast(0))
+            }
         }
     }
 
@@ -1223,15 +1236,21 @@ private fun InteractivePosterWallHeader(
         Box(modifier = Modifier.fillMaxSize()) {
             LazyHorizontalGrid(
                 rows = GridCells.Fixed(4),
+                state = wallGridState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(gridHeight)
+                    .graphicsLayer()
                     .align(Alignment.TopCenter),
                 contentPadding = PaddingValues(0.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                items(wallSongs.size) { index ->
+                items(
+                    count = wallSongs.size,
+                    key = { idx -> "${wallSongs[idx].id}_$idx" },
+                    contentType = { "poster_tile" },
+                ) { index ->
                     val tileSong = wallSongs[index]
                     PosterWallTile(
                         song = tileSong,
@@ -1305,11 +1324,14 @@ private fun PosterWallTile(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
-    val request = remember(song.albumArtUri) {
+    val request = remember(song.id, song.albumArtUri) {
+        val cacheKey = "tile_${song.id}_${song.albumArtUri}"
         ImageRequest.Builder(context)
             .data(song.albumArtUri)
             .size(220)
-            .crossfade(true)
+            .memoryCacheKey(cacheKey)
+            .diskCacheKey(cacheKey)
+            .crossfade(false)
             .build()
     }
     Box(

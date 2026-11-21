@@ -135,7 +135,11 @@ class MusicRepository(private val context: Context) {
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                     id,
                 )
-                val albumArtUri = ContentUris.withAppendedId(albumArtBaseUri, albumId)
+                val albumArtUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    contentUri
+                } else {
+                    ContentUris.withAppendedId(albumArtBaseUri, albumId)
+                }
 
                 songs.add(
                     Song(

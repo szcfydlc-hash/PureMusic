@@ -88,6 +88,7 @@ import com.puremusic.player.data.model.Song
 import com.puremusic.player.ui.MusicViewModel
 import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.ui.components.AddToPlaylistDialog
+import com.puremusic.player.ui.components.AudioArtFetcher
 import com.puremusic.player.ui.components.BatchSongPickerSheet
 import com.puremusic.player.ui.components.ConfirmDeletePlaylistDialog
 import com.puremusic.player.ui.components.ConfirmDeleteSongDialog
@@ -114,6 +115,9 @@ class MainActivity : ComponentActivity() {
         // Global Coil 25% memory cache + 120MB disk thumbnail cache for 120Hz scrolling
         Coil.setImageLoader {
             ImageLoader.Builder(applicationContext)
+                .components {
+                    add(AudioArtFetcher.Factory(applicationContext))
+                }
                 .memoryCache {
                     MemoryCache.Builder(applicationContext)
                         .maxSizePercent(0.25)

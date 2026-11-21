@@ -20,6 +20,7 @@ import android.widget.RemoteViews
 import com.puremusic.player.MainActivity
 import com.puremusic.player.R
 import com.puremusic.player.service.PlaybackService
+import com.puremusic.player.ui.components.AudioArtFetcher
 
 class PureMusicWidgetProvider : AppWidgetProvider() {
 
@@ -105,12 +106,15 @@ class PureMusicWidgetProvider : AppWidgetProvider() {
 
         private fun loadRoundedCover(context: Context, uri: Uri, targetPx: Int, radiusPx: Float): Bitmap? {
             return runCatching {
-                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
-                val sample = maxOf(1, minOf(opts.outWidth, opts.outHeight) / targetPx)
-                val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
-                val raw = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, decodeOpts) }
-                    ?: return null
+                val raw = if (uri.toString().contains("/audio/media/")) {
+                    AudioArtFetcher.loadPerSongBitmap(context, uri, targetPx)
+                } else {
+                    val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+                    val sample = maxOf(1, minOf(opts.outWidth, opts.outHeight) / targetPx)
+                    val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
+                    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, decodeOpts) }
+                } ?: return null
                 val scaled = Bitmap.createScaledBitmap(raw, targetPx, targetPx, true)
                 if (scaled !== raw) raw.recycle()
                 val out = Bitmap.createBitmap(targetPx, targetPx, Bitmap.Config.ARGB_8888)

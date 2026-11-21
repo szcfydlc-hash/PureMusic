@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color as AndroidColor
 import android.net.Uri
+import com.puremusic.player.ui.components.AudioArtFetcher
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,7 +30,7 @@ object DynamicColorExtractor {
 
     private fun decodeSmallBitmap(context: Context, uri: Uri): Bitmap? = runCatching {
         val opts = BitmapFactory.Options().apply { inSampleSize = 8 }
-        context.contentResolver.openInputStream(uri)?.use { stream ->
+        if (uri.toString().contains("/audio/media/")) { AudioArtFetcher.loadPerSongBitmap(context, uri, 96) } else context.contentResolver.openInputStream(uri)?.use { stream ->
             val decoded = BitmapFactory.decodeStream(stream, null, opts)
             if (decoded != null) {
                 val scaled = Bitmap.createScaledBitmap(decoded, 24, 24, true)

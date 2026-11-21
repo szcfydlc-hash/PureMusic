@@ -404,7 +404,7 @@ fun SettingsScreen(
                                 .padding(horizontal = 9.dp, vertical = 3.dp),
                         ) {
                             Text(
-                                text = "v1.5.2 正式版",
+                                text = "v1.5.3 正式版",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
@@ -654,6 +654,8 @@ fun SettingsScreen(
                 }
             }
 
+            }
+            if (currentPage == SettingsPage.TYPOGRAPHY) {
             // Card 2.5: 迷你播放条 (3 Styles + Custom Height Ruler)
             SettingsSectionHeader("迷你播放条")
             BookSettingsCard(
@@ -900,6 +902,8 @@ fun SettingsScreen(
                 }
             }
 
+            }
+            if (currentPage == SettingsPage.APPEARANCE || currentPage == SettingsPage.TYPOGRAPHY) {
             // Card 4: 字体与纸色
             SettingsSectionHeader("字体与纸色")
             BookSettingsCard(
@@ -1351,7 +1355,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.5.2 正式版",
+                            text = "v1.5.3 正式版",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
