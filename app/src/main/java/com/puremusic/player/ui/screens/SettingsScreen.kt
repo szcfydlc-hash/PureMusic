@@ -141,6 +141,7 @@ fun SettingsScreen(
     fadeInSeconds: Int,
     gaplessEnabled: Boolean = true,
     hapticEnabled: Boolean = true,
+    carModeEnabled: Boolean = false,
     keepScreenOn: Boolean,
     liquidGlassEnabled: Boolean,
     floatingControlsEnabled: Boolean,
@@ -164,6 +165,7 @@ fun SettingsScreen(
     onSelectFadeInSeconds: (Int) -> Unit,
     onToggleGapless: (Boolean) -> Unit = {},
     onToggleHaptic: (Boolean) -> Unit = {},
+    onToggleCarMode: (Boolean) -> Unit = {},
     onToggleKeepScreenOn: (Boolean) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onToggleFloatingControls: (Boolean) -> Unit,
@@ -1228,6 +1230,32 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(
+                            text = "极简车机模式",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "高对比夜墨大字界面与盲操级切歌大圆钮",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = carModeEnabled,
+                        onCheckedChange = onToggleCarMode,
+                        colors = switchColors,
+                    )
+                }
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
                             text = "播放页屏幕常亮",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
@@ -1281,7 +1309,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.5.4 正式版",
+                            text = "v1.6 正式版",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,

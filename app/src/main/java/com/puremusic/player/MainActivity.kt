@@ -165,6 +165,7 @@ private fun PureMusicApp(
     val fadeInSeconds by viewModel.fadeInSeconds.collectAsStateWithLifecycle()
     val gaplessEnabled by viewModel.gaplessEnabled.collectAsStateWithLifecycle()
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
+    val carModeEnabled by viewModel.carModeEnabled.collectAsStateWithLifecycle()
     val customFontName by viewModel.customFontName.collectAsStateWithLifecycle()
     val customFontVersion by viewModel.customFontVersion.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
@@ -424,7 +425,7 @@ private fun PureMusicApp(
             val isTabletLayout = when (layoutMode) {
                 LayoutMode.TABLET -> true
                 LayoutMode.PHONE -> false
-                LayoutMode.AUTO -> maxWidth >= 600.dp
+                LayoutMode.AUTO -> minOf(maxWidth, maxHeight) >= 560.dp
             }
             val miniPlayerVisible = playerState.currentSong != null && !isTabletLayout
             val bottomContentPadding = PaddingValues(
@@ -469,7 +470,10 @@ private fun PureMusicApp(
                         fadeInSeconds = fadeInSeconds,
                         gaplessEnabled = gaplessEnabled,
                         hapticEnabled = hapticEnabled,
+                        carModeEnabled = carModeEnabled,
                         keepScreenOn = keepScreenOn,
+                    carModeEnabled = carModeEnabled,
+                    onToggleCarMode = viewModel::setCarModeEnabled,
                         liquidGlassEnabled = liquidGlassEnabled,
                         floatingControlsEnabled = floatingControlsEnabled,
                         liquidGlassLevel = liquidGlassLevel,
@@ -492,6 +496,10 @@ private fun PureMusicApp(
                         onSelectFadeInSeconds = viewModel::setFadeInSeconds,
                         onToggleGapless = viewModel::setGaplessEnabled,
                         onToggleHaptic = viewModel::setHapticEnabled,
+                        onToggleCarMode = {
+                            viewModel.setCarModeEnabled(it)
+                            if (it && playerState.currentSong != null) showNowPlaying = true
+                        },
                         onToggleKeepScreenOn = viewModel::setKeepScreenOn,
                         onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
                         onToggleFloatingControls = viewModel::setFloatingControlsEnabled,

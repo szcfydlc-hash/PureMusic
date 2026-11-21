@@ -263,6 +263,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = true,
     )
 
+    val carModeEnabled: StateFlow<Boolean> = playlistRepository.carModeEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false,
+    )
+
     val lyricOffsets: StateFlow<Map<Long, Long>> = playlistRepository.lyricOffsetsFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -864,6 +870,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setHapticEnabled(enabled: Boolean) {
         viewModelScope.launch { playlistRepository.setHapticEnabled(enabled) }
+    }
+
+    fun setCarModeEnabled(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setCarModeEnabled(enabled) }
     }
 
     fun adjustCurrentLyricOffset(deltaMs: Long) {

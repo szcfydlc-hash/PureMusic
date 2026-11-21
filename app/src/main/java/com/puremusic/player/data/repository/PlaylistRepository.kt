@@ -65,6 +65,7 @@ class PlaylistRepository(private val context: Context) {
         val FADE_IN_SECONDS = intPreferencesKey("fade_in_seconds")
         val GAPLESS_ENABLED = booleanPreferencesKey("gapless_enabled")
         val HAPTIC_ENABLED = booleanPreferencesKey("haptic_enabled")
+        val CAR_MODE_ENABLED = booleanPreferencesKey("car_mode_enabled")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val RECENT_SONG_IDS = stringPreferencesKey("recent_song_ids")
         val PLAY_COUNTS_JSON = stringPreferencesKey("play_counts_json")
@@ -191,6 +192,10 @@ class PlaylistRepository(private val context: Context) {
 
     val hapticEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.HAPTIC_ENABLED] ?: true
+    }
+
+    val carModeEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.CAR_MODE_ENABLED] ?: false
     }
 
     val recentSongIdsFlow: Flow<List<Long>> = context.pureMusicDataStore.data.map { prefs ->
@@ -401,6 +406,10 @@ class PlaylistRepository(private val context: Context) {
 
     suspend fun setHapticEnabled(enabled: Boolean) {
         context.pureMusicDataStore.edit { it[Keys.HAPTIC_ENABLED] = enabled }
+    }
+
+    suspend fun setCarModeEnabled(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.CAR_MODE_ENABLED] = enabled }
     }
 
     suspend fun recordSongPlayed(songId: Long) {
