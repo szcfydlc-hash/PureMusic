@@ -998,7 +998,7 @@ private fun TabletLeftSidebar(
                 ) {
                     SpinningVinylDisc(
                         albumArtUri = song?.albumArtUri,
-                        rotationDegrees = 0f,
+                        rotationProvider = { 0f },
                         discSize = 126.dp,
                     )
                     Text(

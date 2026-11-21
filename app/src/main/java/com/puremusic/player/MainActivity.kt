@@ -333,7 +333,7 @@ private fun PureMusicApp(
             val targets = pendingBatchDeleteSongs
             pendingBatchDeleteSongs = emptyList()
             if (result.resultCode == Activity.RESULT_OK && targets.isNotEmpty()) {
-                targets.forEach { viewModel.onSongDeletedExternally(it) }
+                targets.forEach { viewModel.onSongDeletedFromDevice(it) }
                 Toast.makeText(context, "已删除 ${targets.size} 首本地歌曲", Toast.LENGTH_SHORT).show()
             }
         }
@@ -352,7 +352,7 @@ private fun PureMusicApp(
                         Toast.makeText(context, "批量删除请求失败", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    targets.forEach { viewModel.deleteLocalSongLegacy(it) }
+                    targets.forEach { viewModel.deleteSongLegacy(it) }
                     Toast.makeText(context, "已删除 ${targets.size} 首歌曲", Toast.LENGTH_SHORT).show()
                 }
             }

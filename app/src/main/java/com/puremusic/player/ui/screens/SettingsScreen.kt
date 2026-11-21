@@ -1115,7 +1115,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.4.2 正式版",
+                            text = "v1.4.3 正式版",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,

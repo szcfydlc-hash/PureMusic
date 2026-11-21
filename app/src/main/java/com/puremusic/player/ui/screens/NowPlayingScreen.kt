@@ -142,6 +142,7 @@ import com.puremusic.player.ui.theme.DynamicColorExtractor
 import com.puremusic.player.ui.theme.DynamicSongPalette
 import kotlinx.coroutines.isActive
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NowPlayingScreen(
     playerState: PlayerUiState,
