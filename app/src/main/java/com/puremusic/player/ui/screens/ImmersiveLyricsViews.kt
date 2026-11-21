@@ -1286,7 +1286,7 @@ fun LiveSpectrumWaveformSeekBar(
             withFrameNanos { nowNs ->
                 val dt = if (lastNs == 0L) 0.016f else ((nowNs - lastNs) / 1_000_000_000f).coerceIn(0.004f, 0.05f)
                 lastNs = nowNs
-                if (isPlaying) wavePhase += dt * (3.6f + beatEnergy * 3.2f)
+                if (isPlaying) wavePhase += dt * (6.2f + beatEnergy * 5.8f)
 
                 val bandCount = spectrumBands.size.coerceAtLeast(1)
                 var energySum = 0f
@@ -1296,23 +1296,23 @@ fun LiveSpectrumWaveformSeekBar(
                 var changed = false
                 for (i in 0 until barCount) {
                     val t = i.toFloat() / (barCount - 1)
-                    val ribbonTaper = 0.42f + 0.58f * sin(t * Math.PI).toFloat()
+                    val ribbonTaper = 0.58f + 0.42f * sin(t * Math.PI).toFloat()
                     val target = if (isPlaying) {
                         val live = spectrumBands[(i * bandCount) / barCount]
                         val travelWave = 0.5f + 0.5f * sin(wavePhase - i * 0.24f)
                         if (hasLivePcm) {
-                            val dynamicPeak = (live * 1.12f + beatEnergy * 0.22f * travelWave) * ribbonTaper
-                            (0.10f + dynamicPeak * 0.90f).coerceIn(0.10f, 0.98f)
+                            val dynamicPeak = (live * 1.48f + beatEnergy * 0.36f * travelWave) * ribbonTaper
+                            (0.12f + dynamicPeak * 0.96f).coerceIn(0.12f, 1.0f)
                         } else {
-                            val organic = (0.28f + 0.52f * travelWave * (0.65f + 0.35f * sin(wavePhase * 0.6f + i * 0.11f))) * ribbonTaper
-                            organic.coerceIn(0.12f, 0.88f)
+                            val organic = (0.32f + 0.68f * travelWave * (0.65f + 0.35f * sin(wavePhase * 0.85f + i * 0.14f))) * ribbonTaper
+                            organic.coerceIn(0.14f, 0.98f)
                         }
                     } else {
                         restingContour[i] * 0.58f
                     }
 
                     val cur = animatedLevels[i]
-                    val speed = if (target > cur) 24f else 6.8f
+                    val speed = if (target > cur) 36f else 13.5f
                     val next = cur + (target - cur) * (dt * speed).coerceAtMost(1f)
                     if (abs(next - cur) > 0.001f) changed = true
                     animatedLevels[i] = next
@@ -1322,7 +1322,7 @@ fun LiveSpectrumWaveformSeekBar(
                     peakHoldLevels[i] = if (next >= prevPeak) {
                         next
                     } else {
-                        (prevPeak - dt * 0.38f).coerceAtLeast(next)
+                        (prevPeak - dt * 0.58f).coerceAtLeast(next)
                     }
                 }
                 if (changed || isPlaying) frameTick++
@@ -1350,7 +1350,7 @@ fun LiveSpectrumWaveformSeekBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .height(68.dp)
                 .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
                 .pointerInput(durationMs) {
                     detectTapGestures { offset ->
@@ -1383,7 +1383,7 @@ fun LiveSpectrumWaveformSeekBar(
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(62.dp),
             ) {
                 val _tick = frameTick
                 val totalW = size.width
@@ -1441,23 +1441,7 @@ fun LiveSpectrumWaveformSeekBar(
                             drawPath(crestPath, color = unplayedColor.copy(alpha = 0.80f), style = Stroke(width = 1.6f, cap = StrokeCap.Round))
                         }
 
-                        // Tapered cinnabar needle + glowing top jewel dot
-                        drawLine(
-                            color = needleColor.copy(alpha = 0.26f + beatEnergy * 0.24f),
-                            start = Offset(playheadX, 3f),
-                            end = Offset(playheadX, baseY),
-                            strokeWidth = if (isDragging) 7.5f else 5.5f,
-                            cap = StrokeCap.Round,
-                        )
-                        drawLine(
-                            color = needleColor,
-                            start = Offset(playheadX, 3f),
-                            end = Offset(playheadX, baseY),
-                            strokeWidth = if (isDragging) 3.2f else 2.2f,
-                            cap = StrokeCap.Round,
-                        )
-                        drawCircle(color = needleColor.copy(alpha = 0.35f), radius = 5.5f, center = Offset(playheadX, 3.5f))
-                        drawCircle(color = needleColor, radius = 2.6f, center = Offset(playheadX, 3.5f))
+                        // Clean brightness split marks progress without vertical stick
                     }
 
                     SpectrumStyle.HARMONIC_STRINGS -> {
@@ -1474,7 +1458,7 @@ fun LiveSpectrumWaveformSeekBar(
                         val bassEnergy = animatedLevels[barCount / 2]
                         val midEnergy = animatedLevels[barCount / 3]
                         val highEnergy = animatedLevels[(barCount * 3) / 4]
-                        val maxAmp = totalH * 0.42f
+                        val maxAmp = totalH * 0.47f
 
                         var primaryAtPlayheadY = midY
                         val stringSpecs = listOf(
@@ -1483,9 +1467,9 @@ fun LiveSpectrumWaveformSeekBar(
                             Triple(2.6f, 1.2f, needleColor.copy(alpha = 0.85f)),
                         )
                         val amps = listOf(
-                            (0.22f + bassEnergy * 0.78f) * maxAmp,
-                            (0.18f + midEnergy * 0.62f) * maxAmp,
-                            (0.14f + highEnergy * 0.46f) * maxAmp,
+                            (0.30f + bassEnergy * 0.88f).coerceAtMost(1f) * maxAmp,
+                            (0.24f + midEnergy * 0.78f).coerceAtMost(1f) * maxAmp,
+                            (0.18f + highEnergy * 0.66f).coerceAtMost(1f) * maxAmp,
                         )
                         val freqs = listOf(2.4f, 3.2f, 4.1f)
 
@@ -1519,13 +1503,7 @@ fun LiveSpectrumWaveformSeekBar(
                             }
                         }
 
-                        // Delicate vertical playhead hairline + glowing intersection bead on primary string
-                        drawLine(
-                            color = playedColor.copy(alpha = 0.45f),
-                            start = Offset(playheadX, 2f),
-                            end = Offset(playheadX, totalH - 2f),
-                            strokeWidth = 1.2f,
-                        )
+                        // Clean glowing intersection bead on primary string (no vertical line)
                         drawCircle(color = playedColor.copy(alpha = 0.28f), radius = 7.5f, center = Offset(playheadX, primaryAtPlayheadY))
                         drawCircle(color = playedColor, radius = 3.4f, center = Offset(playheadX, primaryAtPlayheadY))
                     }
@@ -1582,12 +1560,7 @@ fun LiveSpectrumWaveformSeekBar(
                             )
                         }
 
-                        drawLine(
-                            color = playedColor.copy(alpha = 0.42f),
-                            start = Offset(playheadX, 2f),
-                            end = Offset(playheadX, matrixBottom),
-                            strokeWidth = 1.4f,
-                        )
+                        // Clean played/unplayed dot contrast marks progress without vertical line
                     }
 
                     SpectrumStyle.INK_MOUNTAIN -> {

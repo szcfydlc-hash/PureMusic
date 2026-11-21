@@ -48,7 +48,7 @@ object AudioSpectrumBus {
 
     fun updateFromPcm16(buffer: ByteBuffer, startPos: Int, limit: Int, channelCount: Int) {
         val now = SystemClock.uptimeMillis()
-        if (now - lastEmitMs < 18L) return // ~55 fps fluid tracking
+        if (now - lastEmitMs < 14L) return // ~70 fps snappy tracking
         lastEmitMs = now
 
         val channels = channelCount.coerceAtLeast(1)
@@ -127,8 +127,8 @@ object AudioSpectrumBus {
             val binIdx = (distFromCenter * (halfBands - 1)).toInt().coerceIn(0, halfBands - 1)
             val norm = (rawHalf[binIdx] * normScale).coerceIn(0f, 1.25f)
             // Dynamic contrast expansion (power 1.35) + rhythmic beat boost so beats visually pop
-            val beatBoost = (1f - distFromCenter * 0.55f) * smoothedBeat * 0.34f
-            val contrasted = (norm.pow(1.35f) * 0.88f + beatBoost).coerceIn(0f, 1f)
+            val beatBoost = (1f - distFromCenter * 0.40f) * smoothedBeat * 0.46f
+            val contrasted = (norm.pow(1.12f) * 1.15f + beatBoost).coerceIn(0f, 1f)
             rawFull[i] = contrasted
         }
 
@@ -144,9 +144,9 @@ object AudioSpectrumBus {
 
             val prev = smoothed[i]
             val damped = if (graceful > prev) {
-                prev + (graceful - prev) * 0.72f
+                prev + (graceful - prev) * 0.84f
             } else {
-                prev + (graceful - prev) * 0.20f
+                prev + (graceful - prev) * 0.34f
             }
             smoothed[i] = if (abs(damped) < 0.004f) 0f else damped
             next[i] = smoothed[i]
