@@ -68,6 +68,9 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -165,6 +168,7 @@ private fun ArtworkPlaceholder(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongRowItem(
     song: Song,
@@ -180,6 +184,9 @@ fun SongRowItem(
     onDeleteSong: (() -> Unit)? = null,
     extraMenuActionLabel: String? = null,
     onExtraMenuAction: (() -> Unit)? = null,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val density = LocalLayoutDensity.current
@@ -196,10 +203,44 @@ fun SongRowItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(start = 18.dp, end = 6.dp, top = density.rowVerticalPaddingDp.dp, bottom = density.rowVerticalPaddingDp.dp),
+            .background(
+                if (isSelectionMode && isSelected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                } else {
+                    Color.Transparent
+                },
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .padding(start = 16.dp, end = 6.dp, top = density.rowVerticalPaddingDp.dp, bottom = density.rowVerticalPaddingDp.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (isSelectionMode) {
+            Box(
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .border(
+                        width = 1.5.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        }
         Box(modifier = Modifier.size(density.artSizeDp.dp)) {
             AlbumArtwork(
                 uri = song.albumArtUri,

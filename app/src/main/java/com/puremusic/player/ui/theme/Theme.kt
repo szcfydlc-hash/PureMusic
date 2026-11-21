@@ -159,6 +159,7 @@ val LocalLiquidGlassLevel = compositionLocalOf { LiquidGlassLevel.FULL }
 val LocalFloatingControls = compositionLocalOf { false }
 val LocalMiniPlayerStyle = compositionLocalOf { MiniPlayerStyle.CLASSIC_BOOK }
 val LocalMiniPlayerHeightDp = compositionLocalOf { 58 }
+val LocalHapticEnabled = compositionLocalOf { true }
 
 fun sidebarColorFor(isDark: Boolean): Color = if (isDark) Color(0xFF1A1A1C) else Color(0xFFEEECE7)
 
@@ -175,6 +176,7 @@ fun PureMusicTheme(
     floatingControlsEnabled: Boolean = false,
     miniPlayerStyle: MiniPlayerStyle = MiniPlayerStyle.CLASSIC_BOOK,
     miniPlayerHeightDp: Int = 58,
+    hapticEnabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val useDark = when (backgroundStyle) {
@@ -350,6 +352,7 @@ fun PureMusicTheme(
         LocalFloatingControls provides floatingControlsEnabled,
         LocalMiniPlayerStyle provides miniPlayerStyle,
         LocalMiniPlayerHeightDp provides miniPlayerHeightDp,
+        LocalHapticEnabled provides hapticEnabled,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

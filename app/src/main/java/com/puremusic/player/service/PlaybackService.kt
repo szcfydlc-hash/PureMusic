@@ -9,6 +9,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.puremusic.player.MainActivity
@@ -27,10 +28,23 @@ class PlaybackService : MediaSessionService() {
             .setUsage(C.USAGE_MEDIA)
             .build()
 
+        // Gapless-ready continuous pre-buffering LoadControl (50s buffer, seamless track boundary)
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                15_000,
+                50_000,
+                1_000,
+                2_000,
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
         val player = ExoPlayer.Builder(this)
+            .setLoadControl(loadControl)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .build()
+        player.pauseAtEndOfMediaItems = false
 
         if (player.audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
             AudioEqualizerManager.attachToSession(player.audioSessionId)

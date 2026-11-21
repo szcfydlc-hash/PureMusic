@@ -59,6 +59,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -112,6 +113,8 @@ fun SettingsScreen(
     fontSlantDegrees: Float,
     playbackSpeed: Float,
     fadeInSeconds: Int,
+    gaplessEnabled: Boolean = true,
+    hapticEnabled: Boolean = true,
     keepScreenOn: Boolean,
     liquidGlassEnabled: Boolean,
     floatingControlsEnabled: Boolean,
@@ -132,6 +135,8 @@ fun SettingsScreen(
     onChangeFontSlantDegrees: (Float) -> Unit,
     onSelectPlaybackSpeed: (Float) -> Unit,
     onSelectFadeInSeconds: (Int) -> Unit,
+    onToggleGapless: (Boolean) -> Unit = {},
+    onToggleHaptic: (Boolean) -> Unit = {},
     onToggleKeepScreenOn: (Boolean) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onToggleFloatingControls: (Boolean) -> Unit,
@@ -148,6 +153,8 @@ fun SettingsScreen(
     onSelectMinDurationFilter: (MinDurationFilter) -> Unit,
     onOpenEqualizer: () -> Unit,
     onOpenSleepTimer: () -> Unit,
+    onExportBackup: () -> Unit = {},
+    onImportBackup: () -> Unit = {},
 ) {
     BackHandler(onBack = onBackToLibrary)
 
@@ -176,9 +183,14 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxSize(),
         color = canvasBg,
     ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter,
+        ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .widthIn(max = 680.dp)
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(
@@ -940,6 +952,18 @@ fun SettingsScreen(
                     value = "已启用 $enabledCount / ${allFolders.size}",
                     onClick = { showFolderManagerDialog = true },
                 )
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                SettingsListRow(
+                    label = "导出歌单与收藏备份",
+                    value = "JSON",
+                    onClick = onExportBackup,
+                )
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                SettingsListRow(
+                    label = "从备份恢复歌单与收藏",
+                    value = "导入",
+                    onClick = onImportBackup,
+                )
             }
 
             // Card 6: 播放与音效
@@ -973,10 +997,62 @@ fun SettingsScreen(
                 )
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 SettingsListRow(
-                    label = "切歌柔和淡入",
+                    label = "切歌交叉淡化 (Crossfade)",
                     value = if (fadeInSeconds <= 0) "关闭" else "${fadeInSeconds} 秒",
                     onClick = { showFadeInDialog = true },
                 )
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "无缝衔接播放 (Gapless)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "预缓冲音轨消除现场/组曲切歌停顿",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = gaplessEnabled,
+                        onCheckedChange = onToggleGapless,
+                        colors = switchColors,
+                    )
+                }
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "细腻触觉反馈",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "切歌、进度滑块与长按提供轻微震动质感",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = hapticEnabled,
+                        onCheckedChange = onToggleHaptic,
+                        colors = switchColors,
+                    )
+                }
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Row(
                     modifier = Modifier
@@ -1039,7 +1115,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.0 正式版",
+                            text = "v1.4.2 正式版",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -1053,6 +1129,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
         }
     }
 

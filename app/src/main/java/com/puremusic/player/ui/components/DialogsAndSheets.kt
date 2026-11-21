@@ -48,6 +48,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -1823,4 +1824,122 @@ fun BatchSongPickerSheet(
             }
         }
     }
+}
+
+@Composable
+fun SingleTrackRepeatDialog(
+    currentCount: Int,
+    onDismiss: () -> Unit,
+    onSelectCount: (Int) -> Unit,
+) {
+    var selectedCount by remember(currentCount) {
+        mutableStateOf(if (currentCount > 1) currentCount else 3)
+    }
+    val presets = listOf(0, 2, 3, 5, 10)
+    val outlineColor = MaterialTheme.colorScheme.outline
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(14.dp),
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("单曲复听次数", fontWeight = FontWeight.Bold)
+                Text(
+                    text = "播满设定次数后自动切到下一首",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    presets.forEach { preset ->
+                        val isChosen = if (preset == 0) currentCount <= 1 && selectedCount == 0 else selectedCount == preset
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(
+                                    if (isChosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                                .border(0.75.dp, outlineColor, RoundedCornerShape(18.dp))
+                                .clickable {
+                                    if (preset == 0) {
+                                        onSelectCount(0)
+                                        onDismiss()
+                                    } else {
+                                        selectedCount = preset
+                                    }
+                                }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = if (preset == 0) "关闭" else "${preset}次",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isChosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(0.75.dp, outlineColor, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    IconButton(
+                        onClick = { if (selectedCount > 2) selectedCount-- },
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Remove,
+                            contentDescription = "减少次数",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Text(
+                        text = "$selectedCount 次",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    IconButton(
+                        onClick = { if (selectedCount < 99) selectedCount++ },
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = "增加次数",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSelectCount(selectedCount)
+                    onDismiss()
+                },
+            ) {
+                Text("开始复听（${selectedCount} 遍）", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }

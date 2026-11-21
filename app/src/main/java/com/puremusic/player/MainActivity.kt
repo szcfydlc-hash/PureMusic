@@ -50,6 +50,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.puremusic.player.ui.components.SingleTrackRepeatDialog
+import android.widget.Toast
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import coil.Coil
+import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,6 +109,24 @@ import com.puremusic.player.ui.theme.PureMusicTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Global Coil 25% memory cache + 120MB disk thumbnail cache for 120Hz scrolling
+        Coil.setImageLoader {
+            ImageLoader.Builder(applicationContext)
+                .memoryCache {
+                    MemoryCache.Builder(applicationContext)
+                        .maxSizePercent(0.25)
+                        .build()
+                }
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(applicationContext.cacheDir.resolve("coil_art_cache"))
+                        .maxSizeBytes(120L * 1024L * 1024L)
+                        .build()
+                }
+                .crossfade(true)
+                .respectCacheHeaders(false)
+                .build()
+        }
         enableEdgeToEdge()
         setContent {
             PureMusicApp()
@@ -127,7 +156,10 @@ private fun PureMusicApp(
     val fontSlantDegrees by viewModel.fontSlantDegrees.collectAsStateWithLifecycle()
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val fadeInSeconds by viewModel.fadeInSeconds.collectAsStateWithLifecycle()
+    val gaplessEnabled by viewModel.gaplessEnabled.collectAsStateWithLifecycle()
+    val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
+    val singleRepeatRemaining by viewModel.singleRepeatRemaining.collectAsStateWithLifecycle()
 
     val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -175,6 +207,7 @@ private fun PureMusicApp(
         floatingControlsEnabled = floatingControlsEnabled,
         miniPlayerStyle = miniPlayerStyle,
         miniPlayerHeightDp = miniPlayerHeightDp,
+        hapticEnabled = hapticEnabled,
     ) {
         if (!hasAudioPermission) {
             PermissionPromptScreen(
@@ -218,6 +251,7 @@ private fun PureMusicApp(
         var activeMainTab by remember { mutableStateOf(MainTab.LIBRARY) }
         var showNowPlaying by remember { mutableStateOf(false) }
         var showEqualizer by remember { mutableStateOf(false) }
+    var showRepeatCountDialog by remember { mutableStateOf(false) }
         var showSleepTimer by remember { mutableStateOf(false) }
         var showQueue by remember { mutableStateOf(false) }
         var showLyrics by remember { mutableStateOf(false) }
@@ -290,6 +324,73 @@ private fun PureMusicApp(
             }
         }
 
+        var pendingBatchPlaylistSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+        var pendingBatchDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+
+        val batchDeleteLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartIntentSenderForResult(),
+        ) { result ->
+            val targets = pendingBatchDeleteSongs
+            pendingBatchDeleteSongs = emptyList()
+            if (result.resultCode == Activity.RESULT_OK && targets.isNotEmpty()) {
+                targets.forEach { viewModel.onSongDeletedExternally(it) }
+                Toast.makeText(context, "已删除 ${targets.size} 首本地歌曲", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        val requestBatchDeleteSongs: (List<Song>) -> Unit = { targets ->
+            if (targets.isNotEmpty()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    runCatching {
+                        val pi = MediaStore.createDeleteRequest(
+                            context.contentResolver,
+                            targets.map { it.contentUri },
+                        )
+                        pendingBatchDeleteSongs = targets
+                        batchDeleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+                    }.onFailure {
+                        Toast.makeText(context, "批量删除请求失败", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    targets.forEach { viewModel.deleteLocalSongLegacy(it) }
+                    Toast.makeText(context, "已删除 ${targets.size} 首歌曲", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        val exportBackupLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("application/json"),
+        ) { uri ->
+            if (uri != null) {
+                runCatching {
+                    val json = viewModel.exportBackupJson()
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(json.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "歌单与收藏备份已导出", Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(context, "导出失败，请重试", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        val importBackupLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri != null) {
+                runCatching {
+                    val text = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    if (!text.isNullOrBlank()) {
+                        viewModel.importBackupJson(text) { msg ->
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }.onFailure {
+                    Toast.makeText(context, "读取备份文件失败", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val isTabletLayout = when (layoutMode) {
                 LayoutMode.TABLET -> true
@@ -305,11 +406,21 @@ private fun PureMusicApp(
                 },
             )
 
+            val backdropScale by animateFloatAsState(
+                targetValue = if (showNowPlaying && playerState.currentSong != null) 0.965f else 1f,
+                animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
+                label = "backdropDepthScale",
+            )
             AnimatedContent(
                 targetState = activeMainTab == MainTab.SETTINGS,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(180)) },
                 label = "mainRootSwitch",
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = backdropScale
+                        scaleY = backdropScale
+                    },
             ) { isSettingsTab ->
                 if (isSettingsTab) {
                     SettingsScreen(
@@ -326,6 +437,8 @@ private fun PureMusicApp(
                         fontSlantDegrees = fontSlantDegrees,
                         playbackSpeed = playbackSpeed,
                         fadeInSeconds = fadeInSeconds,
+                        gaplessEnabled = gaplessEnabled,
+                        hapticEnabled = hapticEnabled,
                         keepScreenOn = keepScreenOn,
                         liquidGlassEnabled = liquidGlassEnabled,
                         floatingControlsEnabled = floatingControlsEnabled,
@@ -346,6 +459,8 @@ private fun PureMusicApp(
                         onChangeFontSlantDegrees = viewModel::setFontSlantDegrees,
                         onSelectPlaybackSpeed = viewModel::setPlaybackSpeed,
                         onSelectFadeInSeconds = viewModel::setFadeInSeconds,
+                        onToggleGapless = viewModel::setGaplessEnabled,
+                        onToggleHaptic = viewModel::setHapticEnabled,
                         onToggleKeepScreenOn = viewModel::setKeepScreenOn,
                         onToggleLiquidGlass = viewModel::setLiquidGlassEnabled,
                         onToggleFloatingControls = viewModel::setFloatingControlsEnabled,
@@ -362,6 +477,8 @@ private fun PureMusicApp(
                         onSelectMinDurationFilter = viewModel::setMinDurationFilter,
                         onOpenEqualizer = { showEqualizer = true },
                         onOpenSleepTimer = { showSleepTimer = true },
+                        onExportBackup = { exportBackupLauncher.launch("PureMusic_Backup.json") },
+                        onImportBackup = { importBackupLauncher.launch(arrayOf("application/json", "text/*")) },
                     )
                 } else {
                     LibraryScreen(
@@ -399,6 +516,12 @@ private fun PureMusicApp(
                         onReplaceCover = { coverSearchSong = it },
                         onMatchLyrics = { lyricsSearchSong = it },
                         onDeleteSong = requestDeleteLocalSong,
+                        onBatchAddToPlaylist = { chosen -> pendingBatchPlaylistSongs = chosen },
+                        onBatchFavorite = { chosen ->
+                            viewModel.addSongsToFavorites(chosen.map { it.id })
+                            Toast.makeText(context, "已将 ${chosen.size} 首加入我喜欢", Toast.LENGTH_SHORT).show()
+                        },
+                        onBatchDeleteSongs = requestBatchDeleteSongs,
                         onRequestCreatePlaylist = { showCreatePlaylist = true },
                         onRequestDeletePlaylist = { deletingPlaylist = it },
                         onRequestRenamePlaylist = { renamingPlaylist = it },
@@ -447,8 +570,14 @@ private fun PureMusicApp(
 
             AnimatedVisibility(
                 visible = showNowPlaying && playerState.currentSong != null,
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it }),
+                enter = slideInVertically(
+                    animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
+                    initialOffsetY = { it },
+                ) + fadeIn(tween(200)),
+                exit = slideOutVertically(
+                    animationSpec = tween(240),
+                    targetOffsetY = { it },
+                ) + fadeOut(tween(180)),
             ) {
                 val currentSong = playerState.currentSong
                 NowPlayingScreen(
@@ -469,6 +598,8 @@ private fun PureMusicApp(
                     onSkipPrevious = viewModel::skipPrevious,
                     onSkipNext = viewModel::skipNext,
                     onSeekTo = viewModel::seekTo,
+                    singleRepeatRemaining = singleRepeatRemaining,
+                    onOpenRepeatCountDialog = { showRepeatCountDialog = true },
                     onToggleShuffle = viewModel::toggleShuffle,
                     onCycleRepeat = viewModel::cycleRepeatMode,
                     onToggleFavorite = { viewModel.toggleFavorite(it.id) },
@@ -548,12 +679,42 @@ private fun PureMusicApp(
             )
         }
 
+        if (pendingBatchPlaylistSongs.isNotEmpty()) {
+            val batchSongs = pendingBatchPlaylistSongs
+            val representative = batchSongs.first().copy(title = "已选 ${batchSongs.size} 首歌曲")
+            AddToPlaylistDialog(
+                song = representative,
+                playlists = playlists,
+                onDismiss = { pendingBatchPlaylistSongs = emptyList() },
+                onSelectPlaylist = { playlistId ->
+                    viewModel.addSongsToPlaylist(playlistId, batchSongs.map { it.id })
+                    Toast.makeText(context, "已添加 ${batchSongs.size} 首歌曲到歌单", Toast.LENGTH_SHORT).show()
+                },
+                onCreateAndAdd = { name ->
+                    viewModel.createPlaylist(name, batchSongs.map { it.id })
+                    Toast.makeText(context, "已创建歌单并加入 ${batchSongs.size} 首歌曲", Toast.LENGTH_SHORT).show()
+                },
+            )
+        }
+
         if (showSleepTimer) {
             SleepTimerDialog(
                 remainingMs = sleepTimerRemainingMs,
                 onDismiss = { showSleepTimer = false },
                 onSelectMinutes = viewModel::startSleepTimer,
                 onCancelTimer = viewModel::cancelSleepTimer,
+            )
+        }
+
+        if (showRepeatCountDialog) {
+            SingleTrackRepeatDialog(
+                currentCount = singleRepeatRemaining,
+                onDismiss = { showRepeatCountDialog = false },
+                onSelectCount = { count ->
+                    viewModel.setSingleTrackRepeatCount(count)
+                    val tip = if (count <= 1) "已关闭单曲复听计数" else "已设定本曲复听 $count 遍"
+                    Toast.makeText(context, tip, Toast.LENGTH_SHORT).show()
+                },
             )
         }
 

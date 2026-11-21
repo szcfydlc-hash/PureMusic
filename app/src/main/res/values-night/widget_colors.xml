@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_text_primary">#F2ECE1</color>
+    <color name="widget_text_secondary">#A69F95</color>
+    <color name="widget_icon_tint">#F2ECE1</color>
+    <color name="widget_play_icon_tint">#161415</color>
+</resources>

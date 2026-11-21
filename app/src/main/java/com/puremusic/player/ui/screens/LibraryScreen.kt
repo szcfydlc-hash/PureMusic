@@ -93,6 +93,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.PlaylistAdd
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -205,6 +209,9 @@ fun LibraryScreen(
     onReplaceCover: (Song) -> Unit,
     onMatchLyrics: (Song) -> Unit,
     onDeleteSong: (Song) -> Unit,
+    onBatchAddToPlaylist: (List<Song>) -> Unit = {},
+    onBatchFavorite: (List<Song>) -> Unit = {},
+    onBatchDeleteSongs: (List<Song>) -> Unit = {},
     onRequestCreatePlaylist: () -> Unit,
     onRequestDeletePlaylist: (Playlist) -> Unit,
     onRequestRenamePlaylist: (Playlist) -> Unit,
@@ -222,6 +229,8 @@ fun LibraryScreen(
     var selectedSubTab by remember { mutableStateOf(LibrarySubTab.SONGS) }
     var activeDetail by remember { mutableStateOf<CollectionDetail?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var isSelectionMode by remember { mutableStateOf(false) }
+    var selectedSongIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var searchExpanded by remember { mutableStateOf(false) }
     var usePosterGrid by remember { mutableStateOf(false) }
     var albumCompactThreeCol by remember { mutableStateOf(true) }
@@ -555,8 +564,59 @@ fun LibraryScreen(
                     )
                 }
 
-                // 4. Ultra-Clean Compact Single-Line Toolbar (🔀 515  ...  Sort + Grid/List)
+                // 4. Ultra-Clean Compact Single-Line Toolbar (or Batch Multi-Select Header)
                 if (activeMainTab == MainTab.LIBRARY && selectedSubTab == LibrarySubTab.SONGS && !isLoading && songs.isNotEmpty()) {
+                    if (isSelectionMode) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        isSelectionMode = false
+                                        selectedSongIds = emptySet()
+                                    },
+                                    modifier = Modifier.size(36.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = "退出多选",
+                                        tint = MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                                Text(
+                                    text = "已选 ${selectedSongIds.size} 首",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                )
+                            }
+                            Text(
+                                text = if (selectedSongIds.size == songs.size) "取消全选" else "全选",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        selectedSongIds = if (selectedSongIds.size == songs.size) {
+                                            emptySet()
+                                        } else {
+                                            songs.map { it.id }.toSet()
+                                        }
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                            )
+                        }
+                    } else {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -590,6 +650,20 @@ fun LibraryScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
+                            IconButton(
+                                onClick = {
+                                    isSelectionMode = true
+                                    selectedSongIds = emptySet()
+                                },
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Checklist,
+                                    contentDescription = "批量多选",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                             Box {
                                 IconButton(
                                     onClick = { sortMenuExpanded = true },
@@ -643,6 +717,7 @@ fun LibraryScreen(
                             }
                         }
                     }
+                    }
                 }
 
                 // 5. Main Tab Content Area
@@ -677,6 +752,43 @@ fun LibraryScreen(
             onMatchLyrics = onMatchLyrics,
             onDeleteSong = onDeleteSong,
                                     onRefresh = onRefreshLibrary,
+                                    isSelectionMode = isSelectionMode,
+                                    selectedSongIds = selectedSongIds,
+                                    onToggleSelectSong = { songId ->
+                                        selectedSongIds = if (songId in selectedSongIds) {
+                                            selectedSongIds - songId
+                                        } else {
+                                            selectedSongIds + songId
+                                        }
+                                    },
+                                    onEnterSelectionWithSong = { songId ->
+                                        isSelectionMode = true
+                                        selectedSongIds = selectedSongIds + songId
+                                    },
+                                    onBatchAddToPlaylist = {
+                                        val chosen = songs.filter { it.id in selectedSongIds }
+                                        if (chosen.isNotEmpty()) {
+                                            onBatchAddToPlaylist(chosen)
+                                            isSelectionMode = false
+                                            selectedSongIds = emptySet()
+                                        }
+                                    },
+                                    onBatchFavorite = {
+                                        val chosen = songs.filter { it.id in selectedSongIds }
+                                        if (chosen.isNotEmpty()) {
+                                            onBatchFavorite(chosen)
+                                            isSelectionMode = false
+                                            selectedSongIds = emptySet()
+                                        }
+                                    },
+                                    onBatchDelete = {
+                                        val chosen = songs.filter { it.id in selectedSongIds }
+                                        if (chosen.isNotEmpty()) {
+                                            onBatchDeleteSongs(chosen)
+                                            isSelectionMode = false
+                                            selectedSongIds = emptySet()
+                                        }
+                                    },
                                     bottomPadding = bottomContentPadding,
                                 )
 
@@ -968,6 +1080,13 @@ private fun SongsTabContent(
     onMatchLyrics: (Song) -> Unit,
     onDeleteSong: (Song) -> Unit,
     onRefresh: () -> Unit,
+    isSelectionMode: Boolean = false,
+    selectedSongIds: Set<Long> = emptySet(),
+    onToggleSelectSong: (Long) -> Unit = {},
+    onEnterSelectionWithSong: (Long) -> Unit = {},
+    onBatchAddToPlaylist: () -> Unit = {},
+    onBatchFavorite: () -> Unit = {},
+    onBatchDelete: () -> Unit = {},
     bottomPadding: PaddingValues,
 ) {
     if (songs.isEmpty()) {
@@ -1098,36 +1217,151 @@ private fun SongsTabContent(
         }
     } else {
         val listState = rememberLazyListState()
+        val wideGridState = rememberLazyGridState()
         val scope = rememberCoroutineScope()
-        Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
-                state = listState,
-                contentPadding = PaddingValues(
-                    end = 22.dp,
-                    bottom = bottomPadding.calculateBottomPadding(),
-                ),
-            ) {
-                itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
-                    SongRowItem(
-                        song = song,
-                        isCurrent = playerState.currentSong?.id == song.id,
-                        isPlaying = playerState.isPlaying,
-                        isFavorite = song.id in favoriteSongIds,
-                        onClick = { onPlaySongs(songs, index, false) },
-                        onAddToPlaylist = { onRequestAddToPlaylist(song) },
-                        onToggleFavorite = { onToggleFavorite(song.id) },
-                        onShowSongInfo = { onShowSongInfo(song) },
-                        onReplaceCover = { onReplaceCover(song) },
-                        onMatchLyrics = { onMatchLyrics(song) },
-                        onDeleteSong = { onDeleteSong(song) },
-                    )
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val useTwoColumnList = maxWidth >= 600.dp
+            if (useTwoColumnList) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    state = wideGridState,
+                    contentPadding = PaddingValues(
+                        end = 22.dp,
+                        bottom = bottomPadding.calculateBottomPadding(),
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
+                        SongRowItem(
+                            song = song,
+                            isCurrent = playerState.currentSong?.id == song.id,
+                            isPlaying = playerState.isPlaying,
+                            isFavorite = song.id in favoriteSongIds,
+                            onClick = {
+                                if (isSelectionMode) onToggleSelectSong(song.id) else onPlaySongs(songs, index, false)
+                            },
+                            onAddToPlaylist = { onRequestAddToPlaylist(song) },
+                            onToggleFavorite = { onToggleFavorite(song.id) },
+                            onShowSongInfo = { onShowSongInfo(song) },
+                            onReplaceCover = { onReplaceCover(song) },
+                            onMatchLyrics = { onMatchLyrics(song) },
+                            onDeleteSong = { onDeleteSong(song) },
+                            isSelectionMode = isSelectionMode,
+                            isSelected = song.id in selectedSongIds,
+                            onLongClick = { onEnterSelectionWithSong(song.id) },
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(
+                        end = 22.dp,
+                        bottom = bottomPadding.calculateBottomPadding(),
+                    ),
+                ) {
+                    itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
+                        SongRowItem(
+                            song = song,
+                            isCurrent = playerState.currentSong?.id == song.id,
+                            isPlaying = playerState.isPlaying,
+                            isFavorite = song.id in favoriteSongIds,
+                            onClick = {
+                                if (isSelectionMode) onToggleSelectSong(song.id) else onPlaySongs(songs, index, false)
+                            },
+                            onAddToPlaylist = { onRequestAddToPlaylist(song) },
+                            onToggleFavorite = { onToggleFavorite(song.id) },
+                            onShowSongInfo = { onShowSongInfo(song) },
+                            onReplaceCover = { onReplaceCover(song) },
+                            onMatchLyrics = { onMatchLyrics(song) },
+                            onDeleteSong = { onDeleteSong(song) },
+                            isSelectionMode = isSelectionMode,
+                            isSelected = song.id in selectedSongIds,
+                            onLongClick = { onEnterSelectionWithSong(song.id) },
+                        )
+                    }
                 }
             }
             val currentSongIdx = remember(songs, playerState.currentSong?.id) {
                 val cid = playerState.currentSong?.id
                 if (cid == null) -1 else songs.indexOfFirst { it.id == cid }
             }
-            if (currentSongIdx >= 0) {
+            if (isSelectionMode && selectedSongIds.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = bottomPadding.calculateBottomPadding() + 14.dp)
+                        .shadow(8.dp, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(0.85.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(26.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onBatchAddToPlaylist)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PlaylistAdd,
+                            contentDescription = "批量加歌单",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(21.dp),
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "加歌单",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onBatchFavorite)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.FavoriteBorder,
+                            contentDescription = "批量加入喜欢",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(21.dp),
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "我喜欢",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onBatchDelete)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.DeleteOutline,
+                            contentDescription = "批量删除",
+                            tint = Color(0xFFB83B2A),
+                            modifier = Modifier.size(21.dp),
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "删除",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFB83B2A),
+                        )
+                    }
+                }
+            }
+            if (currentSongIdx >= 0 && !isSelectionMode) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -1138,7 +1372,13 @@ private fun SongsTabContent(
                         .background(MaterialTheme.colorScheme.surface)
                         .border(0.75.dp, MaterialTheme.colorScheme.outline, CircleShape)
                         .clickable {
-                            scope.launch { listState.animateScrollToItem(currentSongIdx) }
+                            scope.launch {
+                                if (useTwoColumnList) {
+                                    wideGridState.animateScrollToItem(currentSongIdx)
+                                } else {
+                                    listState.animateScrollToItem(currentSongIdx)
+                                }
+                            }
                         },
                     contentAlignment = Alignment.Center,
                 ) {

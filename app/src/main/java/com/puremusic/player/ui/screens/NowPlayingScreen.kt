@@ -81,6 +81,21 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.puremusic.player.ui.theme.LocalHapticEnabled
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -143,6 +158,8 @@ fun NowPlayingScreen(
     onSkipPrevious: () -> Unit,
     onSkipNext: () -> Unit,
     onSeekTo: (Long) -> Unit,
+    singleRepeatRemaining: Int = 0,
+    onOpenRepeatCountDialog: () -> Unit = {},
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onToggleFavorite: (Song) -> Unit,
@@ -168,6 +185,8 @@ fun NowPlayingScreen(
     }
 
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
     DisposableEffect(keepScreenOn) {
         val window = (context as? Activity)?.window
         if (keepScreenOn) {
@@ -307,6 +326,45 @@ fun NowPlayingScreen(
             return@Box
         }
 
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isLandscape = maxWidth > maxHeight && maxWidth >= 560.dp
+            if (isLandscape) {
+                LandscapeVinylSleeveNowPlaying(
+                    song = song,
+                    playerState = playerState,
+                    durationMs = durationMs,
+                    adjustedPosMs = adjustedPosMs,
+                    lyrics = lyrics,
+                    vinylRotationProvider = { vinylAngle.value },
+                    isFavorite = isFavorite,
+                    isDarkTheme = isDarkTheme,
+                    lyricFamily = lyricFamily,
+                    lyricStyleItalic = lyricStyleItalic,
+                    accentColor = activeAccentColor,
+                    primaryTextColor = primaryTextColor,
+                    secondaryTextColor = secondaryTextColor,
+                    audioSpec = audioSpec,
+                    isTranslatingLyrics = isTranslatingLyrics,
+                    onClose = onClose,
+                    onTogglePlayPause = onTogglePlayPause,
+                    onSkipPrevious = onSkipPrevious,
+                    onSkipNext = onSkipNext,
+                    onSeekTo = onSeekTo,
+                    singleRepeatRemaining = singleRepeatRemaining,
+                    onOpenRepeatCountDialog = onOpenRepeatCountDialog,
+                    onToggleShuffle = onToggleShuffle,
+                    onCycleRepeat = onCycleRepeat,
+                    onToggleFavorite = { onToggleFavorite(song) },
+                    onOpenQueue = onOpenQueue,
+                    onOpenEqualizer = onOpenEqualizer,
+                    onOpenSleepTimer = onOpenSleepTimer,
+                    onOpenSettings = onOpenSettings,
+                    onOpenLyricsSearch = { onOpenLyricsSearch(song) },
+                    onOpenCoverSearch = { onOpenCoverSearch(song) },
+                    onTranslateLyrics = onTranslateLyrics,
+                    onOpenFullLyrics = { showFullLyrics = true },
+                )
+            } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -317,7 +375,7 @@ fun NowPlayingScreen(
             InteractivePosterWallHeader(
                 currentSong = song,
                 allSongs = allSongs,
-                vinylRotation = vinylAngle.value,
+                vinylRotationProvider = { vinylAngle.value },
                 backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
                 backIconTint = primaryTextColor,
                 sleepTimerRemainingMs = sleepTimerRemainingMs,
@@ -520,7 +578,10 @@ fun NowPlayingScreen(
                     }
 
                     FilledIconButton(
-                        onClick = onTogglePlayPause,
+                        onClick = {
+                            if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onTogglePlayPause()
+                        },
                         shape = CircleShape,
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = when {
@@ -554,16 +615,54 @@ fun NowPlayingScreen(
                         )
                     }
 
-                    IconButton(onClick = onCycleRepeat) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .combinedClickable(
+                                onClick = {
+                                    if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onCycleRepeat()
+                                },
+                                onLongClick = {
+                                    if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onOpenRepeatCountDialog()
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Icon(
-                            imageVector = when (playerState.repeatMode) {
-                                RepeatMode.ONE -> Icons.Rounded.RepeatOne
+                            imageVector = when {
+                                singleRepeatRemaining > 0 -> Icons.Rounded.RepeatOne
+                                playerState.repeatMode == RepeatMode.ONE -> Icons.Rounded.RepeatOne
                                 else -> Icons.Rounded.Repeat
                             },
-                            contentDescription = "循环模式",
-                            tint = if (playerState.repeatMode != RepeatMode.OFF) activeAccentColor else primaryTextColor.copy(alpha = 0.85f),
+                            contentDescription = "循环模式（长按设置复听次数）",
+                            tint = if (singleRepeatRemaining > 0 || playerState.repeatMode != RepeatMode.OFF) {
+                                activeAccentColor
+                            } else {
+                                primaryTextColor.copy(alpha = 0.85f)
+                            },
                             modifier = Modifier.size(21.dp),
                         )
+                        if (singleRepeatRemaining > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 4.dp, end = 2.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(activeAccentColor)
+                                    .padding(horizontal = 4.dp, vertical = 0.5.dp),
+                            ) {
+                                Text(
+                                    text = "×$singleRepeatRemaining",
+                                    fontSize = 9.sp,
+                                    lineHeight = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -596,7 +695,7 @@ fun NowPlayingScreen(
 
                     IconButton(onClick = onOpenEqualizer) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
+                            imageVector = Icons.Rounded.Tune,
                             contentDescription = "音效与均衡器",
                             tint = primaryTextColor.copy(alpha = 0.82f),
                             modifier = Modifier.size(22.dp),
@@ -623,6 +722,467 @@ fun NowPlayingScreen(
                 }
             }
         }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LandscapeVinylSleeveNowPlaying(
+    song: Song,
+    playerState: PlayerUiState,
+    durationMs: Long,
+    adjustedPosMs: Long,
+    lyrics: List<LyricLine>,
+    vinylRotationProvider: () -> Float,
+    isFavorite: Boolean,
+    isDarkTheme: Boolean,
+    lyricFamily: FontFamily,
+    lyricStyleItalic: FontStyle,
+    accentColor: Color,
+    primaryTextColor: Color,
+    secondaryTextColor: Color,
+    audioSpec: AudioTechSpec,
+    isTranslatingLyrics: Boolean,
+    onClose: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSeekTo: (Long) -> Unit,
+    singleRepeatRemaining: Int = 0,
+    onOpenRepeatCountDialog: () -> Unit = {},
+    onToggleShuffle: () -> Unit,
+    onCycleRepeat: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onOpenQueue: () -> Unit,
+    onOpenEqualizer: () -> Unit,
+    onOpenSleepTimer: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenLyricsSearch: () -> Unit,
+    onOpenCoverSearch: () -> Unit,
+    onTranslateLyrics: () -> Unit,
+    onOpenFullLyrics: () -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val activeIdx = remember(lyrics, adjustedPosMs) {
+        lyrics.indexOfLast { it.timeMs <= adjustedPosMs }
+    }
+    val prevLine = if (activeIdx > 0) lyrics.getOrNull(activeIdx - 1) else null
+    val currLine = if (activeIdx >= 0) lyrics.getOrNull(activeIdx) else lyrics.firstOrNull()
+    val nextLine = if (activeIdx >= 0) lyrics.getOrNull(activeIdx + 1) else lyrics.getOrNull(1)
+    val activeLyricColor = if (isDarkTheme) Color(0xFFF6DEC8) else accentColor
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // LEFT PANE (~48%): Top '<' and '...' + Square Physical Album Sleeve with Spinning Peeking Vinyl LP
+        Box(
+            modifier = Modifier
+                .weight(0.48f)
+                .fillMaxHeight(),
+        ) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(40.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                    contentDescription = "返回曲库",
+                    tint = primaryTextColor,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreHoriz,
+                        contentDescription = "更多操作",
+                        tint = primaryTextColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("播放队列") },
+                        onClick = { menuExpanded = false; onOpenQueue() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("音频均衡器") },
+                        onClick = { menuExpanded = false; onOpenEqualizer() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (playerState.shuffleEnabled) "关闭随机播放" else "开启随机播放") },
+                        onClick = { menuExpanded = false; onToggleShuffle() },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            val modeLabel = when (playerState.repeatMode) {
+                                RepeatMode.OFF -> "循环模式：顺序"
+                                RepeatMode.ALL -> "循环模式：列表循环"
+                                RepeatMode.ONE -> "循环模式：单曲循环"
+                            }
+                            Text(modeLabel)
+                        },
+                        onClick = { menuExpanded = false; onCycleRepeat() },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (singleRepeatRemaining > 0) "单曲复听（剩余 $singleRepeatRemaining 遍）"
+                                else "单曲复听次数",
+                            )
+                        },
+                        onClick = { menuExpanded = false; onOpenRepeatCountDialog() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("睡眠定时") },
+                        onClick = { menuExpanded = false; onOpenSleepTimer() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("在线匹配歌词") },
+                        onClick = { menuExpanded = false; onOpenLyricsSearch() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("更换封面") },
+                        onClick = { menuExpanded = false; onOpenCoverSearch() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("外观与设置") },
+                        onClick = { menuExpanded = false; onOpenSettings() },
+                    )
+                }
+            }
+
+            // Centered Square Album Sleeve + Continuously Rotating Peeking 96-Groove Vinyl LP
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 34.dp, bottom = 12.dp, start = 6.dp, end = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                val sleeveSize = min(maxWidth * 0.68f, maxHeight * 0.86f)
+                val discSize = sleeveSize * 0.90f
+                val totalWidth = sleeveSize + discSize * 0.36f
+
+                Box(
+                    modifier = Modifier
+                        .width(totalWidth)
+                        .height(sleeveSize),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    // Spinning Black Vinyl LP peeking ~36% out from the right edge of the sleeve
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd),
+                    ) {
+                        SpinningVinylDisc(
+                            albumArtUri = song.albumArtUri,
+                            rotationProvider = vinylRotationProvider,
+                            discSize = discSize,
+                        )
+                    }
+
+                    // Physical Square Album Sleeve sitting in front with realistic editorial shadow
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .size(sleeveSize)
+                            .shadow(18.dp, RoundedCornerShape(2.dp), ambientColor = Color.Black.copy(alpha = 0.40f))
+                            .clip(RoundedCornerShape(2.dp))
+                            .combinedClickable(
+                                onClick = onOpenFullLyrics,
+                                onLongClick = onOpenCoverSearch,
+                            ),
+                    ) {
+                        AlbumArtwork(
+                            uri = song.albumArtUri,
+                            contentDescription = song.album,
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadius = 2.dp,
+                            iconSize = 42.dp,
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(24.dp))
+
+        // RIGHT PANE (~52%): Compact Top Track Header + Left-Aligned 3-Line Editorial Lyrics + Thin SeekBar + 3-Button Controls
+        Column(
+            modifier = Modifier
+                .weight(0.52f)
+                .fillMaxHeight()
+                .padding(end = 12.dp, top = 4.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            // Top Track Info Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AlbumArtwork(
+                        uri = song.albumArtUri,
+                        contentDescription = song.album,
+                        modifier = Modifier.size(42.dp),
+                        cornerRadius = 4.dp,
+                        iconSize = 16.dp,
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = song.title,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = primaryTextColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = song.artist,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = secondaryTextColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (lyrics.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(primaryTextColor.copy(alpha = 0.08f))
+                                .clickable(enabled = !isTranslatingLyrics, onClick = onTranslateLyrics)
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = if (isTranslatingLyrics) "译…" else "译",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = secondaryTextColor,
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            contentDescription = "喜欢",
+                            tint = if (isFavorite) accentColor else secondaryTextColor,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+
+            // Middle: Generous Left-Aligned 3-Line Dynamic Kinetic Lyrics
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenFullLyrics),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (lyrics.isNotEmpty()) {
+                    AnimatedContent(
+                        targetState = Triple(prevLine?.primaryText, currLine, nextLine?.primaryText),
+                        transitionSpec = {
+                            (fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 5 }) togetherWith
+                                (fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it / 5 })
+                        },
+                        label = "landscape3LineLyrics",
+                    ) { (prevText, current, nextText) ->
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalAlignment = Alignment.Start,
+                        ) {
+                            Text(
+                                text = prevText.orEmpty(),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontFamily = lyricFamily,
+                                    fontStyle = lyricStyleItalic,
+                                ),
+                                color = secondaryTextColor.copy(alpha = 0.72f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = current?.primaryText.orEmpty(),
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontSize = 30.sp,
+                                        lineHeight = 38.sp,
+                                        fontFamily = lyricFamily,
+                                        fontStyle = lyricStyleItalic,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    color = activeLyricColor,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (!current?.secondaryText.isNullOrBlank()) {
+                                    Text(
+                                        text = current?.secondaryText.orEmpty(),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = lyricFamily),
+                                        color = secondaryTextColor,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            Text(
+                                text = nextText.orEmpty(),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontFamily = lyricFamily,
+                                    fontStyle = lyricStyleItalic,
+                                ),
+                                color = secondaryTextColor.copy(alpha = 0.72f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.Start,
+                    ) {
+                        Text(
+                            text = if (song.album.isNotBlank() && !song.album.equals(song.title, ignoreCase = true)) {
+                                "专辑 · ${song.album}"
+                            } else {
+                                song.artist
+                            },
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontFamily = lyricFamily,
+                                fontStyle = lyricStyleItalic,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            color = primaryTextColor.copy(alpha = 0.85f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (audioSpec.displayText.isNotBlank()) {
+                            AudioSpecStamp(
+                                spec = audioSpec,
+                                accentColor = accentColor,
+                                outlineColor = MaterialTheme.colorScheme.outline,
+                                secondaryTextColor = secondaryTextColor,
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                                .clickable(onClick = onOpenLyricsSearch)
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                text = "在线匹配歌词",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = accentColor,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Bottom: Thin Seek Bar + Timestamps + Minimalist 3-Icon Playback Controls
+            Column(modifier = Modifier.fillMaxWidth()) {
+                ThinSeekBar(
+                    positionMs = playerState.positionMs,
+                    durationMs = durationMs,
+                    activeLineColor = accentColor,
+                    accentColor = if (isDarkTheme) Color(0xFFF2ECE1) else primaryTextColor,
+                    trackColor = secondaryTextColor.copy(alpha = 0.28f),
+                    onSeekTo = onSeekTo,
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = formatDuration(playerState.positionMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondaryTextColor,
+                    )
+                    Text(
+                        text = formatDuration(playerState.durationMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondaryTextColor,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onSkipPrevious) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipPrevious,
+                            contentDescription = "上一首",
+                            tint = primaryTextColor,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = onTogglePlayPause,
+                        modifier = Modifier.size(52.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                            tint = primaryTextColor,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
+                    IconButton(onClick = onSkipNext) {
+                        Icon(
+                            imageVector = Icons.Rounded.SkipNext,
+                            contentDescription = "下一首",
+                            tint = primaryTextColor,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -631,7 +1191,7 @@ fun NowPlayingScreen(
 private fun InteractivePosterWallHeader(
     currentSong: Song,
     allSongs: List<Song>,
-    vinylRotation: Float,
+    vinylRotationProvider: () -> Float,
     backButtonBg: Color,
     backIconTint: Color,
     sleepTimerRemainingMs: Long?,
@@ -726,20 +1286,11 @@ private fun InteractivePosterWallHeader(
                     .align(Alignment.TopCenter)
                     .offset(y = gridHeight - discSize * 0.58f),
             ) {
-                AnimatedContent(
-                    targetState = currentSong.id to currentSong.albumArtUri,
-                    transitionSpec = {
-                        (fadeIn(tween(300)) + scaleIn(initialScale = 0.92f, animationSpec = tween(300))) togetherWith
-                            (fadeOut(tween(200)) + scaleOut(targetScale = 0.96f, animationSpec = tween(200)))
-                    },
-                    label = "vinylTrackSwitch",
-                ) { (_, artUri) ->
-                    SpinningVinylDisc(
-                        albumArtUri = artUri,
-                        rotationDegrees = vinylRotation,
-                        discSize = discSize,
-                    )
-                }
+                SpinningVinylDisc(
+                    albumArtUri = currentSong.albumArtUri,
+                    rotationProvider = vinylRotationProvider,
+                    discSize = discSize,
+                )
             }
         }
     }
@@ -807,7 +1358,7 @@ private fun DarkVinylTileFallback() {
 @Composable
 fun SpinningVinylDisc(
     albumArtUri: Uri?,
-    rotationDegrees: Float,
+    rotationProvider: () -> Float,
     discSize: Dp,
 ) {
     Box(
@@ -946,22 +1497,28 @@ fun SpinningVinylDisc(
             )
         }
 
-        // Clean unobstructed 37% circular album art label (zero clutter covering artwork)
+        // Clean unobstructed 37% circular album art label (GPU graphicsLayer zero-recomposition spin, zero shadow flash)
         Box(
             modifier = Modifier
                 .size(discSize * 0.37f)
-                .rotate(rotationDegrees)
+                .graphicsLayer { rotationZ = rotationProvider() }
                 .clip(CircleShape)
                 .border(1.5.dp, Color(0xFF0A0A0B), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            AlbumArtwork(
-                uri = albumArtUri,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                cornerRadius = discSize,
-                iconSize = 24.dp,
-            )
+            AnimatedContent(
+                targetState = albumArtUri,
+                transitionSpec = { fadeIn(tween(360)) togetherWith fadeOut(tween(240)) },
+                label = "vinylCenterArtworkCrossfade",
+            ) { artUri ->
+                AlbumArtwork(
+                    uri = artUri,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = discSize,
+                    iconSize = 24.dp,
+                )
+            }
         }
     }
 }
@@ -975,6 +1532,8 @@ private fun ThinSeekBar(
     trackColor: Color,
     onSeekTo: (Long) -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
     var widthPx by remember { mutableFloatStateOf(1f) }
     var isDragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
@@ -1000,6 +1559,7 @@ private fun ThinSeekBar(
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
                         isDragging = true
+                        if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         dragFraction = (offset.x / widthPx).coerceIn(0f, 1f)
                     },
                     onHorizontalDrag = { change, _ ->
@@ -1089,35 +1649,61 @@ private fun EditorialFullScreenLyricsView(
         if (found >= 0) found else if (lyrics.isNotEmpty()) 0 else -1
     }
     var showOffsetBar by remember { mutableStateOf(false) }
-
     var menuExpanded by remember { mutableStateOf(false) }
     val outlineColor = MaterialTheme.colorScheme.outline
     val activeLineColor = if (isDarkTheme) primaryTextColor else accentColor
+    val textMeasurer = rememberTextMeasurer()
+
+    val gridCells = remember(lyrics, activeIdx) {
+        if (lyrics.isEmpty() || activeIdx < 0) {
+            listOf(
+                floatArrayOf(0.55f, 0.24f, 0.34f, -10f),
+                floatArrayOf(0.84f, 0.28f, 0.28f, 0f),
+                floatArrayOf(0.70f, 0.48f, 0.36f, 0f),
+                floatArrayOf(0.86f, 0.64f, 0.30f, 0f),
+            )
+        } else {
+            val window = ((activeIdx - 2).coerceAtLeast(0)..(activeIdx + 3).coerceAtMost(lyrics.lastIndex))
+            window.mapIndexed { i, lineIdx ->
+                val txt = lyrics[lineIdx].primaryText.trim()
+                val lastToken = txt.split(Regex("[\\s,，。!?！？/]+")).lastOrNull { it.isNotBlank() } ?: txt
+                val seed = (lastToken.hashCode() and 0x7FFFFFFF)
+                val xRatio = 0.42f + ((seed % 46) / 100f)
+                val yRatio = 0.18f + (i * 0.115f)
+                val sizeRatio = (0.20f + (lastToken.length.coerceIn(1, 8) * 0.032f)).coerceAtMost(0.42f)
+                val angle = if (i == 0 || lineIdx == activeIdx) ((seed % 22) - 11).toFloat() else 0f
+                floatArrayOf(xRatio, yRatio, sizeRatio, angle)
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Subtle Editorial Architectural Grid Lines on right margin
+        // 1. Breathing Animated Last-Word Architectural Wireframe Grid Backdrop
+        val gridPhase by animateFloatAsState(
+            targetValue = (activeIdx % 8).toFloat(),
+            animationSpec = tween(durationMillis = 750),
+            label = "gridBreathPhase",
+        )
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val gridColor = accentColor.copy(alpha = if (isDarkTheme) 0.10f else 0.12f)
-            val stroke = 1.0f
+            val gridColor = accentColor.copy(alpha = if (isDarkTheme) 0.12f else 0.13f)
             val w = size.width
             val h = size.height
-            val colX = w * 0.88f
-            drawLine(
-                color = gridColor,
-                start = Offset(colX, h * 0.08f),
-                end = Offset(colX, h * 0.86f),
-                strokeWidth = stroke,
-            )
-            val step = 36f
-            var y = h * 0.14f
-            while (y < h * 0.84f) {
-                drawLine(
-                    color = gridColor.copy(alpha = 0.08f),
-                    start = Offset(colX, y),
-                    end = Offset(w, y),
-                    strokeWidth = 0.8f,
-                )
-                y += step
+            gridCells.forEachIndexed { idx, vals ->
+                val driftX = kotlin.math.sin((gridPhase + idx) * 0.75f) * 0.025f
+                val driftY = kotlin.math.cos((gridPhase + idx) * 0.65f) * 0.015f
+                val cx = w * (vals[0] + driftX)
+                val cy = h * (vals[1] + driftY)
+                val boxW = w * vals[2]
+                val boxH = boxW * (if (idx % 2 == 0) 0.72f else 0.92f)
+                val rot = vals[3] + kotlin.math.sin((gridPhase + idx) * 0.5f) * 2.5f
+                rotate(degrees = rot, pivot = Offset(cx, cy)) {
+                    drawRect(
+                        color = gridColor,
+                        topLeft = Offset(cx - boxW / 2f, cy - boxH / 2f),
+                        size = Size(boxW, boxH),
+                        style = Stroke(width = 1.1f),
+                    )
+                }
             }
         }
 
@@ -1128,11 +1714,11 @@ private fun EditorialFullScreenLyricsView(
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 2. Minimal Top Navigation Bar (<  +  简约音乐  +  ...)
+            // 2. Clean Top Bar: '<' on left, '...' on right (no "动态字幕" label)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -1145,18 +1731,13 @@ private fun EditorialFullScreenLyricsView(
                     )
                 }
 
-                Text(
-                    text = "动态字幕",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = secondaryTextColor.copy(alpha = 0.8f),
-                )
-
                 Box {
                     IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
                         Icon(
                             imageVector = Icons.Rounded.MoreHoriz,
-                            contentDescription = "歌词与封面选项",
+                            contentDescription = "更多操作",
                             tint = primaryTextColor,
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                     DropdownMenu(
@@ -1166,122 +1747,83 @@ private fun EditorialFullScreenLyricsView(
                         tonalElevation = 0.dp,
                         border = BorderStroke(0.75.dp, outlineColor),
                     ) {
-                        if (lyrics.isNotEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text(if (isTranslatingLyrics) "正在翻译中文双语..." else "翻译为中文双语歌词") },
-                                enabled = !isTranslatingLyrics,
-                                onClick = {
-                                    menuExpanded = false
-                                    onTranslateLyrics()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (showOffsetBar) "隐藏时间轴微调" else "歌词时间轴微调 (±0.5s)") },
-                                onClick = {
-                                    menuExpanded = false
-                                    showOffsetBar = !showOffsetBar
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("查看完整歌词列表") },
-                                onClick = {
-                                    menuExpanded = false
-                                    onOpenFullLyricsSheet()
-                                },
-                            )
-                        }
+                        DropdownMenuItem(
+                            text = { Text("全部歌词列表") },
+                            onClick = { menuExpanded = false; onOpenFullLyricsSheet() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (showOffsetBar) "隐藏歌词微调" else "歌词时间微调 (±0.5s)") },
+                            onClick = { menuExpanded = false; showOffsetBar = !showOffsetBar },
+                        )
                         DropdownMenuItem(
                             text = { Text("在线匹配 / 导入歌词") },
-                            onClick = {
-                                menuExpanded = false
-                                onOpenLyricsSearch()
-                            },
+                            onClick = { menuExpanded = false; onOpenLyricsSearch() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("更换封面") },
+                            onClick = { menuExpanded = false; onOpenCoverSearch() },
                         )
                         DropdownMenuItem(
                             text = { Text("添加到歌单") },
-                            onClick = {
-                                menuExpanded = false
-                                onAddToPlaylist()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("更换歌曲封面") },
-                            onClick = {
-                                menuExpanded = false
-                                onOpenCoverSearch()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("切换回黑胶唱片") },
-                            onClick = {
-                                menuExpanded = false
-                                onBackToVinyl()
-                            },
+                            onClick = { menuExpanded = false; onAddToPlaylist() },
                         )
                         DropdownMenuItem(
                             text = { Text("收起播放页") },
-                            onClick = {
-                                menuExpanded = false
-                                onClosePlayer()
-                            },
+                            onClick = { menuExpanded = false; onClosePlayer() },
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 3. Centered Miniature Vinyl Sleeve + Title/Artist + Inline 「译」 Pill
-            Box(
-                modifier = Modifier
-                    .size(width = 76.dp, height = 56.dp)
-                    .clickable(onClick = onBackToVinyl),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF0C0C0E))
-                        .border(0.8.dp, Color.White.copy(alpha = 0.22f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(accentColor.copy(alpha = 0.85f)),
-                    )
-                }
-                AlbumArtwork(
-                    uri = song.albumArtUri,
-                    contentDescription = song.album,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .shadow(4.dp, RoundedCornerShape(3.dp)),
-                    cornerRadius = 3.dp,
-                    iconSize = 20.dp,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
+            // 3. Flush Left-Aligned Sleeve+Vinyl & Right-Aligned Title/Artist/Spec + Inline「译」Pill
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 28.dp),
+                    .padding(horizontal = 22.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 82.dp, height = 60.dp)
+                        .clickable(onClick = onBackToVinyl),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF0C0C0E))
+                            .border(0.8.dp, Color.White.copy(alpha = 0.22f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(15.dp)
+                                .clip(CircleShape)
+                                .background(accentColor.copy(alpha = 0.85f)),
+                        )
+                    }
+                    AlbumArtwork(
+                        uri = song.albumArtUri,
+                        contentDescription = song.album,
+                        modifier = Modifier
+                            .size(60.dp)
+                            .shadow(5.dp, RoundedCornerShape(3.dp)),
+                        cornerRadius = 3.dp,
+                        iconSize = 22.dp,
+                    )
+                }
+
                 Column(
-                    modifier = Modifier.weight(1f, fill = false),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    horizontalAlignment = Alignment.Start,
                 ) {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = primaryTextColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1294,7 +1836,7 @@ private fun EditorialFullScreenLyricsView(
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (audioSpec.displayText.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         AudioSpecStamp(
                             spec = audioSpec,
                             accentColor = activeLineColor,
@@ -1305,14 +1847,13 @@ private fun EditorialFullScreenLyricsView(
                 }
 
                 if (lyrics.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(10.dp))
                     val pillShape = RoundedCornerShape(6.dp)
                     Box(
                         modifier = Modifier
                             .clip(pillShape)
                             .border(0.75.dp, outlineColor, pillShape)
                             .clickable(enabled = !isTranslatingLyrics, onClick = onTranslateLyrics)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = 9.dp, vertical = 5.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (isTranslatingLyrics) {
@@ -1333,16 +1874,20 @@ private fun EditorialFullScreenLyricsView(
                 }
             }
 
-            // 4. Center Cinema-Subtitle Stage: STRICTLY 3 LINES (Previous / Enlarged Bold Current / Next)
-            Box(
+            // 4. Fixed-Stage Auto-Sized Editorial Kinetic Typography Lyrics
+            BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 28.dp),
-                contentAlignment = Alignment.Center,
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                contentAlignment = Alignment.CenterStart,
             ) {
+                val stageWidthPx = constraints.maxWidth
+                val stageHeightPx = constraints.maxHeight
+
                 if (lyrics.isEmpty() || activeIdx < 0) {
                     Column(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
@@ -1381,184 +1926,194 @@ private fun EditorialFullScreenLyricsView(
                         targetState = activeIdx,
                         transitionSpec = {
                             val forward = targetState >= initialState
-                            val enterSlide = slideInVertically(tween(340)) { if (forward) it / 5 else -it / 5 }
-                            val exitSlide = slideOutVertically(tween(240)) { if (forward) -it / 5 else it / 5 }
-                            (fadeIn(tween(340)) + enterSlide + scaleIn(tween(340), initialScale = 0.96f)) togetherWith
+                            val enterSlide = slideInVertically(tween(380)) { if (forward) it / 6 else -it / 6 }
+                            val exitSlide = slideOutVertically(tween(240)) { if (forward) -it / 6 else it / 6 }
+                            (fadeIn(tween(380)) + enterSlide + scaleIn(tween(380), initialScale = 0.96f)) togetherWith
                                 (fadeOut(tween(220)) + exitSlide)
                         },
-                        label = "cinemaThreeLineSubtitle",
-                        modifier = Modifier.fillMaxWidth(),
+                        label = "autoFitEditorialLyrics",
+                        modifier = Modifier.fillMaxSize(),
                     ) { idx ->
                         val prevLine = lyrics.getOrNull(idx - 1)
                         val currLine = lyrics.getOrNull(idx)
                         val nextLine = lyrics.getOrNull(idx + 1)
 
+                        val currentText = currLine?.primaryText.orEmpty()
+                        val targetTextHeightPx = (stageHeightPx * 0.56f).toInt().coerceAtLeast(120)
+                        val fittedFontSp = remember(currentText, stageWidthPx, targetTextHeightPx, lyricFamily, lyricStyleItalic) {
+                            var candidate = 64f
+                            while (candidate >= 24f) {
+                                val layout = textMeasurer.measure(
+                                    text = currentText,
+                                    style = TextStyle(
+                                        fontFamily = lyricFamily,
+                                        fontStyle = lyricStyleItalic,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = candidate.sp,
+                                        lineHeight = (candidate * 1.18f).sp,
+                                    ),
+                                    constraints = Constraints(maxWidth = stageWidthPx),
+                                )
+                                if (layout.size.height <= targetTextHeightPx) {
+                                    break
+                                }
+                                candidate -= 3f
+                            }
+                            candidate.coerceIn(24f, 64f)
+                        }
+
+                        val styledCurrent = remember(currentText, primaryTextColor, activeLineColor) {
+                            val words = currentText.split(" ").filter { it.isNotBlank() }
+                            buildAnnotatedString {
+                                if (words.size >= 3) {
+                                    val splitStart = 1
+                                    val splitEnd = (words.size / 2 + 1).coerceAtMost(words.lastIndex)
+                                    val part1 = words.subList(0, splitStart).joinToString(" ") + " "
+                                    val part2 = words.subList(splitStart, splitEnd).joinToString(" ")
+                                    val part3 = " " + words.subList(splitEnd, words.size).joinToString(" ")
+                                    pushStyle(SpanStyle(color = primaryTextColor))
+                                    append(part1)
+                                    pop()
+                                    pushStyle(SpanStyle(color = activeLineColor))
+                                    append(part2)
+                                    pop()
+                                    pushStyle(SpanStyle(color = primaryTextColor))
+                                    append(part3)
+                                    pop()
+                                } else if (currentText.length >= 4) {
+                                    val midStart = currentText.length / 3
+                                    val midEnd = (currentText.length * 2 / 3).coerceAtLeast(midStart + 1)
+                                    pushStyle(SpanStyle(color = primaryTextColor))
+                                    append(currentText.substring(0, midStart))
+                                    pop()
+                                    pushStyle(SpanStyle(color = activeLineColor))
+                                    append(currentText.substring(midStart, midEnd))
+                                    pop()
+                                    pushStyle(SpanStyle(color = primaryTextColor))
+                                    append(currentText.substring(midEnd))
+                                    pop()
+                                } else {
+                                    pushStyle(SpanStyle(color = activeLineColor))
+                                    append(currentText)
+                                    pop()
+                                }
+                            }
+                        }
+
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(24.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.Start,
                         ) {
-                            // Line 1: Previous lyric (subtle, calm, tappable to step back)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .clickable(enabled = prevLine != null && prevLine.timeMs > 0L) {
-                                        prevLine?.let { onSeekTo(it.timeMs) }
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                if (prevLine != null) {
-                                    Text(
-                                        text = prevLine.primaryText,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontFamily = lyricFamily,
-                                            fontStyle = lyricStyleItalic,
-                                            fontSize = 18.sp,
-                                            lineHeight = 24.sp,
-                                        ),
-                                        color = secondaryTextColor.copy(alpha = 0.45f),
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
+                            if (prevLine != null) {
+                                Text(
+                                    text = prevLine.primaryText,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontFamily = lyricFamily,
+                                        fontStyle = lyricStyleItalic,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 17.sp,
+                                        lineHeight = 23.sp,
+                                    ),
+                                    color = secondaryTextColor.copy(alpha = 0.65f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .clickable(enabled = prevLine.timeMs > 0L) { onSeekTo(prevLine.timeMs) }
+                                        .padding(bottom = 12.dp),
+                                )
                             }
 
-                            // Line 2: Middle Active Lyric (DRAMATICALLY ENLARGED & BOLDED!)
-                            if (currLine != null) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Text(
-                                        text = currLine.primaryText,
-                                        style = MaterialTheme.typography.headlineLarge.copy(
-                                            fontFamily = lyricFamily,
-                                            fontStyle = lyricStyleItalic,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 32.sp,
-                                            lineHeight = 42.sp,
-                                        ),
-                                        color = activeLineColor,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 3,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    if (!currLine.secondaryText.isNullOrBlank()) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = currLine.secondaryText,
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontFamily = lyricFamily,
-                                                fontStyle = lyricStyleItalic,
-                                                fontSize = 16.sp,
-                                                lineHeight = 22.sp,
-                                            ),
-                                            color = activeLineColor.copy(alpha = 0.82f),
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-                            }
+                            Text(
+                                text = styledCurrent,
+                                style = TextStyle(
+                                    fontFamily = lyricFamily,
+                                    fontStyle = lyricStyleItalic,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = fittedFontSp.sp,
+                                    lineHeight = (fittedFontSp * 1.18f).sp,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
 
-                            // Line 3: Next lyric (gentle preview, tappable to advance)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .clickable(enabled = nextLine != null && nextLine.timeMs > 0L) {
+                            val bottomNote = currLine?.secondaryText?.takeIf { it.isNotBlank() } ?: nextLine?.primaryText
+                            if (!bottomNote.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text(
+                                    text = bottomNote,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontFamily = lyricFamily,
+                                        fontStyle = lyricStyleItalic,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 17.sp,
+                                        lineHeight = 23.sp,
+                                    ),
+                                    color = secondaryTextColor.copy(alpha = 0.80f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.clickable(enabled = nextLine != null) {
                                         nextLine?.let { onSeekTo(it.timeMs) }
                                     },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                if (nextLine != null) {
-                                    Text(
-                                        text = nextLine.primaryText,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontFamily = lyricFamily,
-                                            fontStyle = lyricStyleItalic,
-                                            fontSize = 18.sp,
-                                            lineHeight = 24.sp,
-                                        ),
-                                        color = secondaryTextColor.copy(alpha = 0.52f),
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
+                                )
                             }
                         }
                     }
                 }
             }
 
-            // Optional Compact Lyric Time-Offset Calibrator Pill (-0.5s / +0.5s / Reset)
-            if (showOffsetBar && lyrics.isNotEmpty()) {
-                val offsetSec = lyricOffsetMs / 1000f
-                val offsetLabel = String.format("偏移 %+.1fs", offsetSec)
-                val barShape = RoundedCornerShape(16.dp)
+            if (showOffsetBar) {
                 Row(
                     modifier = Modifier
-                        .padding(bottom = 6.dp)
-                        .clip(barShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-                        .border(0.75.dp, outlineColor, barShape)
+                        .padding(horizontal = 24.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(0.75.dp, outlineColor, RoundedCornerShape(10.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
                         text = "-0.5s",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = primaryTextColor,
+                        color = accentColor,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .clickable { onAdjustLyricOffset(-500L) }
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                     )
+                    val secStr = String.format(java.util.Locale.US, "%+.1fs", lyricOffsetMs / 1000f)
                     Text(
-                        text = offsetLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = activeLineColor,
-                        fontWeight = FontWeight.Bold,
+                        text = if (lyricOffsetMs == 0L) "0.0s" else secStr,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = primaryTextColor,
+                        modifier = Modifier.clickable { onResetLyricOffset() },
                     )
                     Text(
                         text = "+0.5s",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = primaryTextColor,
+                        color = accentColor,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .clickable { onAdjustLyricOffset(500L) }
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                    )
-                    Text(
-                        text = "重置",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = secondaryTextColor,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .clickable { onResetLyricOffset() }
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
             }
 
-            // 5. Minimal Diamond-Thumb Progress Line + Timestamps + Clean 3-Button Footer
+            // 5. Thin Progress Bar & 3-Button Minimal Playback Controls
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 14.dp),
+                    .padding(horizontal = 24.dp, vertical = 10.dp),
             ) {
-                DiamondThinSeekBar(
+                ThinSeekBar(
                     positionMs = positionMs,
-                    durationMs = durationMs,
-                    activeColor = activeLineColor,
-                    trackColor = outlineColor.copy(alpha = if (isDarkTheme) 0.45f else 0.9f),
+                    durationMs = durationMs.coerceAtLeast(1L),
+                    activeLineColor = accentColor,
+                    accentColor = accentColor,
+                    trackColor = secondaryTextColor.copy(alpha = 0.25f),
                     onSeekTo = onSeekTo,
                 )
                 Row(
@@ -1579,16 +2134,14 @@ private fun EditorialFullScreenLyricsView(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onSkipPrevious, modifier = Modifier.size(48.dp)) {
+                    IconButton(onClick = onSkipPrevious) {
                         Icon(
                             imageVector = Icons.Rounded.SkipPrevious,
                             contentDescription = "上一首",
@@ -1596,7 +2149,10 @@ private fun EditorialFullScreenLyricsView(
                             modifier = Modifier.size(28.dp),
                         )
                     }
-                    IconButton(onClick = onTogglePlayPause, modifier = Modifier.size(56.dp)) {
+                    IconButton(
+                        onClick = onTogglePlayPause,
+                        modifier = Modifier.size(52.dp),
+                    ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             contentDescription = if (isPlaying) "暂停" else "播放",
@@ -1604,7 +2160,7 @@ private fun EditorialFullScreenLyricsView(
                             modifier = Modifier.size(36.dp),
                         )
                     }
-                    IconButton(onClick = onSkipNext, modifier = Modifier.size(48.dp)) {
+                    IconButton(onClick = onSkipNext) {
                         Icon(
                             imageVector = Icons.Rounded.SkipNext,
                             contentDescription = "下一首",
@@ -1614,88 +2170,6 @@ private fun EditorialFullScreenLyricsView(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun DiamondThinSeekBar(
-    positionMs: Long,
-    durationMs: Long,
-    activeColor: Color,
-    trackColor: Color,
-    onSeekTo: (Long) -> Unit,
-) {
-    var widthPx by remember { mutableFloatStateOf(1f) }
-    var isDragging by remember { mutableStateOf(false) }
-    var dragFraction by remember { mutableFloatStateOf(0f) }
-
-    val progressFraction = if (isDragging) {
-        dragFraction
-    } else {
-        (positionMs.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(24.dp)
-            .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
-            .pointerInput(durationMs) {
-                detectTapGestures { offset ->
-                    val fraction = (offset.x / widthPx).coerceIn(0f, 1f)
-                    onSeekTo((fraction * durationMs).toLong())
-                }
-            }
-            .pointerInput(durationMs) {
-                detectHorizontalDragGestures(
-                    onDragStart = { offset ->
-                        isDragging = true
-                        dragFraction = (offset.x / widthPx).coerceIn(0f, 1f)
-                    },
-                    onHorizontalDrag = { change, _ ->
-                        dragFraction = (change.position.x / widthPx).coerceIn(0f, 1f)
-                    },
-                    onDragEnd = {
-                        isDragging = false
-                        onSeekTo((dragFraction * durationMs).toLong())
-                    },
-                    onDragCancel = { isDragging = false },
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(18.dp),
-        ) {
-            val y = size.height / 2f
-            val activeX = size.width * progressFraction
-            drawLine(
-                color = trackColor,
-                start = Offset(0f, y),
-                end = Offset(size.width, y),
-                strokeWidth = 2.4f,
-                cap = StrokeCap.Round,
-            )
-            drawLine(
-                color = activeColor,
-                start = Offset(0f, y),
-                end = Offset(activeX, y),
-                strokeWidth = 2.8f,
-                cap = StrokeCap.Round,
-            )
-            // Classic Diamond Thumb
-            val r = if (isDragging) 11f else 8.5f
-            val diamond = Path().apply {
-                moveTo(activeX, y - r)
-                lineTo(activeX + r, y)
-                lineTo(activeX, y + r)
-                lineTo(activeX - r, y)
-                close()
-            }
-            drawPath(path = diamond, color = activeColor)
         }
     }
 }

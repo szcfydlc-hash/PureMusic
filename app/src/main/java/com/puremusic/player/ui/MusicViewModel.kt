@@ -33,6 +33,10 @@ import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.data.model.RepeatMode
 import com.puremusic.player.data.model.ScanStatus
 import com.puremusic.player.data.model.Song
+import com.puremusic.player.widget.PureMusicWidgetProvider
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Locale
 import com.puremusic.player.data.model.SortOrder
 import com.puremusic.player.data.repository.LyricsRepository
 import com.puremusic.player.data.repository.MusicRepository
@@ -240,6 +244,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = false,
     )
 
+    val gaplessEnabled: StateFlow<Boolean> = playlistRepository.gaplessEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
+    val hapticEnabled: StateFlow<Boolean> = playlistRepository.hapticEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
     val lyricOffsets: StateFlow<Map<Long, Long>> = playlistRepository.lyricOffsetsFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -376,6 +392,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val equalizerState: StateFlow<EqualizerState> = AudioEqualizerManager.state
     val sleepTimerRemainingMs: StateFlow<Long?> = sleepTimerManager.remainingMs
 
+    private val _singleRepeatRemaining = MutableStateFlow(0)
+    val singleRepeatRemaining: StateFlow<Int> = _singleRepeatRemaining.asStateFlow()
+    private var repeatRestoreMode: Int = Player.REPEAT_MODE_OFF
     private var activeQueueSongs: List<Song> = emptyList()
     private var hasRestoredPlayback = false
 
@@ -391,6 +410,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val controller = mediaController
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT && _singleRepeatRemaining.value > 0) {
+                val nextRem = (_singleRepeatRemaining.value - 1).coerceAtLeast(0)
+                _singleRepeatRemaining.value = nextRem
+                if (nextRem <= 1 && controller != null) {
+                    // Last repeat pass started; restore repeat mode so next end advances naturally
+                    controller.repeatMode = if (repeatRestoreMode == Player.REPEAT_MODE_ONE) {
+                        Player.REPEAT_MODE_OFF
+                    } else {
+                        repeatRestoreMode
+                    }
+                    if (nextRem == 0) _singleRepeatRemaining.value = 0
+                }
+            } else if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT && _singleRepeatRemaining.value > 0) {
+                // User manually switched track or playlist changed -> cancel active single-repeat counter
+                _singleRepeatRemaining.value = 0
+                if (controller != null) {
+                    controller.repeatMode = if (repeatRestoreMode == Player.REPEAT_MODE_ONE) {
+                        Player.REPEAT_MODE_OFF
+                    } else {
+                        repeatRestoreMode
+                    }
+                }
+            }
             syncPlayerSnapshot()
             persistCurrentPlayback()
             triggerFadeInIfEnabled()
@@ -589,11 +632,33 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cycleRepeatMode() {
         val controller = mediaController ?: return
+        if (_singleRepeatRemaining.value > 0) {
+            _singleRepeatRemaining.value = 0
+        }
         controller.repeatMode = when (controller.repeatMode) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
         }
+    }
+
+    fun setSingleTrackRepeatCount(count: Int) {
+        val controller = mediaController ?: return
+        if (count <= 1) {
+            _singleRepeatRemaining.value = 0
+            controller.repeatMode = if (repeatRestoreMode == Player.REPEAT_MODE_ONE) {
+                Player.REPEAT_MODE_OFF
+            } else {
+                repeatRestoreMode
+            }
+        } else {
+            if (_singleRepeatRemaining.value == 0) {
+                repeatRestoreMode = controller.repeatMode
+            }
+            _singleRepeatRemaining.value = count
+            controller.repeatMode = Player.REPEAT_MODE_ONE
+        }
+        syncPlayerSnapshot()
     }
 
     fun playQueueIndex(index: Int) {
@@ -737,6 +802,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setKeepScreenOn(enabled: Boolean) {
         viewModelScope.launch { playlistRepository.setKeepScreenOn(enabled) }
+    }
+
+    fun setGaplessEnabled(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setGaplessEnabled(enabled) }
+    }
+
+    fun setHapticEnabled(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setHapticEnabled(enabled) }
     }
 
     fun adjustCurrentLyricOffset(deltaMs: Long) {
@@ -1025,6 +1098,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             shuffleEnabled = controller.shuffleModeEnabled,
             repeatMode = repeat,
         )
+        val isLosslessTrack = currentSong?.filePath?.substringAfterLast('.', "")
+            ?.lowercase(Locale.US) in setOf("flac", "wav", "alac", "ape", "dsd", "aiff")
+        PureMusicWidgetProvider.pushState(
+            context = getApplication(),
+            title = currentSong?.title,
+            artist = currentSong?.artist,
+            isPlaying = controller.isPlaying,
+            artUri = currentSong?.albumArtUri,
+            isLossless = isLosslessTrack,
+        )
         refreshLyricsIfNeeded(currentSong)
         if (currentSong != null) {
             if (currentSong.id != lastSpecSongId) {
@@ -1053,6 +1136,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     val pos = controller.currentPosition.coerceAtLeast(0L)
                     val dur = controller.duration.takeIf { it > 0L } ?: _playerState.value.durationMs
                     _playerState.update { it.copy(positionMs = pos, durationMs = dur) }
+                    val fadeMs = fadeInSeconds.value * 1000L
+                    if (fadeMs > 0L && dur > fadeMs * 2L && fadeInJob?.isActive != true) {
+                        val remaining = (dur - pos).coerceAtLeast(0L)
+                        if (remaining in 1L..fadeMs) {
+                            controller.volume = (remaining.toFloat() / fadeMs.toFloat()).coerceIn(0.08f, 1f)
+                        } else if (controller.volume < 0.99f) {
+                            controller.volume = 1f
+                        }
+                    }
                 }
                 delay(400L)
                 if (System.currentTimeMillis() % 5000L < 450L) {
@@ -1065,6 +1157,118 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun stopPositionTicker() {
         positionTickerJob?.cancel()
         positionTickerJob = null
+    }
+
+    fun addSongsToPlaylist(playlistId: String, songIds: Collection<Long>) {
+        if (songIds.isEmpty()) return
+        val existing = playlists.value.firstOrNull { it.id == playlistId } ?: return
+        val merged = (existing.songIds + songIds).distinct()
+        viewModelScope.launch {
+            playlistRepository.setPlaylistSongs(playlistId, merged)
+        }
+    }
+
+    fun addSongsToFavorites(songIds: Collection<Long>) {
+        if (songIds.isEmpty()) return
+        val merged = favoriteSongIds.value + songIds
+        viewModelScope.launch {
+            playlistRepository.setFavoriteSongIds(merged)
+        }
+    }
+
+    fun exportBackupJson(): String {
+        val songMap = allSongs.value.associateBy { it.id }
+        val root = JSONObject()
+        root.put("app", "PureMusic")
+        root.put("version", "1.2")
+        root.put("exportedAt", System.currentTimeMillis())
+
+        val favArr = JSONArray()
+        favoriteSongIds.value.forEach { id ->
+            songMap[id]?.let { s ->
+                favArr.put(JSONObject().apply {
+                    put("filePath", s.filePath)
+                    put("title", s.title)
+                    put("artist", s.artist)
+                })
+            }
+        }
+        root.put("favorites", favArr)
+
+        val plArr = JSONArray()
+        playlists.value.forEach { pl ->
+            val items = JSONArray()
+            pl.songIds.forEach { id ->
+                songMap[id]?.let { s ->
+                    items.put(JSONObject().apply {
+                        put("filePath", s.filePath)
+                        put("title", s.title)
+                        put("artist", s.artist)
+                    })
+                }
+            }
+            plArr.put(JSONObject().apply {
+                put("name", pl.name)
+                put("songs", items)
+            })
+        }
+        root.put("playlists", plArr)
+        return root.toString(2)
+    }
+
+    fun importBackupJson(jsonText: String, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val msg = runCatching {
+                val root = JSONObject(jsonText)
+                val library = allSongs.value
+                val byPath = library.associateBy { it.filePath }
+                val byKey = library.associateBy { "${it.title.lowercase(Locale.US)}|${it.artist.lowercase(Locale.US)}" }
+
+                fun resolveObj(obj: JSONObject): Long? {
+                    val path = obj.optString("filePath")
+                    if (path.isNotBlank() && byPath.containsKey(path)) return byPath[path]?.id
+                    val key = "${obj.optString("title").lowercase(Locale.US)}|${obj.optString("artist").lowercase(Locale.US)}"
+                    return byKey[key]?.id
+                }
+
+                var restoredFavs = 0
+                val favArr = root.optJSONArray("favorites")
+                if (favArr != null) {
+                    val favIds = mutableSetOf<Long>()
+                    favIds.addAll(favoriteSongIds.value)
+                    for (i in 0 until favArr.length()) {
+                        val id = resolveObj(favArr.getJSONObject(i))
+                        if (id != null && favIds.add(id)) restoredFavs++
+                    }
+                    playlistRepository.setFavoriteSongIds(favIds)
+                }
+
+                var restoredPlaylists = 0
+                val plArr = root.optJSONArray("playlists")
+                if (plArr != null) {
+                    val existingByName = playlists.value.associateBy { it.name }
+                    for (i in 0 until plArr.length()) {
+                        val plObj = plArr.getJSONObject(i)
+                        val name = plObj.optString("name").trim()
+                        if (name.isBlank()) continue
+                        val songsArr = plObj.optJSONArray("songs") ?: JSONArray()
+                        val ids = mutableListOf<Long>()
+                        for (j in 0 until songsArr.length()) {
+                            resolveObj(songsArr.getJSONObject(j))?.let { ids.add(it) }
+                        }
+                        val existing = existingByName[name]
+                        if (existing != null) {
+                            playlistRepository.setPlaylistSongs(existing.id, (existing.songIds + ids).distinct())
+                        } else {
+                            playlistRepository.createPlaylist(name, ids.distinct())
+                        }
+                        restoredPlaylists++
+                    }
+                }
+                "已恢复 $restoredPlaylists 个歌单与 $restoredFavs 首新增喜欢"
+            }.getOrElse { "备份文件格式无效，无法恢复" }
+            onResult(msg)
+        }
     }
 
     override fun onCleared() {
