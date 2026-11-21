@@ -13,11 +13,14 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
  * Zero-permission live audio spectrum bus fed directly by ExoPlayer's decoded PCM-16 stream.
- * Produces 48 smoothly damped normalized frequency-band energy values in [0f, 1f].
+ * Uses Automatic Gain Control (AGC) + spatial smoothing so both quiet ambient tracks and loud
+ * tracks drive expressive, fluid 48-band spectrum motion in [0f, 1f].
  */
 object AudioSpectrumBus {
     const val BAND_COUNT = 48
@@ -26,16 +29,18 @@ object AudioSpectrumBus {
     val bands: StateFlow<FloatArray> = _bands.asStateFlow()
 
     private val smoothed = FloatArray(BAND_COUNT)
+    private var runningPeak = 0.08f
     private var lastEmitMs = 0L
 
     fun resetToIdle() {
         smoothed.fill(0f)
+        runningPeak = 0.08f
         _bands.value = FloatArray(BAND_COUNT)
     }
 
     fun updateFromPcm16(buffer: ByteBuffer, startPos: Int, limit: Int, channelCount: Int) {
         val now = SystemClock.uptimeMillis()
-        if (now - lastEmitMs < 32L) return // ~30 fps lightweight publish
+        if (now - lastEmitMs < 20L) return // ~50 fps fluid updates
         lastEmitMs = now
 
         val channels = channelCount.coerceAtLeast(1)
@@ -43,7 +48,6 @@ object AudioSpectrumBus {
         val totalFrames = (limit - startPos) / frameBytes
         if (totalFrames < 16) return
 
-        // Extract up to 256 mono samples evenly strided across this PCM buffer
         val sampleCount = totalFrames.coerceAtMost(256)
         val stride = (totalFrames / sampleCount).coerceAtLeast(1)
         val mono = FloatArray(sampleCount)
@@ -58,38 +62,57 @@ object AudioSpectrumBus {
             } else {
                 ((b0 shl 8) or (b1 and 0xFF)).toShort()
             }
-            mono[i] = s / 32768f
+            // Hann window for clean spectral peaks
+            val hann = 0.5f * (1f - cos((2.0 * Math.PI * i) / (sampleCount - 1)).toFloat())
+            mono[i] = (s / 32768f) * hann
         }
 
-        // Compute overall RMS + lightweight Goertzel-like multi-band energy across 48 bands
-        var rmsAcc = 0f
-        for (v in mono) rmsAcc += v * v
-        val rms = sqrt(rmsAcc / sampleCount).coerceIn(0f, 1f)
-
-        val next = FloatArray(BAND_COUNT)
+        val rawMags = FloatArray(BAND_COUNT)
+        var frameMax = 0.001f
         val twoPiOverN = (2.0 * Math.PI) / sampleCount
         for (b in 0 until BAND_COUNT) {
-            // Map band index logarithmically to musical frequency bins (1..64)
-            val freqBin = 1.0 + (b.toDouble() / (BAND_COUNT - 1)) * (b.toDouble() / (BAND_COUNT - 1)) * 56.0
+            val t = b.toDouble() / (BAND_COUNT - 1)
+            // Log-spaced musical frequency bins from sub-bass to crisp treble
+            val freqBin = 1.0 + t.pow(1.65) * 48.0
             var re = 0.0
             var im = 0.0
-            val step = 2
             var idx = 0
             while (idx < sampleCount) {
                 val angle = twoPiOverN * freqBin * idx
                 val v = mono[idx].toDouble()
                 re += v * cos(angle)
-                im += v * kotlin.math.sin(angle)
-                idx += step
+                im += v * sin(angle)
+                idx += 2
             }
-            val mag = (sqrt(re * re + im * im) / (sampleCount / step.toDouble())).toFloat()
-            // Blend spectral magnitude with overall RMS for natural musical fullness
-            val target = (mag * 3.8f + rms * 0.45f).coerceIn(0f, 1f)
+            val mag = (sqrt(re * re + im * im) / (sampleCount / 2.0)).toFloat()
+            // Gentle perceptual tilt so mids & highs remain lively alongside bass
+            val weighted = mag * (1.0f + t.toFloat() * 1.4f)
+            rawMags[b] = weighted
+            if (weighted > frameMax) frameMax = weighted
+        }
+
+        // Automatic Gain Control (AGC): fast rise, slow decay so ambient tracks stay expressive
+        runningPeak = if (frameMax > runningPeak) {
+            runningPeak + (frameMax - runningPeak) * 0.45f
+        } else {
+            (runningPeak * 0.965f).coerceAtLeast(0.025f)
+        }
+        val normScale = 1f / runningPeak.coerceAtLeast(0.025f)
+
+        // Spatial 3-tap smoothing so bars form sculptural undulating waves
+        val next = FloatArray(BAND_COUNT)
+        for (b in 0 until BAND_COUNT) {
+            val left = rawMags[(b - 1).coerceAtLeast(0)]
+            val cur = rawMags[b]
+            val right = rawMags[(b + 1).coerceAtMost(BAND_COUNT - 1)]
+            val spatial = (left * 0.22f + cur * 0.56f + right * 0.22f) * normScale
+            // Perceptual compression curve (sqrt) for vivid musical dynamics
+            val target = sqrt(spatial.coerceIn(0f, 1.2f)).coerceIn(0f, 1f)
             val prev = smoothed[b]
             val damped = if (target > prev) {
-                prev + (target - prev) * 0.58f
+                prev + (target - prev) * 0.65f
             } else {
-                prev + (target - prev) * 0.24f
+                prev + (target - prev) * 0.22f
             }
             smoothed[b] = if (abs(damped) < 0.005f) 0f else damped
             next[b] = smoothed[b]

@@ -22,6 +22,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -60,11 +61,13 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.graphics.Path
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -188,6 +191,8 @@ fun NowPlayingScreen(
     onSelectImmersionStyle: (ImmersionLyricStyle) -> Unit = {},
     onAdjustLyricOffset: (Long) -> Unit = {},
     onResetLyricOffset: () -> Unit = {},
+    currentImmersionStyle: ImmersionLyricStyle = ImmersionLyricStyle.ARCHITECTURAL_GRID,
+    onSelectImmersionStyle: (ImmersionLyricStyle) -> Unit = {},
 ) {
     var showFullLyrics by remember { mutableStateOf(false) }
     BackHandler {
@@ -272,9 +277,11 @@ fun NowPlayingScreen(
         animationSpec = tween(durationMillis = 550),
         label = "darkAmbientBottom",
     )
+    val rootInteraction = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .clickable(interactionSource = rootInteraction, indication = null) {}
             .then(
                 if (isDarkTheme) {
                     Modifier.background(
@@ -349,6 +356,39 @@ fun NowPlayingScreen(
                 onOpenFullLyricsSheet = onOpenLyrics,
                 onAdjustLyricOffset = onAdjustLyricOffset,
                 onResetLyricOffset = onResetLyricOffset,
+                architecturalGridContent = {
+                    EditorialFullScreenLyricsView(
+                        song = song,
+                        lyrics = lyrics,
+                        positionMs = playerState.positionMs,
+                        durationMs = durationMs,
+                        isPlaying = playerState.isPlaying,
+                        lyricFamily = lyricFamily,
+                        lyricStyleItalic = lyricStyleItalic,
+                        accentColor = activeAccentColor,
+                        primaryTextColor = primaryTextColor,
+                        secondaryTextColor = secondaryTextColor,
+                        onBackToVinyl = { showFullLyrics = false },
+                        onClosePlayer = onClose,
+                        onTogglePlayPause = onTogglePlayPause,
+                        onSkipPrevious = onSkipPrevious,
+                        onSkipNext = onSkipNext,
+                        onSeekTo = onSeekTo,
+                        onOpenLyricsSearch = { onOpenLyricsSearch(song) },
+                        onOpenCoverSearch = { onOpenCoverSearch(song) },
+                        isTranslatingLyrics = isTranslatingLyrics,
+                        onTranslateLyrics = onTranslateLyrics,
+                        onAddToPlaylist = { onAddToPlaylist(song) },
+                        isDarkTheme = isDarkTheme,
+                        onOpenFullLyricsSheet = onOpenLyrics,
+                        audioSpec = audioSpec,
+                        lyricOffsetMs = lyricOffsetMs,
+                        onAdjustLyricOffset = onAdjustLyricOffset,
+                        onResetLyricOffset = onResetLyricOffset,
+                        currentImmersionStyle = immersionStyle,
+                        onSelectImmersionStyle = onSelectImmersionStyle,
+                    )
+                },
             )
             return@Box
         }
@@ -1823,8 +1863,41 @@ private fun EditorialFullScreenLyricsView(
                         tonalElevation = 0.dp,
                         border = BorderStroke(0.75.dp, outlineColor),
                     ) {
+                        ImmersionLyricStyle.entries.forEach { option ->
+                            val isSelected = option == currentImmersionStyle
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = option.label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    )
+                                },
+                                trailingIcon = if (isSelected) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    onSelectImmersionStyle(option)
+                                },
+                            )
+                        }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            thickness = 0.5.dp,
+                            color = outlineColor.copy(alpha = 0.4f),
+                        )
                         DropdownMenuItem(
-                            text = { Text("全部歌词列表") },
+                            text = { Text("全部歌词列表", style = MaterialTheme.typography.bodyMedium) },
                             onClick = { menuExpanded = false; onOpenFullLyricsSheet() },
                         )
                         DropdownMenuItem(

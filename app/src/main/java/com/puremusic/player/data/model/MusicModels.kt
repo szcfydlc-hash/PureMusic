@@ -218,6 +218,7 @@ data class AudioTechSpec(
 }
 
 enum class ImmersionLyricStyle(val label: String) {
+    ARCHITECTURAL_GRID("建筑网格"),
     VINYL_STUDY("黑胶书房"),
     SPATIAL_GALLERY("空间唱片廊"),
     VINYL_LIGHTFIELD("黑胶光场"),

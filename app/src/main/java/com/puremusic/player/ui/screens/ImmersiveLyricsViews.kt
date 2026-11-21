@@ -10,10 +10,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +24,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,29 +46,38 @@ import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import android.app.Activity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -79,12 +89,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
@@ -96,6 +108,7 @@ import com.puremusic.player.service.AudioSpectrumBus
 import com.puremusic.player.ui.components.AlbumArtwork
 import com.puremusic.player.ui.components.formatDuration
 import com.puremusic.player.ui.theme.LocalHapticEnabled
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -129,6 +142,7 @@ fun ImmersiveLyricsHost(
     onOpenFullLyricsSheet: () -> Unit,
     onAdjustLyricOffset: (Long) -> Unit,
     onResetLyricOffset: () -> Unit,
+    architecturalGridContent: @Composable () -> Unit,
 ) {
     val effectivePosMs = (positionMs + lyricOffsetMs).coerceAtLeast(0L)
     val activeIdx = remember(lyrics, effectivePosMs) {
@@ -137,14 +151,36 @@ fun ImmersiveLyricsHost(
     }
     var showOffsetBar by remember { mutableStateOf(false) }
     val spectrumBands by AudioSpectrumBus.bands.collectAsState()
+    val view = LocalView.current
+    val sceneHasDarkBackdrop = when (style) {
+        ImmersionLyricStyle.SPATIAL_GALLERY, ImmersionLyricStyle.VINYL_LIGHTFIELD -> true
+        ImmersionLyricStyle.VINYL_STUDY, ImmersionLyricStyle.ARCHITECTURAL_GRID -> isDarkTheme
+    }
+    DisposableEffect(sceneHasDarkBackdrop, isDarkTheme) {
+        val window = (view.context as? Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        controller?.isAppearanceLightStatusBars = !sceneHasDarkBackdrop
+        onDispose {
+            controller?.isAppearanceLightStatusBars = !isDarkTheme
+        }
+    }
 
     AnimatedContent(
         targetState = style,
-        transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(220)) },
+        transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(200)) },
         label = "immersionSceneSwitch",
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {},
     ) { targetStyle ->
         when (targetStyle) {
+            ImmersionLyricStyle.ARCHITECTURAL_GRID -> {
+                architecturalGridContent()
+            }
+
             ImmersionLyricStyle.VINYL_STUDY -> {
                 VinylStudyImmersiveView(
                     song = song,
@@ -156,6 +192,7 @@ fun ImmersiveLyricsHost(
                     spectrumBands = spectrumBands,
                     vinylRotationProvider = vinylRotationProvider,
                     lyricFamily = lyricFamily,
+                    lyricStyleItalic = lyricStyleItalic,
                     isDarkTheme = isDarkTheme,
                     currentStyle = targetStyle,
                     isTranslatingLyrics = isTranslatingLyrics,
@@ -187,8 +224,8 @@ fun ImmersiveLyricsHost(
                     durationMs = durationMs,
                     isPlaying = isPlaying,
                     spectrumBands = spectrumBands,
-                    vinylRotationProvider = vinylRotationProvider,
                     lyricFamily = lyricFamily,
+                    lyricStyleItalic = lyricStyleItalic,
                     dynamicAccent = dynamicAccent,
                     currentStyle = targetStyle,
                     isTranslatingLyrics = isTranslatingLyrics,
@@ -221,6 +258,7 @@ fun ImmersiveLyricsHost(
                     spectrumBands = spectrumBands,
                     vinylRotationProvider = vinylRotationProvider,
                     lyricFamily = lyricFamily,
+                    lyricStyleItalic = lyricStyleItalic,
                     dynamicAccent = dynamicAccent,
                     currentStyle = targetStyle,
                     isTranslatingLyrics = isTranslatingLyrics,
@@ -247,9 +285,6 @@ fun ImmersiveLyricsHost(
 
 /**
  * 1. 黑胶书房 (Vinyl Study)
- * Archival warm cream paper (#F5F0E6) in light mode / deep matte charcoal (#151413) in dark mode.
- * 90° crisp physical sleeve + peeking 96-groove spinning black LP + soft floor shadow,
- * left-aligned editorial Song Title, Artist, and flowing lyrics, pure gesture controls + live PCM spectrum bar.
  */
 @Composable
 private fun VinylStudyImmersiveView(
@@ -262,6 +297,7 @@ private fun VinylStudyImmersiveView(
     spectrumBands: FloatArray,
     vinylRotationProvider: () -> Float,
     lyricFamily: FontFamily,
+    lyricStyleItalic: FontStyle,
     isDarkTheme: Boolean,
     currentStyle: ImmersionLyricStyle,
     isTranslatingLyrics: Boolean,
@@ -303,7 +339,7 @@ private fun VinylStudyImmersiveView(
         val stageW = maxWidth
         val stageH = maxHeight
         val isCompactH = stageH < 520.dp
-        val sleeveSize = min(stageW * 0.63f, stageH * (if (isCompactH) 0.34f else 0.36f))
+        val sleeveSize = min(stageW * 0.62f, stageH * (if (isCompactH) 0.34f else 0.35f))
         val discSize = sleeveSize * 0.92f
 
         Column(
@@ -315,6 +351,7 @@ private fun VinylStudyImmersiveView(
                 title = "黑胶书房",
                 inkColor = inkPrimary,
                 currentStyle = currentStyle,
+                isDarkSurface = isDarkTheme,
                 isTranslatingLyrics = isTranslatingLyrics,
                 onSelectStyle = onSelectStyle,
                 onBack = onBackToVinyl,
@@ -325,9 +362,8 @@ private fun VinylStudyImmersiveView(
                 onOpenFullLyricsSheet = onOpenFullLyricsSheet,
             )
 
-            Spacer(modifier = Modifier.height(if (isCompactH) 8.dp else 16.dp))
+            Spacer(modifier = Modifier.height(if (isCompactH) 8.dp else 14.dp))
 
-            // 90° Square Physical Sleeve + Peeking Spinning LP + Soft Floor Contact Shadow (Pure Gesture Stage)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -376,7 +412,6 @@ private fun VinylStudyImmersiveView(
                         .width(sleeveSize + discSize * 0.46f)
                         .height(sleeveSize + 14.dp),
                 ) {
-                    // Subtle soft horizontal floor contact shadow
                     Canvas(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
@@ -395,7 +430,6 @@ private fun VinylStudyImmersiveView(
                         )
                     }
 
-                    // Peeking 96-groove spinning vinyl LP behind right edge
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -408,7 +442,6 @@ private fun VinylStudyImmersiveView(
                         )
                     }
 
-                    // Crisp 90° physical album sleeve
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -427,101 +460,53 @@ private fun VinylStudyImmersiveView(
                 }
             }
 
-            Spacer(modifier = Modifier.height(if (isCompactH) 12.dp else 22.dp))
+            Spacer(modifier = Modifier.height(if (isCompactH) 12.dp else 20.dp))
 
-            // Left-aligned Song Title & Artist
             Text(
                 text = song.title,
-                style = MaterialTheme.typography.headlineSmall.copy(
+                style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.4).sp,
+                    letterSpacing = (-0.3).sp,
                 ),
                 color = inkPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(3.dp))
+            val subtitle = if (song.album.isNotBlank() && song.album != song.title) {
+                "${song.artist} · ${song.album}"
+            } else {
+                song.artist
+            }
             Text(
-                text = song.artist,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal),
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
                 color = inkSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
 
-            Spacer(modifier = Modifier.height(if (isCompactH) 12.dp else 24.dp))
+            Spacer(modifier = Modifier.height(if (isCompactH) 10.dp else 16.dp))
+            HorizontalDivider(
+                thickness = 0.6.dp,
+                color = inkMuted.copy(alpha = 0.35f),
+            )
+            Spacer(modifier = Modifier.height(if (isCompactH) 10.dp else 20.dp))
 
-            // Left-aligned Editorial Lyrics Stage
-            Column(
+            ThreeSlotAutoFitLyricsStage(
+                lyrics = lyrics,
+                activeIdx = activeIdx,
+                lyricFamily = lyricFamily,
+                lyricStyleItalic = lyricStyleItalic,
+                activeColor = inkPrimary,
+                secondaryColor = inkSecondary,
+                mutedColor = inkMuted,
+                horizontalAlignment = Alignment.Start,
+                textAlign = TextAlign.Start,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                if (lyrics.isEmpty() || activeIdx < 0) {
-                    Text(
-                        text = "暂无歌词 · 点击右上角匹配在线歌词",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontFamily = lyricFamily),
-                        color = inkSecondary,
-                    )
-                } else {
-                    val prevLine = lyrics.getOrNull(activeIdx - 1)
-                    val curLine = lyrics[activeIdx]
-                    val nextLine = lyrics.getOrNull(activeIdx + 1)
-
-                    if (prevLine != null) {
-                        Text(
-                            text = prevLine.primaryText,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = lyricFamily,
-                                fontWeight = FontWeight.Medium,
-                                lineHeight = 25.sp,
-                            ),
-                            color = inkSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    Text(
-                        text = curLine.primaryText,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontFamily = lyricFamily,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = 32.sp,
-                        ),
-                        color = inkPrimary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (!curLine.secondaryText.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = curLine.secondaryText,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = lyricFamily),
-                            color = inkSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-
-                    if (nextLine != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = nextLine.primaryText,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = lyricFamily,
-                                fontWeight = FontWeight.Normal,
-                                lineHeight = 24.sp,
-                            ),
-                            color = inkMuted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
+            )
 
             if (showOffsetBar) {
                 ImmersiveOffsetStrip(
@@ -541,21 +526,21 @@ private fun VinylStudyImmersiveView(
                 isPlaying = isPlaying,
                 spectrumBands = spectrumBands,
                 playedColor = inkPrimary,
-                unplayedColor = inkMuted.copy(alpha = 0.42f),
+                unplayedColor = inkMuted.copy(alpha = 0.45f),
                 needleColor = cinnabar,
                 timestampColor = inkSecondary,
                 onSeekTo = onSeekTo,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }
 
 /**
  * 2. 空间唱片廊 (Spatial Record Gallery)
- * Pure silky dynamic album-color ambient gradient (zero raindrops),
- * 3D tilted receding physical vinyl sleeve stack from real local queue + peeking LP + silky mirror floor reflection,
- * pure swipe/tap gesture control, centered serif bilingual lyrics, live PCM spectrum waveform scrubber.
+ * True diagonal upper-right receding 3D album sleeve stack matching reference geometry,
+ * seamless alpha-masked floor mirror reflection (zero dark box seam), pure album-color velvet backdrop,
+ * swipe-to-skip & tap-to-play/pause gestures, refined typography + 60fps live PCM spectrum scrubber.
  */
 @Composable
 private fun SpatialGalleryImmersiveView(
@@ -567,8 +552,8 @@ private fun SpatialGalleryImmersiveView(
     durationMs: Long,
     isPlaying: Boolean,
     spectrumBands: FloatArray,
-    vinylRotationProvider: () -> Float,
     lyricFamily: FontFamily,
+    lyricStyleItalic: FontStyle,
     dynamicAccent: Color,
     currentStyle: ImmersionLyricStyle,
     isTranslatingLyrics: Boolean,
@@ -589,12 +574,12 @@ private fun SpatialGalleryImmersiveView(
     onResetLyricOffset: () -> Unit,
 ) {
     val bgTop by animateColorAsState(
-        targetValue = lerp(Color(0xFF141118), dynamicAccent, 0.34f),
+        targetValue = lerp(Color(0xFF141118), dynamicAccent, 0.36f),
         animationSpec = tween(550),
         label = "galleryBgTop",
     )
     val bgMid by animateColorAsState(
-        targetValue = lerp(Color(0xFF0E0C12), dynamicAccent, 0.20f),
+        targetValue = lerp(Color(0xFF0E0C12), dynamicAccent, 0.22f),
         animationSpec = tween(550),
         label = "galleryBgMid",
     )
@@ -636,20 +621,19 @@ private fun SpatialGalleryImmersiveView(
     ) {
         val stageW = maxWidth
         val stageH = maxHeight
-        val frontSize = min(stageW * 0.56f, stageH * 0.31f)
-        val discSize = frontSize * 0.88f
+        val frontSize = min(stageW * 0.62f, stageH * 0.33f)
 
         // Soft ambient glow behind the 3D sleeve stack
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    0.0f to dynamicAccent.copy(alpha = 0.24f),
+                    0.0f to dynamicAccent.copy(alpha = 0.28f),
                     1.0f to Color.Transparent,
-                    center = Offset(size.width * 0.48f, size.height * 0.30f),
-                    radius = size.width * 0.65f,
+                    center = Offset(size.width * 0.46f, size.height * 0.31f),
+                    radius = size.width * 0.68f,
                 ),
-                radius = size.width * 0.65f,
-                center = Offset(size.width * 0.48f, size.height * 0.30f),
+                radius = size.width * 0.68f,
+                center = Offset(size.width * 0.46f, size.height * 0.31f),
             )
         }
 
@@ -675,11 +659,11 @@ private fun SpatialGalleryImmersiveView(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 3D Perspective Receding Physical Sleeve Stack + Peeking LP + Glossy Floor Reflection
+            // 3D Diagonal Upper-Right Receding Physical Album Sleeve Stack + True Alpha-Masked Reflection
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(frontSize * 1.32f)
+                    .height(frontSize * 1.38f)
                     .pointerInput(song.id) {
                         detectTapGestures(
                             onTap = {
@@ -714,6 +698,8 @@ private fun SpatialGalleryImmersiveView(
                     },
                 contentAlignment = Alignment.TopCenter,
             ) {
+                val baseX = 4.dp
+                val baseY = 34.dp
                 Box(
                     modifier = Modifier
                         .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
@@ -721,17 +707,17 @@ private fun SpatialGalleryImmersiveView(
                             scaleX = tapScale.value
                             scaleY = tapScale.value
                         }
-                        .width(frontSize * 1.44f)
-                        .height(frontSize * 1.28f),
+                        .width(frontSize + 78.dp)
+                        .height(frontSize * 1.36f),
                     contentAlignment = Alignment.TopStart,
                 ) {
-                    // Draw receding background sleeves from farthest to nearest (depth 3 -> 1)
+                    // Receding sleeves stepping cleanly UP and TO THE RIGHT (depth 3 -> 1)
                     for (depth in (stackSongs.lastIndex downTo 1)) {
                         val depthSong = stackSongs[depth]
                         val scaleFactor = 1f - depth * 0.085f
-                        val xShift = (14 - depth * 12).dp
-                        val yShift = (depth * -6 + 18).dp
-                        val sleeveAlpha = (1f - depth * 0.22f).coerceAtLeast(0.28f)
+                        val xShift = baseX + (depth * 26).dp
+                        val yShift = baseY - (depth * 10).dp
+                        val sleeveAlpha = (1f - depth * 0.18f).coerceAtLeast(0.35f)
 
                         Box(
                             modifier = Modifier
@@ -740,12 +726,12 @@ private fun SpatialGalleryImmersiveView(
                                 .graphicsLayer {
                                     scaleX = scaleFactor
                                     scaleY = scaleFactor
-                                    rotationY = -15f
-                                    cameraDistance = 14f * density
+                                    rotationY = 14f
+                                    cameraDistance = 15f * density
                                     alpha = sleeveAlpha
                                 }
-                                .shadow(12.dp, RoundedCornerShape(3.dp))
-                                .border(0.8.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(3.dp)),
+                                .shadow(14.dp, RoundedCornerShape(3.dp))
+                                .border(1.2.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(3.dp)),
                         ) {
                             AlbumArtwork(
                                 uri = depthSong.albumArtUri,
@@ -757,34 +743,22 @@ private fun SpatialGalleryImmersiveView(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = depth * 0.16f)),
+                                    .background(Color.Black.copy(alpha = depth * 0.14f)),
                             )
                         }
                     }
 
-                    // Peeking glossy spinning black vinyl LP emerging from right opening of front sleeve
+                    // Front-most active sleeve angled cleanly into the corridor
                     Box(
                         modifier = Modifier
-                            .offset(x = frontSize * 0.56f, y = 18.dp + (frontSize - discSize) / 2f),
-                    ) {
-                        SpinningVinylDisc(
-                            albumArtUri = song.albumArtUri,
-                            rotationProvider = vinylRotationProvider,
-                            discSize = discSize,
-                        )
-                    }
-
-                    // Front-most active physical vinyl sleeve (clean razor-thin specular edge, zero clunky plastic frame)
-                    Box(
-                        modifier = Modifier
-                            .offset(x = 24.dp, y = 18.dp)
+                            .offset(x = baseX, y = baseY)
                             .size(frontSize)
                             .graphicsLayer {
-                                rotationY = -13f
-                                cameraDistance = 14f * density
+                                rotationY = 14f
+                                cameraDistance = 15f * density
                             }
-                            .shadow(22.dp, RoundedCornerShape(3.dp), ambientColor = Color.Black)
-                            .border(0.9.dp, Color.White.copy(alpha = 0.26f), RoundedCornerShape(3.dp)),
+                            .shadow(24.dp, RoundedCornerShape(3.dp), ambientColor = Color.Black)
+                            .border(1.2.dp, Color.White.copy(alpha = 0.34f), RoundedCornerShape(3.dp)),
                     ) {
                         AlbumArtwork(
                             uri = song.albumArtUri,
@@ -795,43 +769,44 @@ private fun SpatialGalleryImmersiveView(
                         )
                     }
 
-                    // Silky diffused mirror reflection directly beneath the front sleeve
+                    // True alpha-masked glossy floor reflection (zero hard dark rectangle seam!)
                     Box(
                         modifier = Modifier
-                            .offset(x = 24.dp, y = 18.dp + frontSize + 2.dp)
+                            .offset(x = baseX, y = baseY + frontSize + 1.dp)
                             .width(frontSize)
-                            .height(frontSize * 0.28f)
-                            .clip(RectangleShape)
+                            .height(frontSize * 0.30f)
                             .graphicsLayer {
-                                rotationY = -13f
-                                cameraDistance = 14f * density
-                                scaleY = -1f
-                                alpha = 0.24f
-                            },
+                                rotationY = 14f
+                                cameraDistance = 15f * density
+                                compositingStrategy = CompositingStrategy.Offscreen
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        0.0f to Color.Black.copy(alpha = 0.32f),
+                                        0.65f to Color.Black.copy(alpha = 0.08f),
+                                        1.0f to Color.Transparent,
+                                    ),
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            }
+                            .clip(RectangleShape),
                     ) {
                         AlbumArtwork(
                             uri = song.albumArtUri,
                             contentDescription = null,
-                            modifier = Modifier.size(frontSize),
+                            modifier = Modifier
+                                .size(frontSize)
+                                .graphicsLayer { scaleY = -1f },
                             cornerRadius = 3.dp,
                             iconSize = 32.dp,
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        0.0f to bgBottom,
-                                        0.75f to bgBottom.copy(alpha = 0.65f),
-                                        1.0f to Color.Transparent,
-                                    ),
-                                ),
                         )
                     }
                 }
             }
 
-            // Centered Editorial Bilingual Serif Lyrics
+            // Song title + artist subtle anchor + centered refined lyrics
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -840,70 +815,30 @@ private fun SpatialGalleryImmersiveView(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (lyrics.isEmpty() || activeIdx < 0) {
-                    Text(
-                        text = song.title,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontFamily = lyricFamily,
-                            fontStyle = FontStyle.Italic,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                        color = ivoryInk,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = song.artist,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = mutedInk,
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    val prevLine = lyrics.getOrNull(activeIdx - 1)
-                    val curLine = lyrics[activeIdx]
+                Text(
+                    text = "${song.title} · ${song.artist}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = mutedInk.copy(alpha = 0.82f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
 
-                    if (prevLine != null) {
-                        Text(
-                            text = prevLine.primaryText,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = lyricFamily,
-                            ),
-                            color = mutedInk.copy(alpha = 0.72f),
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                    }
-
-                    Text(
-                        text = curLine.primaryText,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontFamily = lyricFamily,
-                            fontStyle = FontStyle.Italic,
-                            fontWeight = FontWeight.SemiBold,
-                            lineHeight = 34.sp,
-                        ),
-                        color = ivoryInk,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-
-                    if (!curLine.secondaryText.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = curLine.secondaryText,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = lyricFamily),
-                            color = mutedInk,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+                ThreeSlotAutoFitLyricsStage(
+                    lyrics = lyrics,
+                    activeIdx = activeIdx,
+                    lyricFamily = lyricFamily,
+                    lyricStyleItalic = lyricStyleItalic,
+                    activeColor = ivoryInk,
+                    secondaryColor = mutedInk,
+                    mutedColor = mutedInk.copy(alpha = 0.65f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                )
             }
 
             if (showOffsetBar) {
@@ -929,17 +864,16 @@ private fun SpatialGalleryImmersiveView(
                 timestampColor = mutedInk,
                 onSeekTo = onSeekTo,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }
 
 /**
  * 3. 黑胶光场 (Vinyl Lightfield)
- * Seamless dynamic album-color velvet backdrop (zero horizontal clipping seams!),
- * full-size left-bled 96-groove spinning vinyl LP with complete circular bottom arc + articulated brushed-silver tonearm,
- * first row below vinyl: Song Title & Artist left + vintage brushed champagne-ivory Play/Pause & Prev/Next right,
- * calm vintage italic serif lyrics + Chinese translation, bottom matte-brass live PCM spectrum waveform scrubber.
+ * Seamless dynamic album-color velvet backdrop, full-size left-bled spinning LP + brushed-silver tonearm,
+ * complete stacked Song Title & Artist on the left beside compact champagne-gold controls,
+ * refined appropriately sized lyrics + 60fps live PCM spectrum waveform scrubber.
  */
 @Composable
 private fun VinylLightfieldImmersiveView(
@@ -952,6 +886,7 @@ private fun VinylLightfieldImmersiveView(
     spectrumBands: FloatArray,
     vinylRotationProvider: () -> Float,
     lyricFamily: FontFamily,
+    lyricStyleItalic: FontStyle,
     dynamicAccent: Color,
     currentStyle: ImmersionLyricStyle,
     isTranslatingLyrics: Boolean,
@@ -1011,11 +946,9 @@ private fun VinylLightfieldImmersiveView(
     ) {
         val stageW = maxWidth
         val stageH = maxHeight
-        // Full-size left-bleeding vinyl LP diameter (complete bottom arc cleanly preserved!)
-        val discSize = min(stageW * 0.94f, stageH * 0.44f)
+        val discSize = min(stageW * 0.94f, stageH * 0.43f)
 
         Column(modifier = Modifier.fillMaxSize()) {
-            // Minimal top bar (zero song title clutter here)
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 ImmersiveTopBar(
                     title = "",
@@ -1032,13 +965,12 @@ private fun VinylLightfieldImmersiveView(
                 )
             }
 
-            // Unclipped Upper Vinyl + Brushed-Silver Mechanical Tonearm Stage
+            // Unclipped Full-Size Left-Bled Vinyl + Brushed-Silver Tonearm Stage
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(discSize + 8.dp),
             ) {
-                // Full-size left-bled spinning black vinyl LP (offset left ~20%, full bottom rim intact)
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
@@ -1055,74 +987,85 @@ private fun VinylLightfieldImmersiveView(
                     )
                 }
 
-                // Brushed-silver mechanical tonearm resting cleanly from upper right
                 Canvas(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 14.dp, top = 6.dp)
                         .size(width = discSize * 0.46f, height = discSize * 0.88f),
                 ) {
-                    val pivot = Offset(size.width * 0.76f, size.height * 0.12f)
-                    // Base mount
+                    val pivot = Offset(size.width * 0.74f, size.height * 0.13f)
+                    // Machined anodized base housing with chamfered highlight rings
+                    drawCircle(color = Color(0xFF1E1D1C), radius = size.width * 0.25f, center = pivot)
                     drawCircle(
-                        color = Color(0xFF202022),
-                        radius = size.width * 0.24f,
+                        color = Color(0xFFD8C6AA).copy(alpha = 0.28f),
+                        radius = size.width * 0.25f,
                         center = pivot,
+                        style = Stroke(width = 1.6f),
                     )
+                    drawCircle(color = Color(0xFF131211), radius = size.width * 0.16f, center = pivot)
                     drawCircle(
-                        color = Color.White.copy(alpha = 0.14f),
-                        radius = size.width * 0.24f,
-                        center = pivot,
-                        style = Stroke(width = 1.4f),
-                    )
-                    drawCircle(
-                        color = Color(0xFF141416),
-                        radius = size.width * 0.13f,
+                        brush = Brush.linearGradient(listOf(champagneLight, Color(0xFF8F7B5E))),
+                        radius = size.width * 0.085f,
                         center = pivot,
                     )
 
                     rotate(degrees = tonearmAngle, pivot = pivot) {
-                        val armEnd = Offset(pivot.x - size.width * 0.04f, pivot.y + size.height * 0.68f)
-                        // Subtle drop shadow under arm
+                        val armEnd = Offset(pivot.x - size.width * 0.05f, pivot.y + size.height * 0.67f)
+                        // Soft shadow cast onto vinyl surface
                         drawLine(
-                            color = Color.Black.copy(alpha = 0.48f),
-                            start = Offset(pivot.x + 5f, pivot.y + 6f),
-                            end = Offset(armEnd.x + 5f, armEnd.y + 6f),
-                            strokeWidth = 10f,
+                            color = Color.Black.copy(alpha = 0.55f),
+                            start = Offset(pivot.x + 6f, pivot.y + 7f),
+                            end = Offset(armEnd.x + 6f, armEnd.y + 7f),
+                            strokeWidth = 12f,
                             cap = StrokeCap.Round,
                         )
-                        // Counterweight block
+                        // Precision counterweight cylinder
                         drawRoundRect(
-                            color = Color(0xFF27272A),
-                            topLeft = Offset(pivot.x - 16f, pivot.y - 26f),
-                            size = Size(32f, 22f),
-                            cornerRadius = CornerRadius(4f, 4f),
+                            brush = Brush.horizontalGradient(listOf(Color(0xFF3A3835), Color(0xFF1F1E1C))),
+                            topLeft = Offset(pivot.x - 17f, pivot.y - 30f),
+                            size = Size(34f, 24f),
+                            cornerRadius = CornerRadius(5f, 5f),
                         )
-                        // Brushed silver tubular tonearm
+                        drawRoundRect(
+                            color = champagneMid.copy(alpha = 0.35f),
+                            topLeft = Offset(pivot.x - 17f, pivot.y - 30f),
+                            size = Size(34f, 24f),
+                            cornerRadius = CornerRadius(5f, 5f),
+                            style = Stroke(width = 1f),
+                        )
+                        // Brushed silver-champagne tubular arm
                         drawLine(
                             brush = Brush.horizontalGradient(
-                                0.0f to Color(0xFF9EA2A8),
-                                0.5f to Color(0xFFE7E9EC),
-                                1.0f to Color(0xFF7D8187),
+                                0.0f to Color(0xFF9C9890),
+                                0.45f to Color(0xFFF0EAE0),
+                                1.0f to Color(0xFF77726B),
                             ),
                             start = pivot,
                             end = armEnd,
-                            strokeWidth = 7.5f,
+                            strokeWidth = 9.5f,
                             cap = StrokeCap.Round,
                         )
-                        // Matte obsidian headshell cartridge
+                        // Headshell cartridge with champagne-gold finger-lift tab
                         drawRoundRect(
-                            color = Color(0xFF19191C),
-                            topLeft = Offset(armEnd.x - 12f, armEnd.y - 6f),
-                            size = Size(24f, 36f),
+                            brush = Brush.verticalGradient(listOf(Color(0xFF2B2825), Color(0xFF171514))),
+                            topLeft = Offset(armEnd.x - 13f, armEnd.y - 4f),
+                            size = Size(26f, 38f),
                             cornerRadius = CornerRadius(5f, 5f),
                         )
                         drawRoundRect(
-                            color = Color.White.copy(alpha = 0.16f),
-                            topLeft = Offset(armEnd.x - 12f, armEnd.y - 6f),
-                            size = Size(24f, 36f),
+                            color = champagneLight.copy(alpha = 0.42f),
+                            topLeft = Offset(armEnd.x - 13f, armEnd.y - 4f),
+                            size = Size(26f, 38f),
                             cornerRadius = CornerRadius(5f, 5f),
-                            style = Stroke(width = 1f),
+                            style = Stroke(width = 1.2f),
+                        )
+                        // Subtle gold finger-lift lever on right of headshell
+                        drawLine(
+                            color = champagneLight.copy(alpha = 0.85f),
+                            start = Offset(armEnd.x + 12f, armEnd.y + 10f),
+                            end = Offset(armEnd.x + 24f, armEnd.y + 18f),
+                            strokeWidth = 2.6f,
+                            cap = StrokeCap.Round,
                         )
                     }
                 }
@@ -1130,7 +1073,7 @@ private fun VinylLightfieldImmersiveView(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // First Row Directly Below Vinyl: Left Song/Artist · Right Vintage Champagne-Gold Controls
+            // First Row Directly Below Vinyl: Complete 2-Line Stacked Song Title + Artist on Left, Controls on Right
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1138,27 +1081,26 @@ private fun VinylLightfieldImmersiveView(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 12.dp),
-                    verticalAlignment = Alignment.Bottom,
+                        .padding(end = 14.dp),
                 ) {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.titleLarge.copy(
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.3).sp,
+                            letterSpacing = (-0.2).sp,
                         ),
                         color = ivoryInk,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = song.artist,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                         color = mutedInk,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1167,27 +1109,26 @@ private fun VinylLightfieldImmersiveView(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     IconButton(
                         onClick = {
                             if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onSkipPrevious()
                         },
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(34.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.SkipPrevious,
                             contentDescription = "上一首",
                             tint = ivoryInk.copy(alpha = 0.86f),
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(21.dp),
                         )
                     }
 
-                    // Vintage brushed champagne-ivory tactile circular Play/Pause button
                     Box(
                         modifier = Modifier
-                            .size(46.dp)
+                            .size(44.dp)
                             .shadow(10.dp, CircleShape, ambientColor = Color.Black)
                             .clip(CircleShape)
                             .background(
@@ -1206,7 +1147,7 @@ private fun VinylLightfieldImmersiveView(
                             imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             contentDescription = if (isPlaying) "暂停" else "播放",
                             tint = Color(0xFF1A1612),
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(22.dp),
                         )
                     }
 
@@ -1215,63 +1156,35 @@ private fun VinylLightfieldImmersiveView(
                             if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onSkipNext()
                         },
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(34.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.SkipNext,
                             contentDescription = "下一首",
                             tint = ivoryInk.copy(alpha = 0.86f),
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(21.dp),
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Open Calm Vintage Liner-Note Italic Serif Lyrics Stage
-            Column(
+            ThreeSlotAutoFitLyricsStage(
+                lyrics = lyrics,
+                activeIdx = activeIdx,
+                lyricFamily = lyricFamily,
+                lyricStyleItalic = lyricStyleItalic,
+                activeColor = ivoryInk,
+                secondaryColor = mutedInk,
+                mutedColor = mutedInk.copy(alpha = 0.62f),
+                horizontalAlignment = Alignment.Start,
+                textAlign = TextAlign.Start,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                if (lyrics.isEmpty() || activeIdx < 0) {
-                    Text(
-                        text = "暂无歌词 · 点击右上角匹配在线歌词",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontFamily = lyricFamily),
-                        color = mutedInk,
-                    )
-                } else {
-                    val curLine = lyrics[activeIdx]
-                    Text(
-                        text = curLine.primaryText,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontFamily = lyricFamily,
-                            fontStyle = FontStyle.Italic,
-                            fontWeight = FontWeight.SemiBold,
-                            lineHeight = 38.sp,
-                        ),
-                        color = ivoryInk,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (!curLine.secondaryText.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = curLine.secondaryText,
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontFamily = lyricFamily,
-                                fontWeight = FontWeight.Normal,
-                            ),
-                            color = mutedInk,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
+            )
 
             if (showOffsetBar) {
                 Box(modifier = Modifier.padding(horizontal = 24.dp)) {
@@ -1300,15 +1213,15 @@ private fun VinylLightfieldImmersiveView(
                     onSeekTo = onSeekTo,
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }
 
 /**
- * High-density rounded micro-capsule Live Audio Spectrum + Draggable Waveform Progress Scrubber.
- * Played bars on the left of the razor-thin vertical playhead needle dance with real-time PCM audio spectrum energy;
- * unplayed bars on the right show a refined resting contour; dragging anywhere seeks smoothly.
+ * Fluid 60fps Live Audio Spectrum + Draggable Waveform Progress Scrubber.
+ * Runs a silky frame-synced per-bar spring/exponential animator over real-time PCM spectrum energy
+ * with graceful gravity decay so every beat feels lush and alive even on quiet ambient music.
  */
 @Composable
 fun LiveSpectrumWaveformSeekBar(
@@ -1324,13 +1237,60 @@ fun LiveSpectrumWaveformSeekBar(
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val barCount = 56
+    val barCount = 52
     val baseProfile = remember(songId) {
         FloatArray(barCount) { idx ->
-            val seed = ((songId * 31L + idx * 17L) xor (idx.toLong() * 131L)) and 0xFFFF
-            val wave = 0.32f + 0.24f * sin(idx * 0.38f + (songId % 7)).toFloat()
-            val jitter = ((seed % 100) / 100f) * 0.28f
-            (wave + jitter).coerceIn(0.18f, 0.82f)
+            val t = idx.toFloat() / (barCount - 1)
+            val arch = 0.34f + 0.28f * sin(t * Math.PI).toFloat()
+            val ripple = 0.16f * sin(idx * 0.45f + (songId % 11)).toFloat()
+            (arch + ripple).coerceIn(0.18f, 0.74f)
+        }
+    }
+
+    val animatedLevels = remember { FloatArray(barCount) { 0.22f } }
+    var frameTick by remember { mutableIntStateOf(0) }
+    var animPhase by remember { mutableFloatStateOf(0f) }
+
+    // 60fps silky per-bar interpolation & gentle acoustic motion
+    LaunchedEffect(isPlaying) {
+        var lastNs = 0L
+        while (isActive) {
+            withFrameNanos { nowNs ->
+                val dt = if (lastNs == 0L) 0.016f else ((nowNs - lastNs) / 1_000_000_000f).coerceIn(0.004f, 0.05f)
+                lastNs = nowNs
+                if (isPlaying) animPhase += dt * 5.2f
+
+                val bandCount = spectrumBands.size.coerceAtLeast(1)
+                var energySum = 0f
+                for (b in spectrumBands) energySum += b
+                val hasLivePcm = energySum > 0.04f
+
+                var changed = false
+                for (i in 0 until barCount) {
+                    val target = if (isPlaying) {
+                        val live = spectrumBands[(i * bandCount) / barCount]
+                        val harmonicPulse = 0.14f * (0.5f + 0.5f * sin(animPhase + i * 0.34f)) +
+                            0.10f * (0.5f + 0.5f * sin(animPhase * 1.7f - i * 0.21f))
+                        if (hasLivePcm) {
+                            (live * 0.88f + baseProfile[i] * 0.20f + harmonicPulse * 0.45f).coerceIn(0.14f, 0.98f)
+                        } else {
+                            (baseProfile[i] * 0.65f + harmonicPulse * 1.35f).coerceIn(0.16f, 0.92f)
+                        }
+                    } else {
+                        (baseProfile[i] * 0.42f).coerceIn(0.12f, 0.42f)
+                    }
+                    val cur = animatedLevels[i]
+                    val speed = if (target > cur) 18f else 7.5f
+                    val next = cur + (target - cur) * (dt * speed).coerceAtMost(1f)
+                    if (abs(next - cur) > 0.0015f) changed = true
+                    animatedLevels[i] = next
+                }
+                if (changed || isPlaying) frameTick++
+            }
+            if (!isPlaying && animatedLevels.all { abs(it - (baseProfile[0] * 0.42f)) < 0.35f }) {
+                // Keep ticking smoothly until fully settled, then yield
+                kotlinx.coroutines.delay(16L)
+            }
         }
     }
 
@@ -1345,14 +1305,13 @@ fun LiveSpectrumWaveformSeekBar(
     } else {
         if (durationMs > 0L) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
     }
-
     val displayPosMs = if (isDragging) (dragFraction * durationMs).toLong() else positionMs
 
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(34.dp)
+                .height(48.dp)
                 .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
                 .pointerInput(durationMs) {
                     detectTapGestures { offset ->
@@ -1385,33 +1344,26 @@ fun LiveSpectrumWaveformSeekBar(
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(28.dp),
+                    .height(42.dp),
             ) {
+                // Read frameTick so Canvas redraws smoothly at 60fps
+                val _tick = frameTick
                 val totalW = size.width
                 val totalH = size.height
                 val midY = totalH / 2f
                 val step = totalW / barCount
-                val barW = (step * 0.48f).coerceIn(2.0f, 4.2f)
+                val barW = (step * 0.50f).coerceIn(2.4f, 4.8f)
                 val playheadX = totalW * progress
-                val bandCount = spectrumBands.size.coerceAtLeast(1)
 
                 for (i in 0 until barCount) {
                     val cx = i * step + step / 2f
                     val isPlayed = cx <= playheadX
-                    val baseAmp = baseProfile[i]
-                    val liveBand = spectrumBands[(i * bandCount) / barCount]
-                    val heightFrac = if (isPlaying && isPlayed) {
-                        // Played zone dances smoothly with real PCM audio spectrum + base contour
-                        (baseAmp * 0.42f + liveBand * 0.85f).coerceIn(0.16f, 0.96f)
-                    } else if (isPlaying) {
-                        // Unplayed zone breathes very subtly
-                        (baseAmp * 0.62f + liveBand * 0.14f).coerceIn(0.14f, 0.72f)
+                    val level = if (isPlayed) {
+                        animatedLevels[i]
                     } else {
-                        // Paused resting silhouette
-                        (baseAmp * 0.56f).coerceIn(0.14f, 0.60f)
+                        (baseProfile[i] * 0.44f + animatedLevels[i] * 0.22f).coerceIn(0.12f, 0.58f)
                     }
-
-                    val barH = (totalH * heightFrac).coerceAtLeast(4f)
+                    val barH = (totalH * level).coerceAtLeast(5f)
                     drawRoundRect(
                         color = if (isPlayed) playedColor else unplayedColor,
                         topLeft = Offset(cx - barW / 2f, midY - barH / 2f),
@@ -1420,19 +1372,18 @@ fun LiveSpectrumWaveformSeekBar(
                     )
                 }
 
-                // Razor-thin vertical playhead needle right at the exact played/unplayed boundary
-                val needleX = playheadX.coerceIn(1.5f, totalW - 1.5f)
+                val needleX = playheadX.coerceIn(2f, totalW - 2f)
                 drawLine(
                     color = needleColor,
-                    start = Offset(needleX, 0f),
-                    end = Offset(needleX, totalH),
-                    strokeWidth = if (isDragging) 3.4f else 2.4f,
+                    start = Offset(needleX, 1f),
+                    end = Offset(needleX, totalH - 1f),
+                    strokeWidth = if (isDragging) 3.8f else 2.6f,
                     cap = StrokeCap.Round,
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1457,6 +1408,7 @@ private fun ImmersiveTopBar(
     title: String,
     inkColor: Color,
     currentStyle: ImmersionLyricStyle,
+    isDarkSurface: Boolean = true,
     isTranslatingLyrics: Boolean,
     onSelectStyle: (ImmersionLyricStyle) -> Unit,
     onBack: () -> Unit,
@@ -1487,11 +1439,8 @@ private fun ImmersiveTopBar(
         if (title.isNotBlank()) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp,
-                ),
-                color = inkColor.copy(alpha = 0.72f),
+                style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.sp),
+                color = inkColor.copy(alpha = 0.74f),
             )
         } else {
             Spacer(modifier = Modifier.width(1.dp))
@@ -1517,7 +1466,6 @@ private fun ImmersiveTopBar(
                         text = "译",
                         style = MaterialTheme.typography.labelSmall,
                         color = inkColor.copy(alpha = 0.85f),
-                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
@@ -1533,23 +1481,33 @@ private fun ImmersiveTopBar(
                         modifier = Modifier.size(22.dp),
                     )
                 }
+                val menuBg = if (isDarkSurface) Color(0xFF1F1D1B) else Color(0xFFFAF6EE)
+                val menuBorder = if (isDarkSurface) Color.White.copy(alpha = 0.14f) else Color(0xFFDCD5C7)
+                val menuText = if (isDarkSurface) Color(0xFFF2ECE1) else Color(0xFF1E1B18)
+                val menuAccent = if (isDarkSurface) Color(0xFFD8B888) else Color(0xFFC83E2B)
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
+                    containerColor = menuBg,
+                    tonalElevation = 0.dp,
+                    border = BorderStroke(0.75.dp, menuBorder),
                 ) {
                     ImmersionLyricStyle.entries.forEach { option ->
+                        val isSelected = option == currentStyle
                         DropdownMenuItem(
                             text = {
                                 Text(
                                     text = option.label,
-                                    fontWeight = if (option == currentStyle) FontWeight.Bold else FontWeight.Normal,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isSelected) menuAccent else menuText,
                                 )
                             },
-                            trailingIcon = if (option == currentStyle) {
+                            trailingIcon = if (isSelected) {
                                 {
                                     Icon(
                                         imageVector = Icons.Rounded.Check,
                                         contentDescription = null,
+                                        tint = menuAccent,
                                         modifier = Modifier.size(16.dp),
                                     )
                                 }
@@ -1562,29 +1520,34 @@ private fun ImmersiveTopBar(
                             },
                         )
                     }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        thickness = 0.5.dp,
+                        color = menuBorder,
+                    )
                     DropdownMenuItem(
-                        text = { Text("歌词时间轴微调") },
+                        text = { Text("歌词时间轴微调", style = MaterialTheme.typography.bodyMedium, color = menuText) },
                         onClick = {
                             menuExpanded = false
                             onToggleOffsetBar()
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("查看完整歌词列表") },
+                        text = { Text("查看完整歌词列表", style = MaterialTheme.typography.bodyMedium, color = menuText) },
                         onClick = {
                             menuExpanded = false
                             onOpenFullLyricsSheet()
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("在线匹配歌词") },
+                        text = { Text("在线匹配歌词", style = MaterialTheme.typography.bodyMedium, color = menuText) },
                         onClick = {
                             menuExpanded = false
                             onOpenLyricsSearch()
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("搜索替换封面") },
+                        text = { Text("搜索替换封面", style = MaterialTheme.typography.bodyMedium, color = menuText) },
                         onClick = {
                             menuExpanded = false
                             onOpenCoverSearch()
@@ -1637,5 +1600,199 @@ private fun ImmersiveOffsetStrip(
                 .clickable { onAdjust(500L) }
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         )
+    }
+}
+
+private val inlineBilingualRegex = Regex("""^([A-Za-z0-9\p{Punct}\s'’\-—–]+?)[\s/|]+([\u4e00-\u9fff].+)$""")
+
+/**
+ * Splits a LyricLine into (originalText, translationOrNull).
+ * Handles both explicit LyricLine.secondaryText AND embedded inline bilingual LRC lines
+ * such as "Cause it's the sound of love' 因为这是爱的声音".
+ */
+private fun splitBilingualLyric(line: LyricLine): Pair<String, String?> {
+    val primary = line.primaryText.trim()
+    val explicitTrans = line.secondaryText?.trim()?.takeIf { it.isNotBlank() }
+    if (explicitTrans != null) return primary to explicitTrans
+
+    val match = inlineBilingualRegex.matchEntire(primary)
+    if (match != null) {
+        val orig = match.groupValues[1].trim()
+        val trans = match.groupValues[2].trim()
+        val latinLetters = orig.count { it.isLetter() }
+        val hanChars = trans.count { it in '\u4e00'..'\u9fff' }
+        if (latinLetters >= 3 && hanChars >= 2) {
+            return orig to trans
+        }
+    }
+    return primary to null
+}
+
+/**
+ * Fixed 3-Slot Auto-Fit Bilingual Lyrics Stage:
+ * - No translation: Line 1 (prev lyric, fixed 13sp) | Line 2 (active lyric, auto-scaled in fixed box so 100% complete) | Line 3 (next lyric, fixed 13sp).
+ * - With translation: Line 1 (prev lyric, fixed 13sp) | Line 2 (active original lyric, auto-scaled in fixed box so 100% complete) | Line 3 (active translation, fixed 13sp).
+ */
+@Composable
+private fun ThreeSlotAutoFitLyricsStage(
+    lyrics: List<LyricLine>,
+    activeIdx: Int,
+    lyricFamily: FontFamily,
+    lyricStyleItalic: FontStyle,
+    activeColor: Color,
+    secondaryColor: Color,
+    mutedColor: Color,
+    horizontalAlignment: Alignment.Horizontal,
+    textAlign: TextAlign,
+    modifier: Modifier = Modifier,
+) {
+    val textMeasurer = rememberTextMeasurer()
+
+    Box(
+        modifier = modifier,
+        contentAlignment = if (horizontalAlignment == Alignment.CenterHorizontally) {
+            Alignment.Center
+        } else {
+            Alignment.CenterStart
+        },
+    ) {
+        if (lyrics.isEmpty() || activeIdx < 0) {
+            Text(
+                text = "暂无歌词 · 点击右上角匹配在线歌词",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = lyricFamily,
+                    fontSize = 14.sp,
+                ),
+                color = secondaryColor,
+                textAlign = textAlign,
+            )
+            return@Box
+        }
+
+        val prevPair = lyrics.getOrNull(activeIdx - 1)?.let { splitBilingualLyric(it) }
+        val curPair = splitBilingualLyric(lyrics[activeIdx])
+        val nextPair = lyrics.getOrNull(activeIdx + 1)?.let { splitBilingualLyric(it) }
+
+        val line1Text = prevPair?.first.orEmpty()
+        val line2Text = curPair.first
+        val hasTranslation = !curPair.second.isNullOrBlank()
+        val line3Text = if (hasTranslation) curPair.second.orEmpty() else nextPair?.first.orEmpty()
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = horizontalAlignment,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            // Slot 1: Fixed 13sp previous lyric
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(22.dp),
+                contentAlignment = if (horizontalAlignment == Alignment.CenterHorizontally) {
+                    Alignment.Center
+                } else {
+                    Alignment.CenterStart
+                },
+            ) {
+                if (line1Text.isNotBlank()) {
+                    Text(
+                        text = line1Text,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = lyricFamily,
+                            fontStyle = lyricStyleItalic,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                        ),
+                        color = mutedColor,
+                        textAlign = textAlign,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Slot 2: Fixed-height stage with automatic font sizing (24sp -> 11sp) so 100% of active lyric fits with ZERO ellipsis
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(74.dp),
+                contentAlignment = if (horizontalAlignment == Alignment.CenterHorizontally) {
+                    Alignment.Center
+                } else {
+                    Alignment.CenterStart
+                },
+            ) {
+                val maxWpx = constraints.maxWidth.coerceAtLeast(1)
+                val maxHpx = constraints.maxHeight.coerceAtLeast(1)
+                val fittedFontSp = remember(line2Text, maxWpx, maxHpx, lyricFamily, lyricStyleItalic) {
+                    var chosen = 12
+                    for (candidate in 24 downTo 11) {
+                        val result = textMeasurer.measure(
+                            text = line2Text,
+                            style = TextStyle(
+                                fontFamily = lyricFamily,
+                                fontStyle = lyricStyleItalic,
+                                fontSize = candidate.sp,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = (candidate * 1.32f).sp,
+                                textAlign = textAlign,
+                            ),
+                            constraints = Constraints(maxWidth = maxWpx),
+                        )
+                        if (result.size.height <= maxHpx && !result.didOverflowWidth) {
+                            chosen = candidate
+                            break
+                        }
+                    }
+                    chosen
+                }
+
+                Text(
+                    text = line2Text,
+                    style = TextStyle(
+                        fontFamily = lyricFamily,
+                        fontStyle = lyricStyleItalic,
+                        fontSize = fittedFontSp.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = (fittedFontSp * 1.32f).sp,
+                        textAlign = textAlign,
+                    ),
+                    color = activeColor,
+                    textAlign = textAlign,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Slot 3: Fixed 13sp translation (when bilingual) or next lyric (when monolingual)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp),
+                contentAlignment = if (horizontalAlignment == Alignment.CenterHorizontally) {
+                    Alignment.TopCenter
+                } else {
+                    Alignment.TopStart
+                },
+            ) {
+                if (line3Text.isNotBlank()) {
+                    Text(
+                        text = line3Text,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = lyricFamily,
+                            fontStyle = if (hasTranslation) FontStyle.Normal else lyricStyleItalic,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                        ),
+                        color = if (hasTranslation) secondaryColor else mutedColor,
+                        textAlign = textAlign,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
