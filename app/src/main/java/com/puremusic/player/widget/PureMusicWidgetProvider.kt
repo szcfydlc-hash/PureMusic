@@ -25,14 +25,25 @@ import com.puremusic.player.R
 import com.puremusic.player.service.PlaybackService
 import com.puremusic.player.ui.components.AudioArtFetcher
 
-class PureMusicWidgetProvider : AppWidgetProvider() {
+open class PureMusicWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray,
     ) {
-        updateAllWidgets(context, appWidgetManager, appWidgetIds)
+        updateWidgetsForLayout(
+            context = context,
+            manager = appWidgetManager,
+            appWidgetIds = appWidgetIds,
+            layoutRes = R.layout.widget_pure_music,
+            highRes = false,
+            title = cachedTitle,
+            artist = cachedArtist,
+            isPlaying = cachedIsPlaying,
+            artUri = cachedArtUri,
+            isLossless = cachedIsLossless,
+        )
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -53,6 +64,12 @@ class PureMusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_NEXT = "com.puremusic.player.WIDGET_NEXT"
         const val ACTION_PREV = "com.puremusic.player.WIDGET_PREV"
 
+        @Volatile internal var cachedTitle: String? = null
+        @Volatile internal var cachedArtist: String? = null
+        @Volatile internal var cachedIsPlaying: Boolean = false
+        @Volatile internal var cachedArtUri: Uri? = null
+        @Volatile internal var cachedIsLossless: Boolean = false
+
         fun pushState(
             context: Context,
             title: String?,
@@ -61,32 +78,69 @@ class PureMusicWidgetProvider : AppWidgetProvider() {
             artUri: Uri? = null,
             isLossless: Boolean = false,
         ) {
+            cachedTitle = title
+            cachedArtist = artist
+            cachedIsPlaying = isPlaying
+            cachedArtUri = artUri
+            cachedIsLossless = isLossless
+
             val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(ComponentName(context, PureMusicWidgetProvider::class.java))
-            if (ids.isEmpty()) return
-            updateAllWidgets(context, manager, ids, title, artist, isPlaying, artUri, isLossless)
+            val compactIds = manager.getAppWidgetIds(ComponentName(context, PureMusicWidgetProvider::class.java))
+            if (compactIds.isNotEmpty()) {
+                updateWidgetsForLayout(
+                    context = context,
+                    manager = manager,
+                    appWidgetIds = compactIds,
+                    layoutRes = R.layout.widget_pure_music,
+                    highRes = false,
+                    title = title,
+                    artist = artist,
+                    isPlaying = isPlaying,
+                    artUri = artUri,
+                    isLossless = isLossless,
+                )
+            }
+
+            val largeIds = manager.getAppWidgetIds(ComponentName(context, PureMusicWidgetLargeProvider::class.java))
+            if (largeIds.isNotEmpty()) {
+                updateWidgetsForLayout(
+                    context = context,
+                    manager = manager,
+                    appWidgetIds = largeIds,
+                    layoutRes = R.layout.widget_pure_music_4x2,
+                    highRes = true,
+                    title = title,
+                    artist = artist,
+                    isPlaying = isPlaying,
+                    artUri = artUri,
+                    isLossless = isLossless,
+                )
+            }
         }
 
-        private fun updateAllWidgets(
+        internal fun updateWidgetsForLayout(
             context: Context,
             manager: AppWidgetManager,
             appWidgetIds: IntArray,
+            layoutRes: Int,
+            highRes: Boolean,
             title: String? = null,
             artist: String? = null,
             isPlaying: Boolean = false,
             artUri: Uri? = null,
             isLossless: Boolean = false,
         ) {
+            if (appWidgetIds.isEmpty()) return
             val openAppIntent = PendingIntent.getActivity(
                 context,
                 10,
                 Intent(context, MainActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            val turntableBitmap = renderTurntableWidgetBitmap(context, artUri)
+            val turntableBitmap = renderTurntableWidgetBitmap(context, artUri, highRes)
 
             appWidgetIds.forEach { widgetId ->
-                val views = RemoteViews(context.packageName, R.layout.widget_pure_music)
+                val views = RemoteViews(context.packageName, layoutRes)
                 views.setTextViewText(R.id.widget_title, title?.takeIf { it.isNotBlank() } ?: "简约音乐")
                 views.setTextViewText(R.id.widget_artist, artist?.takeIf { it.isNotBlank() } ?: "点击打开本地曲库")
                 views.setViewVisibility(R.id.widget_badge, if (isLossless) View.VISIBLE else View.GONE)
@@ -103,20 +157,23 @@ class PureMusicWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        private fun renderTurntableWidgetBitmap(context: Context, uri: Uri?): Bitmap {
-            val w = 228
-            val h = 162
-            val sleeveSize = 154
+        private fun renderTurntableWidgetBitmap(context: Context, uri: Uri?, highRes: Boolean): Bitmap {
+            // Safe unclipped canvas geometry: discCx + discRadius + margin <= w
+            val w = if (highRes) 420 else 236
+            val h = if (highRes) 308 else 176
+            val sleeveSize = if (highRes) 280 else 160
+            val sleeveLeft = if (highRes) 10f else 6f
             val sleeveTop = (h - sleeveSize) / 2f
-            val discRadius = 70f
-            val discCx = sleeveSize + 14f
+            val discRadius = if (highRes) 128f else 72f
+            val discCx = sleeveLeft + sleeveSize * (if (highRes) 0.95f else 0.92f)
             val discCy = h / 2f
+            val cornerRadius = if (highRes) 24f else 14f
 
             val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(out)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-            // 1. Draw peeking 96-groove glossy black vinyl disc on the right
+            // 1. Draw complete unclipped glossy black vinyl disc peeking out from the right
             paint.color = Color.parseColor("#0B0B0D")
             canvas.drawCircle(discCx, discCy, discRadius, paint)
 
@@ -126,9 +183,9 @@ class PureMusicWidgetProvider : AppWidgetProvider() {
                 discCy,
                 intArrayOf(
                     Color.TRANSPARENT,
-                    Color.argb(72, 234, 236, 239),
+                    Color.argb(80, 238, 240, 244),
                     Color.TRANSPARENT,
-                    Color.argb(68, 234, 236, 239),
+                    Color.argb(72, 238, 240, 244),
                     Color.TRANSPARENT,
                 ),
                 floatArrayOf(0.0f, 0.14f, 0.30f, 0.64f, 0.85f),
@@ -140,13 +197,28 @@ class PureMusicWidgetProvider : AppWidgetProvider() {
 
             val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE
-                strokeWidth = 1.1f
+                strokeWidth = if (highRes) 1.4f else 1.0f
             }
-            for (i in 0..18) {
-                val r = discRadius * (0.44f + i * 0.028f)
-                groovePaint.color = if (i % 2 == 0) Color.argb(30, 255, 255, 255) else Color.argb(80, 0, 0, 0)
+            val grooveSteps = if (highRes) 24 else 16
+            for (i in 0..grooveSteps) {
+                val frac = 0.42f + (i.toFloat() / grooveSteps) * 0.52f
+                val r = discRadius * frac
+                groovePaint.color = if (i % 2 == 0) Color.argb(32, 255, 255, 255) else Color.argb(82, 0, 0, 0)
                 canvas.drawCircle(discCx, discCy, r, groovePaint)
             }
+
+            // Subtle vinyl center label ring & outer rim highlight
+            val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = if (highRes) 1.5f else 1.0f
+                color = Color.argb(45, 255, 255, 255)
+            }
+            canvas.drawCircle(discCx, discCy, discRadius - 1f, rimPaint)
+
+            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#C83E2B") }
+            canvas.drawCircle(discCx, discCy, discRadius * 0.28f, labelPaint)
+            labelPaint.color = Color.parseColor("#18181B")
+            canvas.drawCircle(discCx, discCy, discRadius * 0.06f, labelPaint)
 
             // 2. Decode album cover (per-song or fallback dark vinyl sleeve)
             val rawCover = uri?.let { loadRawBitmap(context, it, sleeveSize) }
@@ -155,7 +227,7 @@ class PureMusicWidgetProvider : AppWidgetProvider() {
             val cPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             val rect = Rect(0, 0, sleeveSize, sleeveSize)
             val rectF = RectF(rect)
-            cCanvas.drawRoundRect(rectF, 14f, 14f, cPaint)
+            cCanvas.drawRoundRect(rectF, cornerRadius, cornerRadius, cPaint)
             cPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
             if (rawCover != null) {
                 cCanvas.drawBitmap(rawCover, null, rect, cPaint)
@@ -163,16 +235,27 @@ class PureMusicWidgetProvider : AppWidgetProvider() {
             } else {
                 val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#24211F") }
                 cCanvas.drawRect(rectF, fallbackPaint)
-                fallbackPaint.color = Color.parseColor("#A63429")
-                cCanvas.drawCircle(sleeveSize / 2f, sleeveSize / 2f, 22f, fallbackPaint)
+                fallbackPaint.color = Color.parseColor("#C83E2B")
+                cCanvas.drawCircle(sleeveSize / 2f, sleeveSize / 2f, sleeveSize * 0.14f, fallbackPaint)
             }
 
             // Soft drop shadow behind sleeve edge over the vinyl disc
+            val shadowOffset = if (highRes) 8f else 5f
             val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(65, 0, 0, 0)
+                color = Color.argb(72, 0, 0, 0)
             }
-            canvas.drawRoundRect(RectF(6f, sleeveTop + 2f, sleeveSize + 4f, sleeveTop + sleeveSize + 2f), 14f, 14f, shadowPaint)
-            canvas.drawBitmap(coverRounded, 0f, sleeveTop, null)
+            canvas.drawRoundRect(
+                RectF(
+                    sleeveLeft + shadowOffset,
+                    sleeveTop + 3f,
+                    sleeveLeft + sleeveSize + shadowOffset * 0.7f,
+                    sleeveTop + sleeveSize + 3f,
+                ),
+                cornerRadius,
+                cornerRadius,
+                shadowPaint,
+            )
+            canvas.drawBitmap(coverRounded, sleeveLeft, sleeveTop, null)
             coverRounded.recycle()
             return out
         }

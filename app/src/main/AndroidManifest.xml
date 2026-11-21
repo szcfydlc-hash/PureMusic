@@ -46,7 +46,8 @@
 
         <receiver
             android:name=".widget.PureMusicWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_label_4x1">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.puremusic.player.WIDGET_TOGGLE" />
@@ -56,6 +57,21 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/pure_music_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PureMusicWidgetLargeProvider"
+            android:exported="true"
+            android:label="@string/widget_label_4x2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.puremusic.player.WIDGET_TOGGLE" />
+                <action android:name="com.puremusic.player.WIDGET_NEXT" />
+                <action android:name="com.puremusic.player.WIDGET_PREV" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pure_music_widget_4x2_info" />
         </receiver>
     </application>
 
