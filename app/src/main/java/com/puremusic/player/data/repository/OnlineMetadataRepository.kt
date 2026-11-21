@@ -64,10 +64,10 @@ class OnlineMetadataRepository(private val context: Context) {
 
     private fun normalizeLyricQuery(raw: String): String {
         return raw
-            .replace(Regex("[(\[（【][^)\]）】]*(?:live|伴奏|纯音乐|remaster|remix|ver\.?|版|主题曲|插曲|片尾曲|片头曲|feat\.?|ft\.?)[^)\]）】]*[)\]）】]", RegexOption.IGNORE_CASE), " ")
-            .replace(Regex("[(\[（【][^)\]）】]{1,28}[)\]）】]"), " ")
-            .replace(Regex("\b(?:feat\.?|ft\.?)\s+.*$", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\s+"), " ")
+            .replace(Regex("""[(\[（【][^)\]）】]*(?:live|伴奏|纯音乐|remaster|remix|ver\.?|版|主题曲|插曲|片尾曲|片头曲|feat\.?|ft\.?)[^)\]）】]*[)\]）】]""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""[(\[（【][^)\]）】]{1,28}[)\]）】]"""), " ")
+            .replace(Regex("""\b(?:feat\.?|ft\.?)\s+.*$""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\s+"""), " ")
             .trim()
     }
 
@@ -106,7 +106,7 @@ class OnlineMetadataRepository(private val context: Context) {
 
             // Pass 2: Fallback title-only fuzzy match for Chinese/mixed tracks when full query misses
             val syncedHits = merged.values.count { it.hasSynced }
-            val titleOnly = cleaned.split(Regex("\s+[-–—]\s+|\s+")).firstOrNull()?.trim().orEmpty()
+            val titleOnly = cleaned.split(Regex("""\s+[-–—]\s+|\s+""")).firstOrNull()?.trim().orEmpty()
             if (syncedHits < 2 && titleOnly.isNotBlank() && titleOnly != cleaned) {
                 runCatching {
                     val fallbackUrl = "https://lrclib.net/api/search?track_name=${URLEncoder.encode(titleOnly, "UTF-8")}"

@@ -106,6 +106,7 @@ import com.puremusic.player.ui.screens.LibraryScreen
 import com.puremusic.player.ui.screens.NowPlayingScreen
 import com.puremusic.player.ui.screens.SettingsScreen
 import com.puremusic.player.ui.theme.PureMusicTheme
+import com.puremusic.player.ui.theme.resolveLyricFontFamily
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -824,10 +825,8 @@ private fun PureMusicApp(
         }
 
         if (showLyrics) {
-            val lyricFamily = when (lyricFontStyle) {
-                LyricFontStyle.SERIF_ITALIC, LyricFontStyle.SERIF -> FontFamily.Serif
-                LyricFontStyle.SANS -> FontFamily.SansSerif
-                LyricFontStyle.MONOSPACE -> FontFamily.Monospace
+            val lyricFamily = remember(lyricFontStyle, customFontVersion) {
+                resolveLyricFontFamily(context, lyricFontStyle)
             }
             LyricsBottomSheet(
                 songTitle = playerState.currentSong?.title.orEmpty(),

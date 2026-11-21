@@ -59,6 +59,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.puremusic.player.ui.theme.resolveLyricFontFamily
+import com.puremusic.player.ui.theme.resolveAppFontFamily
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -107,7 +110,6 @@ import com.puremusic.player.data.model.ScanStatus
 import com.puremusic.player.ui.components.liquidGlass
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalLayoutApi::class)
 private enum class SettingsPage(val title: String) {
     HUB("设置"),
     APPEARANCE("外观与纸色"),
@@ -116,6 +118,7 @@ private enum class SettingsPage(val title: String) {
     LIBRARY("曲库与备份"),
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     songCount: Int,
@@ -191,6 +194,7 @@ fun SettingsScreen(
         currentPage = SettingsPage.HUB
     }
 
+    val settingsContext = LocalContext.current
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val canvasBg = MaterialTheme.colorScheme.background
     val cardBg = MaterialTheme.colorScheme.surface
@@ -275,10 +279,11 @@ fun SettingsScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (scanStatus.message.isNotBlank()) {
+                            val statusMsg = scanStatus.message
+                            if (!statusMsg.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = scanStatus.message,
+                                    text = statusMsg,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     maxLines = 1,
@@ -399,7 +404,7 @@ fun SettingsScreen(
                                 .padding(horizontal = 9.dp, vertical = 3.dp),
                         ) {
                             Text(
-                                text = "v1.5.1 正式版",
+                                text = "v1.5.2 正式版",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
@@ -1346,7 +1351,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.5.1 正式版",
+                            text = "v1.5.2 正式版",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -1376,12 +1381,9 @@ fun SettingsScreen(
             },
             onDismiss = { showAppFontDialog = false },
             previewFontStyle = { option ->
-                when (option) {
-                    AppFontStyle.SERIF -> FontFamily.Serif to FontStyle.Normal
-                    AppFontStyle.SERIF_ITALIC -> FontFamily.Serif to FontStyle.Italic
-                    AppFontStyle.SANS -> FontFamily.SansSerif to FontStyle.Normal
-                    AppFontStyle.MONOSPACE -> FontFamily.Monospace to FontStyle.Normal
-                }
+                val fam = resolveAppFontFamily(settingsContext, option)
+                val st = if (option == AppFontStyle.SERIF_ITALIC || option == AppFontStyle.PLAYFAIR) FontStyle.Italic else FontStyle.Normal
+                fam to st
             },
         )
     }
@@ -1397,12 +1399,9 @@ fun SettingsScreen(
             },
             onDismiss = { showLyricFontDialog = false },
             previewFontStyle = { option ->
-                when (option) {
-                    LyricFontStyle.SERIF_ITALIC -> FontFamily.Serif to FontStyle.Italic
-                    LyricFontStyle.SERIF -> FontFamily.Serif to FontStyle.Normal
-                    LyricFontStyle.SANS -> FontFamily.SansSerif to FontStyle.Normal
-                    LyricFontStyle.MONOSPACE -> FontFamily.Monospace to FontStyle.Normal
-                }
+                val fam = resolveLyricFontFamily(settingsContext, option)
+                val st = if (option == LyricFontStyle.SERIF_ITALIC || option == LyricFontStyle.PLAYFAIR) FontStyle.Italic else FontStyle.Normal
+                fam to st
             },
         )
     }
