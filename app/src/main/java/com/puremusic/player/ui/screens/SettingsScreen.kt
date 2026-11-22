@@ -265,14 +265,14 @@ fun SettingsScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(18.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(
                                     if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                 )
                                 .border(
                                     width = if (selected) 0.dp else 0.75.dp,
                                     color = if (selected) Color.Transparent else outlineColor,
-                                    shape = RoundedCornerShape(18.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                 )
                                 .clickable {
                                     activeAnchor = idx
@@ -511,9 +511,11 @@ fun SettingsScreen(
                     DropdownMenu(
                         expanded = glassLevelMenuExpanded,
                         onDismissRequest = { glassLevelMenuExpanded = false },
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
                         tonalElevation = 0.dp,
-                        border = BorderStroke(0.75.dp, outlineColor),
+                        shadowElevation = 10.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(0.75.dp, outlineColor.copy(alpha = 0.55f)),
                     ) {
                         LiquidGlassLevel.entries.forEach { tier ->
                             val selected = tier == liquidGlassLevel
@@ -1044,9 +1046,9 @@ fun SettingsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(7.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(pine.copy(alpha = if (isDark) 0.24f else 0.10f))
-                            .border(0.6.dp, pine.copy(alpha = 0.35f), RoundedCornerShape(7.dp))
+                            .border(0.6.dp, pine.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
                             .padding(horizontal = 12.dp, vertical = 9.dp),
                     ) {
                         Text(
@@ -1068,7 +1070,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                val chipShape = RoundedCornerShape(7.dp)
+                val chipShape = RoundedCornerShape(6.dp)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1310,7 +1312,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.9.7",
+                            text = "v2.0.1",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold,
@@ -1673,9 +1675,9 @@ private fun SettingsActionIconRow(
         Box(
             modifier = Modifier
                 .size(34.dp)
-                .clip(RoundedCornerShape(7.dp))
+                .clip(RoundedCornerShape(6.dp))
                 .background(MaterialTheme.colorScheme.background)
-                .border(0.6.dp, outlineColor, RoundedCornerShape(7.dp)),
+                .border(0.6.dp, outlineColor, RoundedCornerShape(6.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

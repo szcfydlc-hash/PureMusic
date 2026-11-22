@@ -679,9 +679,11 @@ fun LibraryScreen(
                                 DropdownMenu(
                                     expanded = sortMenuExpanded,
                                     onDismissRequest = { sortMenuExpanded = false },
-                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
                                     tonalElevation = 0.dp,
-                                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                                    shadowElevation = 10.dp,
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
                                 ) {
                                     SortOrder.entries.forEach { order ->
                                         DropdownMenuItem(
@@ -855,7 +857,7 @@ private fun HeaderToolButton(
     liquidGlassEnabled: Boolean,
     content: @Composable () -> Unit,
 ) {
-    val shape = if (liquidGlassEnabled) CircleShape else RoundedCornerShape(7.dp)
+    val shape = if (liquidGlassEnabled) CircleShape else RoundedCornerShape(6.dp)
     Box(
         modifier = Modifier
             .size(34.dp)
@@ -1165,9 +1167,11 @@ private fun SongsTabContent(
                     DropdownMenu(
                         expanded = itemMenuExpanded,
                         onDismissRequest = { itemMenuExpanded = false },
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
                         tonalElevation = 0.dp,
-                        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                        shadowElevation = 10.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
                     ) {
                         DropdownMenuItem(
                             text = { Text(if (song.id in favoriteSongIds) "取消喜欢" else "添加到我喜欢") },
@@ -1977,9 +1981,11 @@ private fun PlaylistsTabContent(
                     DropdownMenu(
                         expanded = plMenuExpanded,
                         onDismissRequest = { plMenuExpanded = false },
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
                         tonalElevation = 0.dp,
-                        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                        shadowElevation = 10.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
                     ) {
                         DropdownMenuItem(
                             text = { Text("添加 / 管理歌曲") },

@@ -1,5 +1,7 @@
 package com.puremusic.player.ui.screens
 
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -172,14 +174,19 @@ fun ImmersiveLyricsHost(
         val window = (view.context as? Activity)?.window
         val controller = window?.let { WindowCompat.getInsetsController(it, view) }
         controller?.isAppearanceLightStatusBars = !sceneHasDarkBackdrop
+        controller?.isAppearanceLightNavigationBars = !sceneHasDarkBackdrop
         onDispose {
             controller?.isAppearanceLightStatusBars = !isDarkTheme
+            controller?.isAppearanceLightNavigationBars = !isDarkTheme
         }
     }
 
     AnimatedContent(
         targetState = style,
-        transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(200)) },
+        transitionSpec = {
+            (fadeIn(tween(260)) + scaleIn(initialScale = 0.97f, animationSpec = tween(260))) togetherWith
+                (fadeOut(tween(180)) + scaleOut(targetScale = 1.02f, animationSpec = tween(180)))
+        },
         label = "immersionSceneSwitch",
         modifier = Modifier
             .fillMaxSize()
@@ -609,7 +616,7 @@ private fun SpatialGalleryImmersiveView(
             listOf(song)
         } else {
             val idx = allSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-            List(minOf(6, allSongs.size)) { step ->
+            List(minOf(7, allSongs.size)) { step ->
                 allSongs[(idx + step) % allSongs.size]
             }
         }
@@ -716,10 +723,12 @@ private fun SpatialGalleryImmersiveView(
                     },
                 contentAlignment = Alignment.TopCenter,
             ) {
-                val baseX = 14.dp
-                val baseY = 48.dp
-                val dynamicRotY = 24f + (dragOffsetX.value * 0.10f).coerceIn(-10f, 10f)
-                val camDist = 6.2f * density
+                val baseX = 0.dp
+                val baseY = 42.dp
+                val dynamicRotY = 18f + (dragOffsetX.value * 0.08f).coerceIn(-8f, 8f)
+                val camDist = 7.4f * density
+                val corridorWidth = frontSize + 108.dp
+
                 Box(
                     modifier = Modifier
                         .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
@@ -727,169 +736,151 @@ private fun SpatialGalleryImmersiveView(
                             scaleX = tapScale.value
                             scaleY = tapScale.value
                         }
-                        .width(frontSize + 116.dp)
-                        .height(frontSize * 1.42f),
+                        .width(corridorWidth)
+                        .height(frontSize * 1.44f),
                     contentAlignment = Alignment.TopStart,
                 ) {
-                    // Deep 6-sleeve 3D gallery corridor receding diagonally UP and TO THE RIGHT
-                    for (depth in (stackSongs.lastIndex downTo 1)) {
-                        val depthSong = stackSongs[depth]
-                        val scaleFactor = (1f - depth * 0.105f).coerceAtLeast(0.46f)
-                        val xShift = baseX + (depth * 30 - depth * depth * 0.8f).dp
-                        val yShift = baseY - (depth * 10).dp
-                        val sleeveAlpha = (1f - depth * 0.14f).coerceAtLeast(0.26f)
+                    // True 1/z vanishing-point projection (7 jackets converging cleanly toward upper-right vanishing point!)
+                    for (depth in (stackSongs.lastIndex downTo 0)) {
+                        val itemSong = stackSongs[depth]
+                        val isFront = depth == 0
+                        val p = 1f / (1f + depth * 0.23f) // 1.00, 0.81, 0.68, 0.59, 0.52, 0.47, 0.42
+                        val invP = 1f - p
+                        val xShift = baseX + (frontSize * 1.18f * invP)
+                        val yShift = baseY - (34.dp * invP)
+                        val rotY = if (isFront) dynamicRotY else 18f
+                        val sleeveAlpha = (1f - depth * 0.09f).coerceAtLeast(0.38f)
 
-                        Box(
+                        // Unified 3D Plane per jacket: jacket + its mirror reflection share ONE graphicsLayer (zero V-gap!)
+                        Column(
                             modifier = Modifier
                                 .offset(x = xShift, y = yShift)
-                                .size(frontSize)
+                                .width(frontSize)
                                 .graphicsLayer {
-                                    scaleX = scaleFactor
-                                    scaleY = scaleFactor
-                                    transformOrigin = TransformOrigin(0.0f, 0.5f)
-                                    rotationY = 24f
+                                    transformOrigin = TransformOrigin(0.0f, 0.36f)
+                                    scaleX = p
+                                    scaleY = p
+                                    rotationY = rotY
                                     cameraDistance = camDist
                                     alpha = sleeveAlpha
-                                }
-                                .shadow(18.dp, RoundedCornerShape(3.dp), ambientColor = Color.Black)
-                                .background(Color(0xFF282624), RoundedCornerShape(3.dp)),
+                                },
                         ) {
-                            // Physical 3D cardboard spine thickness on left & top
-                            Row(modifier = Modifier.fillMaxSize()) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(5.dp)
-                                        .fillMaxSize()
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                0.0f to Color.White.copy(alpha = 0.42f),
-                                                0.5f to Color(0xFF9C968E),
-                                                1.0f to Color.Black.copy(alpha = 0.55f),
-                                            ),
-                                        ),
-                                )
-                                Box(modifier = Modifier.weight(1f).fillMaxSize()) {
-                                    AlbumArtwork(
-                                        uri = depthSong.albumArtUri,
-                                        contentDescription = depthSong.album,
-                                        modifier = Modifier.fillMaxSize(),
-                                        cornerRadius = 2.dp,
-                                        iconSize = 36.dp,
-                                    )
-                                    // Top rim specular highlight + depth atmospheric fog
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(2.dp)
-                                            .background(Color.White.copy(alpha = 0.32f)),
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color.Black.copy(alpha = (depth * 0.15f).coerceAtMost(0.68f))),
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Aligned 3D alpha-masked glossy floor reflection beneath front jacket
-                    Box(
-                        modifier = Modifier
-                            .offset(x = baseX, y = baseY + frontSize + 3.dp)
-                            .width(frontSize)
-                            .height(frontSize * 0.34f)
-                            .graphicsLayer {
-                                transformOrigin = TransformOrigin(0.0f, 0.5f)
-                                rotationY = dynamicRotY
-                                cameraDistance = camDist
-                                compositingStrategy = CompositingStrategy.Offscreen
-                            }
-                            .drawWithContent {
-                                drawContent()
-                                drawRect(
-                                    brush = Brush.verticalGradient(
-                                        0.0f to Color.Black.copy(alpha = 0.38f),
-                                        0.55f to Color.Black.copy(alpha = 0.10f),
-                                        1.0f to Color.Transparent,
-                                    ),
-                                    blendMode = BlendMode.DstIn,
-                                )
-                            }
-                            .clip(RectangleShape),
-                    ) {
-                        AlbumArtwork(
-                            uri = song.albumArtUri,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(frontSize)
-                                .graphicsLayer { scaleY = -1f },
-                            cornerRadius = 2.dp,
-                            iconSize = 32.dp,
-                        )
-                    }
-
-                    // Front-most active 3D physical vinyl jacket with tangible cardboard spine + glossy sleeve sheen
-                    Box(
-                        modifier = Modifier
-                            .offset(x = baseX, y = baseY)
-                            .size(frontSize)
-                            .graphicsLayer {
-                                transformOrigin = TransformOrigin(0.0f, 0.5f)
-                                rotationY = dynamicRotY
-                                cameraDistance = camDist
-                            }
-                            .shadow(28.dp, RoundedCornerShape(3.dp), ambientColor = Color.Black)
-                            .background(Color(0xFF2B2927), RoundedCornerShape(3.dp)),
-                    ) {
-                        Row(modifier = Modifier.fillMaxSize()) {
-                            // Tangible 6dp 3D record jacket spine edge
+                            // Physical brushed-silver-edged vinyl jacket matching 1000075911.jpg
                             Box(
                                 modifier = Modifier
-                                    .width(6.dp)
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            0.0f to Color.White.copy(alpha = 0.55f),
-                                            0.45f to Color(0xFFC8C2B8),
-                                            0.85f to Color(0xFF5A5651),
-                                            1.0f to Color.Black.copy(alpha = 0.72f),
-                                        ),
-                                    ),
-                            )
-                            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
-                                AlbumArtwork(
-                                    uri = song.albumArtUri,
-                                    contentDescription = song.album,
-                                    modifier = Modifier.fillMaxSize(),
-                                    cornerRadius = 2.dp,
-                                    iconSize = 48.dp,
-                                )
-                                // Crisp top paper edge specular bevel
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(2.dp)
-                                        .background(Color.White.copy(alpha = 0.42f)),
-                                )
-                                // Subtle glossy protective sleeve diagonal light sheen
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            Brush.linearGradient(
-                                                0.0f to Color.White.copy(alpha = 0.16f),
-                                                0.35f to Color.Transparent,
-                                                0.68f to Color.Transparent,
-                                                1.0f to Color.Black.copy(alpha = 0.18f),
+                                    .size(frontSize)
+                                    .shadow(if (isFront) 26.dp else 14.dp, RoundedCornerShape(2.dp), ambientColor = Color.Black)
+                                    .background(Color(0xFFB8B5B0), RoundedCornerShape(2.dp)),
+                            ) {
+                                Row(modifier = Modifier.fillMaxSize()) {
+                                    // Brushed silver-aluminum left spine thickness (5dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .width(5.dp)
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.horizontalGradient(
+                                                    0.0f to Color(0xFFE6E4E0),
+                                                    0.45f to Color(0xFFAFAEA9),
+                                                    0.85f to Color(0xFF6B6A66),
+                                                    1.0f to Color(0xFF3A3937),
+                                                ),
                                             ),
-                                        ),
-                                )
+                                    )
+                                    Column(modifier = Modifier.weight(1f).fillMaxSize()) {
+                                        // Crisp brushed-silver top rim thickness (2.5dp)
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(2.5.dp)
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        0.0f to Color(0xFFE4E2DE),
+                                                        1.0f to Color(0xFF9E9D98),
+                                                    ),
+                                                ),
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxWidth()
+                                                .border(0.7.dp, Color.White.copy(alpha = 0.28f), RectangleShape),
+                                        ) {
+                                            AlbumArtwork(
+                                                uri = itemSong.albumArtUri,
+                                                contentDescription = itemSong.album,
+                                                modifier = Modifier.fillMaxSize(),
+                                                cornerRadius = 0.dp,
+                                                iconSize = if (isFront) 48.dp else 32.dp,
+                                            )
+                                            if (isFront) {
+                                                // Subtle diagonal glossy sleeve light sheen
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .background(
+                                                            Brush.linearGradient(
+                                                                0.0f to Color.White.copy(alpha = 0.14f),
+                                                                0.34f to Color.Transparent,
+                                                                0.70f to Color.Transparent,
+                                                                1.0f to Color.Black.copy(alpha = 0.14f),
+                                                            ),
+                                                        ),
+                                                )
+                                            } else {
+                                                // Subtle depth shading on receding jackets
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .background(Color.Black.copy(alpha = (depth * 0.10f).coerceAtMost(0.55f))),
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Seamless parallel floor mirror reflection (stronger on front, fading cleanly on receding jackets)
+                            if (depth <= 2) {
+                                val reflStrength = when (depth) {
+                                    0 -> 0.36f
+                                    1 -> 0.16f
+                                    else -> 0.08f
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .padding(start = 5.dp, top = 0.5.dp)
+                                        .width(frontSize - 5.dp)
+                                        .height(frontSize * 0.34f)
+                                        .graphicsLayer {
+                                            compositingStrategy = CompositingStrategy.Offscreen
+                                        }
+                                        .drawWithContent {
+                                            drawContent()
+                                            drawRect(
+                                                brush = Brush.verticalGradient(
+                                                    0.0f to Color.Black.copy(alpha = reflStrength),
+                                                    0.58f to Color.Black.copy(alpha = reflStrength * 0.24f),
+                                                    1.0f to Color.Transparent,
+                                                ),
+                                                blendMode = BlendMode.DstIn,
+                                            )
+                                        }
+                                        .clip(RectangleShape),
+                                ) {
+                                    AlbumArtwork(
+                                        uri = itemSong.albumArtUri,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(frontSize - 5.dp)
+                                            .graphicsLayer { scaleY = -1f },
+                                        cornerRadius = 0.dp,
+                                        iconSize = 32.dp,
+                                    )
+                                }
                             }
                         }
                     }
-
-
                 }
             }
 
@@ -2183,7 +2174,6 @@ private fun SongInfoSpecHeader(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImmersiveControlSheet(
     isDarkSurface: Boolean,
@@ -2197,102 +2187,105 @@ fun ImmersiveControlSheet(
     onOpenCoverSearch: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val sheetBg = if (isDarkSurface) Color(0xFF1A1917) else Color(0xFFFAF6EE)
+    val menuBg = if (isDarkSurface) Color(0xFF1D1C1A).copy(alpha = 0.96f) else Color(0xFFFAF6EE).copy(alpha = 0.98f)
     val pillBg = if (isDarkSurface) Color.White.copy(alpha = 0.07f) else Color(0xFFEFE9DC)
-    val borderColor = if (isDarkSurface) Color.White.copy(alpha = 0.12f) else Color(0xFFDAD2C3)
+    val borderColor = if (isDarkSurface) Color.White.copy(alpha = 0.14f) else Color(0xFFDAD2C3)
     val ink = if (isDarkSurface) Color(0xFFF2ECE1) else Color(0xFF1E1B18)
     val muted = if (isDarkSurface) Color(0xFF9C948A) else Color(0xFF6B655D)
-    val accent = if (isDarkSurface) Color(0xFFD8B888) else Color(0xFFC83E2B)
+    val accent = if (isDarkSurface) Color(0xFFE0C08E) else Color(0xFFC83E2B)
 
-    ModalBottomSheet(
+    DropdownMenu(
+        expanded = true,
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = sheetBg,
-        scrimColor = Color.Black.copy(alpha = 0.36f),
-        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+        containerColor = menuBg,
+        tonalElevation = 0.dp,
+        shadowElevation = 12.dp,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(0.75.dp, borderColor),
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .width(236.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Row 1: 4 Immersion Scenes (single compact row, live preview!)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Section 1: 沉浸场景 (compact 2x2 grid — keeps bottom lyrics & spectrum 100% visible!)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = "沉浸场景",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = muted,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    ImmersionLyricStyle.entries.forEach { option ->
-                        val selected = option == currentStyle
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (selected) accent.copy(alpha = 0.18f) else pillBg)
-                                .border(
-                                    width = if (selected) 1.dp else 0.6.dp,
-                                    color = if (selected) accent else borderColor,
-                                    shape = RoundedCornerShape(10.dp),
+                ImmersionLyricStyle.entries.chunked(2).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        rowItems.forEach { option ->
+                            val selected = option == currentStyle
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selected) accent.copy(alpha = 0.18f) else pillBg)
+                                    .border(
+                                        width = if (selected) 0.9.dp else 0.5.dp,
+                                        color = if (selected) accent else borderColor.copy(alpha = 0.6f),
+                                        shape = RoundedCornerShape(8.dp),
+                                    )
+                                    .clickable { onSelectStyle(option) }
+                                    .padding(vertical = 7.dp, horizontal = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = option.label,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.5.sp),
+                                    color = if (selected) accent else ink,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                                .clickable { onSelectStyle(option) }
-                                .padding(vertical = 9.dp, horizontal = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = option.label,
-                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                                color = if (selected) accent else ink,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            }
                         }
                     }
                 }
             }
 
-            // Row 2: 4 Live Audio Spectrums (single compact row, live preview!)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Section 2: 实时频谱 (compact 2x2 grid — live preview at bottom completely unobstructed!)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = "实时频谱",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = muted,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    SpectrumStyle.entries.forEach { spOpt ->
-                        val selected = spOpt == currentSpectrumStyle
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (selected) accent.copy(alpha = 0.18f) else pillBg)
-                                .border(
-                                    width = if (selected) 1.dp else 0.6.dp,
-                                    color = if (selected) accent else borderColor,
-                                    shape = RoundedCornerShape(10.dp),
+                SpectrumStyle.entries.chunked(2).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        rowItems.forEach { spOpt ->
+                            val selected = spOpt == currentSpectrumStyle
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selected) accent.copy(alpha = 0.18f) else pillBg)
+                                    .border(
+                                        width = if (selected) 0.9.dp else 0.5.dp,
+                                        color = if (selected) accent else borderColor.copy(alpha = 0.6f),
+                                        shape = RoundedCornerShape(8.dp),
+                                    )
+                                    .clickable { onSelectSpectrumStyle(spOpt) }
+                                    .padding(vertical = 7.dp, horizontal = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = spOpt.label,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.5.sp),
+                                    color = if (selected) accent else ink,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                                .clickable { onSelectSpectrumStyle(spOpt) }
-                                .padding(vertical = 9.dp, horizontal = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = spOpt.label,
-                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                                color = if (selected) accent else ink,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            }
                         }
                     }
                 }
@@ -2300,33 +2293,37 @@ fun ImmersiveControlSheet(
 
             HorizontalDivider(thickness = 0.5.dp, color = borderColor.copy(alpha = 0.6f))
 
-            // Row 3: 4 Compact Tool Pills
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val actions = listOf(
-                    "时间微调" to onToggleOffsetBar,
-                    "完整歌词" to onOpenFullLyricsSheet,
-                    "匹配歌词" to onOpenLyricsSearch,
-                    "替换封面" to onOpenCoverSearch,
-                )
-                actions.forEach { (label, action) ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(pillBg)
-                            .clickable(onClick = action)
-                            .padding(vertical = 9.dp, horizontal = 4.dp),
-                        contentAlignment = Alignment.Center,
+            // Section 3: Compact 2x2 quick tools
+            val tools = listOf(
+                "时间微调" to onToggleOffsetBar,
+                "完整歌词" to onOpenFullLyricsSheet,
+                "匹配歌词" to onOpenLyricsSearch,
+                "替换封面" to onOpenCoverSearch,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                tools.chunked(2).forEach { rowTools ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                            color = ink.copy(alpha = 0.88f),
-                            maxLines = 1,
-                        )
+                        rowTools.forEach { (label, action) ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(pillBg)
+                                    .clickable(onClick = action)
+                                    .padding(vertical = 6.dp, horizontal = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.5.sp),
+                                    color = ink.copy(alpha = 0.88f),
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
                 }
             }

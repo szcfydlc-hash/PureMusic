@@ -337,9 +337,11 @@ fun SongRowItem(
             DropdownMenu(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
                 tonalElevation = 0.dp,
-                border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                shadowElevation = 10.dp,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
             ) {
                 DropdownMenuItem(
                     text = { Text(if (isFavorite) "取消喜欢" else "添加到我喜欢") },

@@ -253,7 +253,7 @@ fun SleepTimerDialog(
     onCancelTimer: () -> Unit,
 ) {
     val options = listOf(10, 15, 30, 45, 60, 90)
-    val chipShape = RoundedCornerShape(7.dp)
+    val chipShape = RoundedCornerShape(6.dp)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -333,7 +333,7 @@ fun EqualizerBottomSheet(
 ) {
     val outlineColor = MaterialTheme.colorScheme.outline
     val cardShape = RoundedCornerShape(10.dp)
-    val pillShape = RoundedCornerShape(7.dp)
+    val pillShape = RoundedCornerShape(6.dp)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -935,9 +935,9 @@ fun SongInfoDialog(
                     )
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(7.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(MaterialTheme.colorScheme.background)
-                            .border(0.75.dp, outlineColor, RoundedCornerShape(7.dp))
+                            .border(0.75.dp, outlineColor, RoundedCornerShape(6.dp))
                             .clickable {
                                 onDismiss()
                                 onReplaceCover()
@@ -1211,7 +1211,7 @@ fun OnlineLyricsSearchSheet(
                                         val pine = Color(0xFF2F5D50)
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .background(if (item.hasSynced) pine.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant)
                                                 .padding(horizontal = 7.dp, vertical = 3.dp),
                                         ) {
@@ -1443,7 +1443,7 @@ fun OnlineCoverSearchSheet(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .aspectRatio(1f)
-                                            .clip(RoundedCornerShape(5.dp)),
+                                            .clip(RoundedCornerShape(6.dp)),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         SubcomposeAsyncImage(
@@ -1864,11 +1864,11 @@ fun SingleTrackRepeatDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(18.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(
                                     if (isChosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                 )
-                                .border(0.75.dp, outlineColor, RoundedCornerShape(18.dp))
+                                .border(0.75.dp, outlineColor, RoundedCornerShape(16.dp))
                                 .clickable {
                                     if (preset == 0) {
                                         onSelectCount(0)

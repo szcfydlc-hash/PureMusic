@@ -1,5 +1,8 @@
 package com.puremusic.player.ui.screens
 
+import androidx.core.view.WindowCompat
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.animation.AnimatedVisibility
 import android.app.Activity
 import android.net.Uri
 import android.view.WindowManager
@@ -331,76 +334,6 @@ fun NowPlayingScreen(
                 onSkipNext = onSkipNext,
                 onSeekTo = onSeekTo,
                 onExitCarMode = { onToggleCarMode(false) },
-            )
-            return@Box
-        }
-
-        if (showFullLyrics) {
-            ImmersiveLyricsHost(
-                style = immersionStyle,
-                onSelectStyle = onSelectImmersionStyle,
-                spectrumStyle = spectrumStyle,
-                onSelectSpectrumStyle = onSelectSpectrumStyle,
-                song = song,
-                allSongs = allSongs,
-                lyrics = lyrics,
-                audioSpec = audioSpec,
-                positionMs = playerState.positionMs,
-                durationMs = durationMs,
-                isPlaying = playerState.isPlaying,
-                vinylRotationProvider = { vinylAngle.value },
-                lyricFamily = lyricFamily,
-                lyricStyleItalic = lyricStyleItalic,
-                dynamicAccent = extractedPalette.accent,
-                isDarkTheme = isDarkTheme,
-                isTranslatingLyrics = isTranslatingLyrics,
-                lyricOffsetMs = lyricOffsetMs,
-                onBackToVinyl = { showFullLyrics = false },
-                onTogglePlayPause = onTogglePlayPause,
-                onSkipPrevious = onSkipPrevious,
-                onSkipNext = onSkipNext,
-                onSeekTo = onSeekTo,
-                onTranslateLyrics = onTranslateLyrics,
-                onOpenLyricsSearch = { onOpenLyricsSearch(song) },
-                onOpenCoverSearch = { onOpenCoverSearch(song) },
-                onOpenFullLyricsSheet = onOpenLyrics,
-                onAdjustLyricOffset = onAdjustLyricOffset,
-                onResetLyricOffset = onResetLyricOffset,
-                architecturalGridContent = {
-                    EditorialFullScreenLyricsView(
-                        song = song,
-                        lyrics = lyrics,
-                        positionMs = playerState.positionMs,
-                        durationMs = durationMs,
-                        isPlaying = playerState.isPlaying,
-                        lyricFamily = lyricFamily,
-                        lyricStyleItalic = lyricStyleItalic,
-                        accentColor = activeAccentColor,
-                        primaryTextColor = primaryTextColor,
-                        secondaryTextColor = secondaryTextColor,
-                        onBackToVinyl = { showFullLyrics = false },
-                        onClosePlayer = onClose,
-                        onTogglePlayPause = onTogglePlayPause,
-                        onSkipPrevious = onSkipPrevious,
-                        onSkipNext = onSkipNext,
-                        onSeekTo = onSeekTo,
-                        onOpenLyricsSearch = { onOpenLyricsSearch(song) },
-                        onOpenCoverSearch = { onOpenCoverSearch(song) },
-                        isTranslatingLyrics = isTranslatingLyrics,
-                        onTranslateLyrics = onTranslateLyrics,
-                        onAddToPlaylist = { onAddToPlaylist(song) },
-                        isDarkTheme = isDarkTheme,
-                        onOpenFullLyricsSheet = onOpenLyrics,
-                        audioSpec = audioSpec,
-                        lyricOffsetMs = lyricOffsetMs,
-                        onAdjustLyricOffset = onAdjustLyricOffset,
-                        onResetLyricOffset = onResetLyricOffset,
-                        currentImmersionStyle = immersionStyle,
-                        onSelectImmersionStyle = onSelectImmersionStyle,
-                        currentSpectrumStyle = spectrumStyle,
-                        onSelectSpectrumStyle = onSelectSpectrumStyle,
-                    )
-                },
             )
             return@Box
         }
@@ -809,6 +742,80 @@ fun NowPlayingScreen(
         }
             }
         }
+
+        AnimatedVisibility(
+            visible = showFullLyrics,
+            enter = fadeIn(tween(260)) + scaleIn(initialScale = 0.96f, animationSpec = tween(260)),
+            exit = fadeOut(tween(180)) + scaleOut(targetScale = 0.97f, animationSpec = tween(180)),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            ImmersiveLyricsHost(
+                style = immersionStyle,
+                onSelectStyle = onSelectImmersionStyle,
+                spectrumStyle = spectrumStyle,
+                onSelectSpectrumStyle = onSelectSpectrumStyle,
+                song = song,
+                allSongs = allSongs,
+                lyrics = lyrics,
+                audioSpec = audioSpec,
+                positionMs = playerState.positionMs,
+                durationMs = durationMs,
+                isPlaying = playerState.isPlaying,
+                vinylRotationProvider = { vinylAngle.value },
+                lyricFamily = lyricFamily,
+                lyricStyleItalic = lyricStyleItalic,
+                dynamicAccent = extractedPalette.accent,
+                isDarkTheme = isDarkTheme,
+                isTranslatingLyrics = isTranslatingLyrics,
+                lyricOffsetMs = lyricOffsetMs,
+                onBackToVinyl = { showFullLyrics = false },
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipPrevious = onSkipPrevious,
+                onSkipNext = onSkipNext,
+                onSeekTo = onSeekTo,
+                onTranslateLyrics = onTranslateLyrics,
+                onOpenLyricsSearch = { onOpenLyricsSearch(song) },
+                onOpenCoverSearch = { onOpenCoverSearch(song) },
+                onOpenFullLyricsSheet = onOpenLyrics,
+                onAdjustLyricOffset = onAdjustLyricOffset,
+                onResetLyricOffset = onResetLyricOffset,
+                architecturalGridContent = {
+                    EditorialFullScreenLyricsView(
+                        song = song,
+                        lyrics = lyrics,
+                        positionMs = playerState.positionMs,
+                        durationMs = durationMs,
+                        isPlaying = playerState.isPlaying,
+                        lyricFamily = lyricFamily,
+                        lyricStyleItalic = lyricStyleItalic,
+                        accentColor = activeAccentColor,
+                        primaryTextColor = primaryTextColor,
+                        secondaryTextColor = secondaryTextColor,
+                        onBackToVinyl = { showFullLyrics = false },
+                        onClosePlayer = onClose,
+                        onTogglePlayPause = onTogglePlayPause,
+                        onSkipPrevious = onSkipPrevious,
+                        onSkipNext = onSkipNext,
+                        onSeekTo = onSeekTo,
+                        onOpenLyricsSearch = { onOpenLyricsSearch(song) },
+                        onOpenCoverSearch = { onOpenCoverSearch(song) },
+                        isTranslatingLyrics = isTranslatingLyrics,
+                        onTranslateLyrics = onTranslateLyrics,
+                        onAddToPlaylist = { onAddToPlaylist(song) },
+                        isDarkTheme = isDarkTheme,
+                        onOpenFullLyricsSheet = onOpenLyrics,
+                        audioSpec = audioSpec,
+                        lyricOffsetMs = lyricOffsetMs,
+                        onAdjustLyricOffset = onAdjustLyricOffset,
+                        onResetLyricOffset = onResetLyricOffset,
+                        currentImmersionStyle = immersionStyle,
+                        onSelectImmersionStyle = onSelectImmersionStyle,
+                        currentSpectrumStyle = spectrumStyle,
+                        onSelectSpectrumStyle = onSelectSpectrumStyle,
+                    )
+                },
+            )
+        }
     }
 }
 
@@ -903,9 +910,11 @@ private fun LandscapeVinylSleeveNowPlaying(
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
                     tonalElevation = 0.dp,
-                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline),
+                    shadowElevation = 10.dp,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
                 ) {
                     DropdownMenuItem(
                         text = { Text("播放队列") },
@@ -1347,21 +1356,6 @@ private fun InteractivePosterWallHeader(
                     )
                 }
             }
-
-            // Subtle top status-bar gradient scrim so clock/battery icons remain crisp over bright covers
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .height(26.dp)
-                    .align(Alignment.TopCenter)
-                    .background(
-                        Brush.verticalGradient(
-                            0.0f to Color.Black.copy(alpha = 0.44f),
-                            1.0f to Color.Transparent,
-                        ),
-                    ),
-            )
 
             // Floating circular '<' back button
             Box(
@@ -2358,6 +2352,18 @@ private fun MinimalistCarModeView(
     onExitCarMode: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    DisposableEffect(isDarkTheme) {
+        val window = (view.context as? Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        controller?.isAppearanceLightStatusBars = false
+        controller?.isAppearanceLightNavigationBars = false
+        onDispose {
+            controller?.isAppearanceLightStatusBars = !isDarkTheme
+            controller?.isAppearanceLightNavigationBars = !isDarkTheme
+        }
+    }
     val bgColor = Color(0xFF121214)
     val creamInk = Color(0xFFF5F1E8)
     val cinnabar = Color(0xFFC83E2B)
