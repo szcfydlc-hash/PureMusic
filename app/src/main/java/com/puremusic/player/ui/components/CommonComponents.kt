@@ -287,13 +287,14 @@ fun SongRowItem(
                     modifier = Modifier
                         .clip(RoundedCornerShape(3.dp))
                         .background(badgeColor.copy(alpha = 0.14f))
-                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                        .padding(horizontal = 3.5.dp, vertical = 0.8.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = badgeText,
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 8.5.sp,
-                            lineHeight = 10.sp,
+                            fontSize = 8.sp,
+                            lineHeight = 9.5.sp,
                             fontWeight = FontWeight.Bold,
                         ),
                         color = badgeColor,
@@ -301,25 +302,16 @@ fun SongRowItem(
                 }
                 Text(
                     text = subLine,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 11.5.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = FontWeight.Normal,
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-
-        // Light quick-add '+' icon button (Salt Player style!)
-        IconButton(
-            onClick = onAddToPlaylist,
-            modifier = Modifier.size(34.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Add,
-                contentDescription = "添加到歌单",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                modifier = Modifier.size(18.dp),
-            )
         }
 
         Box {

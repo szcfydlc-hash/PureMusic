@@ -273,12 +273,25 @@ class LyricsRepository(private val context: Context) {
         }
     }.getOrNull()
 
+    private fun decodeHtmlEntities(input: String): String {
+        if (!input.contains('&')) return input
+        return input
+            .replace("&apos;", "'")
+            .replace("&#39;", "'")
+            .replace("&#x27;", "'")
+            .replace("&quot;", "\"")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&nbsp;", " ")
+    }
+
     fun parseLrc(raw: String): List<LyricLine> {
         val rawEntries = mutableListOf<Pair<Long, String>>()
         raw.lineSequence().forEach { line ->
             val matches = timeTagRegex.findAll(line).toList()
             if (matches.isEmpty()) return@forEach
-            val text = line.replace(timeTagRegex, "").trim()
+            val text = decodeHtmlEntities(line.replace(timeTagRegex, "").trim())
             if (text.isEmpty()) return@forEach
 
             matches.forEach { match ->

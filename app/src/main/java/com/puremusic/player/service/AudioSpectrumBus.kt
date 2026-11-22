@@ -138,29 +138,32 @@ object AudioSpectrumBus {
         }
         _beatEnergy.value = smoothedBeat.coerceIn(0f, 1f)
 
-        // Adaptive soft-knee peak normalization (keeps peaks expressive, NEVER clips flat!)
+        // Adaptive soft-knee peak normalization with snappier dynamic contrast
         runningPeakDb = if (frameMax > runningPeakDb) {
-            runningPeakDb + (frameMax - runningPeakDb) * 0.35f
+            runningPeakDb + (frameMax - runningPeakDb) * 0.42f
         } else {
-            (runningPeakDb * 0.992f).coerceAtLeast(0.18f)
+            (runningPeakDb * 0.984f).coerceAtLeast(0.14f)
         }
-        val normScale = 1f / runningPeakDb.coerceAtLeast(0.18f)
+        val normScale = 1f / runningPeakDb.coerceAtLeast(0.14f)
 
         val next = FloatArray(BAND_COUNT)
         for (b in 0 until BAND_COUNT) {
-            // Light 3-tap spatial smoothing so frequency peaks remain distinct & lively (not a flat hump)
+            // Crisp 3-tap focus keeps individual harmonic peaks & valleys vivid
             val l = rawBands[(b - 1).coerceAtLeast(0)]
             val c = rawBands[b]
             val r = rawBands[(b + 1).coerceAtMost(BAND_COUNT - 1)]
-            val blended = (l * 0.18f + c * 0.64f + r * 0.18f) * normScale
-            // Soft-knee tanh curve prevents flat-top clipping while keeping strong contrast
-            val shaped = tanh((blended * 1.15f).toDouble()).toFloat().coerceIn(0f, 0.96f)
+            val blended = (l * 0.10f + c * 0.80f + r * 0.10f) * normScale
+            // Expand dynamic contrast (deep valleys, tall expressive peaks) + subtle beat kick surge
+            val contrasted = blended.coerceIn(0f, 1.45f).pow(1.42f)
+            val bandPos = b.toFloat() / (BAND_COUNT - 1)
+            val beatKick = smoothedBeat * (0.20f * (1f - bandPos * 0.55f))
+            val shaped = tanh(((contrasted + beatKick) * 1.32f).toDouble()).toFloat().coerceIn(0f, 0.98f)
 
             val prev = smoothed[b]
             val damped = if (shaped > prev) {
-                prev + (shaped - prev) * 0.82f
+                prev + (shaped - prev) * 0.88f
             } else {
-                prev + (shaped - prev) * 0.32f
+                prev + (shaped - prev) * 0.42f
             }
             smoothed[b] = if (abs(damped) < 0.004f) 0f else damped
             next[b] = smoothed[b]

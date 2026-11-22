@@ -1564,27 +1564,39 @@ fun LiveSpectrumWaveformSeekBar(
                 val totalH = size.height
                 val playheadX = (totalW * progress).coerceIn(2f, totalW - 2f)
 
+                fun sampleSmooth(arr: FloatArray, u: Float): Float {
+                    val fIdx = u.coerceIn(0f, 1f) * (arr.size - 1)
+                    val i0 = fIdx.toInt().coerceIn(0, arr.size - 1)
+                    val i1 = (i0 + 1).coerceAtMost(arr.size - 1)
+                    val t = fIdx - i0
+                    val smoothT = t * t * (3f - 2f * t)
+                    return arr[i0] + (arr[i1] - arr[i0]) * smoothT
+                }
+
                 when (spectrumStyle) {
                     SpectrumStyle.SILK_RIBBON -> {
-                        val step = totalW / barCount
-                        val barW = (step * 0.46f).coerceIn(2.2f, 4.2f)
+                        // Ultra-dense micro-capsules (76–96 fine bars on phone screens) with pronounced wave peaks
+                        val displayBars = (totalW / (4.2f * density)).toInt().coerceIn(72, 96)
+                        val step = totalW / displayBars
+                        val barW = (step * 0.48f).coerceIn(1.5f * density, 2.5f * density)
                         val baseY = totalH - 2f
                         val crestPath = Path()
                         var prevX = 0f
                         var prevY = baseY
 
-                        for (i in 0 until barCount) {
+                        for (i in 0 until displayBars) {
+                            val u = i.toFloat() / (displayBars - 1).coerceAtLeast(1)
                             val cx = i * step + step / 2f
                             val isPlayed = cx <= playheadX
-                            val rawLevel = animatedLevels[i]
-                            val level = if (isPlayed) rawLevel else (rawLevel * 0.82f).coerceIn(0.06f, 0.86f)
-                            val barH = ((totalH - 6f) * level).coerceAtLeast(4f)
+                            val rawLevel = sampleSmooth(animatedLevels, u)
+                            val dynamicLevel = (rawLevel * rawLevel * 0.45f + rawLevel * 0.55f).coerceIn(0.04f, 0.98f)
+                            val level = if (isPlayed) dynamicLevel else (dynamicLevel * 0.78f).coerceIn(0.04f, 0.84f)
+                            val barH = ((totalH - 5f) * level).coerceAtLeast(3.5f)
                             val topY = baseY - barH
 
-                            // Vertical bottom-to-top mist fade inside each slender bar
                             val barBrush = Brush.verticalGradient(
                                 0.0f to (if (isPlayed) playedColor else unplayedColor),
-                                0.72f to (if (isPlayed) playedColor.copy(alpha = 0.72f) else unplayedColor.copy(alpha = 0.55f)),
+                                0.72f to (if (isPlayed) playedColor.copy(alpha = 0.68f) else unplayedColor.copy(alpha = 0.48f)),
                                 1.0f to Color.Transparent,
                                 startY = topY,
                                 endY = baseY,
@@ -1596,7 +1608,7 @@ fun LiveSpectrumWaveformSeekBar(
                                 cornerRadius = CornerRadius(barW / 2f, barW / 2f),
                             )
 
-                            val crestY = (topY - 2f).coerceAtLeast(2f)
+                            val crestY = (topY - 1.8f).coerceAtLeast(2f)
                             if (i == 0) {
                                 crestPath.moveTo(cx, crestY)
                             } else {
@@ -1608,14 +1620,12 @@ fun LiveSpectrumWaveformSeekBar(
                         crestPath.lineTo(prevX, prevY)
 
                         clipRect(left = 0f, top = 0f, right = playheadX, bottom = totalH) {
-                            drawPath(crestPath, color = playedColor.copy(alpha = 0.22f), style = Stroke(width = 5.5f, cap = StrokeCap.Round))
-                            drawPath(crestPath, color = playedColor.copy(alpha = 0.90f), style = Stroke(width = 2.0f, cap = StrokeCap.Round))
+                            drawPath(crestPath, color = playedColor.copy(alpha = 0.22f), style = Stroke(width = 4.8f, cap = StrokeCap.Round))
+                            drawPath(crestPath, color = playedColor.copy(alpha = 0.92f), style = Stroke(width = 1.85f, cap = StrokeCap.Round))
                         }
                         clipRect(left = playheadX, top = 0f, right = totalW, bottom = totalH) {
-                            drawPath(crestPath, color = unplayedColor.copy(alpha = 0.80f), style = Stroke(width = 1.6f, cap = StrokeCap.Round))
+                            drawPath(crestPath, color = unplayedColor.copy(alpha = 0.76f), style = Stroke(width = 1.45f, cap = StrokeCap.Round))
                         }
-
-                        // Clean brightness split marks progress without vertical stick
                     }
 
                     SpectrumStyle.HARMONIC_STRINGS -> {
@@ -1683,54 +1693,56 @@ fun LiveSpectrumWaveformSeekBar(
                     }
 
                     SpectrumStyle.DOT_MATRIX -> {
-                        val cols = 34
-                        val rows = 8
+                        // Ultra-dense dot matrix (54–66 cols x 12 rows) with vivid tall surges & cinnabar peak dots
+                        val cols = (totalW / (5.8f * density)).toInt().coerceIn(52, 68)
+                        val rows = 12
                         val colStep = totalW / cols
-                        val matrixBottom = totalH - 7f
-                        val rowStep = (matrixBottom - 3f) / rows
-                        val dotRadius = (minOf(colStep, rowStep) * 0.31f).coerceIn(1.6f, 3.0f)
+                        val matrixBottom = totalH - 6f
+                        val rowStep = (matrixBottom - 2f) / rows
+                        val dotRadius = (minOf(colStep, rowStep) * 0.34f).coerceIn(1.3f * density, 2.2f * density)
 
                         for (c in 0 until cols) {
+                            val u = c.toFloat() / (cols - 1).coerceAtLeast(1)
                             val cx = c * colStep + colStep / 2f
                             val isPlayed = cx <= playheadX
-                            val mappedIdx = (c * barCount) / cols
-                            val level = if (isPlayed) animatedLevels[mappedIdx] else (animatedLevels[mappedIdx] * 0.82f).coerceIn(0.06f, 0.86f)
+                            val rawLevel = sampleSmooth(animatedLevels, u)
+                            val boosted = (rawLevel * 1.18f).coerceIn(0.05f, 1.0f)
+                            val level = if (isPlayed) boosted else (boosted * 0.78f).coerceIn(0.04f, 0.85f)
                             val litRows = (level * rows).roundToInt().coerceIn(1, rows)
-                            val peakRow = (peakHoldLevels[mappedIdx] * rows).roundToInt().coerceIn(litRows, rows)
+                            val rawPeak = (sampleSmooth(peakHoldLevels, u) * 1.18f).coerceIn(level, 1.0f)
+                            val peakRow = (rawPeak * rows).roundToInt().coerceIn(litRows, rows)
 
                             for (r in 0 until rows) {
                                 val cy = matrixBottom - r * rowStep - rowStep / 2f
-                                val rowFade = 0.58f + (r.toFloat() / rows) * 0.42f
+                                val rowFade = 0.62f + (r.toFloat() / rows) * 0.38f
                                 val isLit = r < litRows
                                 val color = when {
                                     isLit && isPlayed -> playedColor.copy(alpha = rowFade)
-                                    isLit -> unplayedColor.copy(alpha = rowFade * 0.85f)
-                                    else -> unplayedColor.copy(alpha = 0.14f)
+                                    isLit -> unplayedColor.copy(alpha = rowFade * 0.82f)
+                                    else -> unplayedColor.copy(alpha = 0.11f)
                                 }
                                 drawCircle(color = color, radius = dotRadius, center = Offset(cx, cy))
                             }
 
-                            // Floating gravity-falling cinnabar peak-hold jewel dot on played columns
+                            // Vivid floating gravity-falling cinnabar peak-hold jewel dot
                             if (isPlayed && peakRow in 1..rows) {
                                 val py = matrixBottom - (peakRow - 1) * rowStep - rowStep / 2f
-                                drawCircle(color = needleColor.copy(alpha = 0.30f), radius = dotRadius * 2.1f, center = Offset(cx, py))
-                                drawCircle(color = needleColor, radius = dotRadius * 1.05f, center = Offset(cx, py))
+                                drawCircle(color = needleColor.copy(alpha = 0.28f), radius = dotRadius * 2.1f, center = Offset(cx, py))
+                                drawCircle(color = needleColor, radius = dotRadius * 1.12f, center = Offset(cx, py))
                             }
                         }
 
                         // Ultra-fine vintage hardware hairline ticks along bottom baseline
-                        for (tIdx in 0..40) {
-                            val tx = (tIdx / 40f) * totalW
-                            val tickH = if (tIdx % 5 == 0) 4.5f else 2.2f
+                        for (tIdx in 0..50) {
+                            val tx = (tIdx / 50f) * totalW
+                            val tickH = if (tIdx % 5 == 0) 4.0f else 2.0f
                             drawLine(
-                                color = unplayedColor.copy(alpha = 0.45f),
+                                color = unplayedColor.copy(alpha = 0.42f),
                                 start = Offset(tx, totalH - tickH),
                                 end = Offset(tx, totalH),
-                                strokeWidth = 0.9f,
+                                strokeWidth = 0.85f,
                             )
                         }
-
-                        // Clean played/unplayed dot contrast marks progress without vertical line
                     }
 
                     SpectrumStyle.INK_MOUNTAIN -> {
