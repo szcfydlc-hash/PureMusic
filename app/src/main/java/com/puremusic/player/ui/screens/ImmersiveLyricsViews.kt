@@ -910,7 +910,6 @@ private fun SpatialGalleryImmersiveView(
 
                 ThreeSlotAutoFitLyricsStage(
                     lyrics = lyrics,
-                    audioSpec = audioSpec,
                     activeIdx = activeIdx,
                     lyricFamily = lyricFamily,
                     lyricStyleItalic = lyricStyleItalic,
@@ -2007,7 +2006,6 @@ private fun splitBilingualLyric(line: LyricLine): Pair<String, String?> {
 @Composable
 private fun ThreeSlotAutoFitLyricsStage(
     lyrics: List<LyricLine>,
-    audioSpec: AudioTechSpec,
     activeIdx: Int,
     lyricFamily: FontFamily,
     lyricStyleItalic: FontStyle,
