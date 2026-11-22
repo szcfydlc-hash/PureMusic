@@ -1,5 +1,6 @@
 package com.puremusic.player
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -171,7 +172,6 @@ private fun PureMusicApp(
     val fontSlantDegrees by viewModel.fontSlantDegrees.collectAsStateWithLifecycle()
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val fadeInSeconds by viewModel.fadeInSeconds.collectAsStateWithLifecycle()
-    val gaplessEnabled by viewModel.gaplessEnabled.collectAsStateWithLifecycle()
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
     val carModeEnabled by viewModel.carModeEnabled.collectAsStateWithLifecycle()
 
@@ -254,6 +254,8 @@ private fun PureMusicApp(
         val playlistCovers by viewModel.playlistCovers.collectAsStateWithLifecycle()
         val recentSongs by viewModel.recentSongs.collectAsStateWithLifecycle()
         val mostPlayedSongs by viewModel.mostPlayedSongs.collectAsStateWithLifecycle()
+    val playCounts by viewModel.playCounts.collectAsStateWithLifecycle()
+    val hourlyPlays by viewModel.hourlyPlays.collectAsStateWithLifecycle()
         val currentAudioSpec by viewModel.currentAudioSpec.collectAsStateWithLifecycle()
         val lyricOffsets by viewModel.lyricOffsets.collectAsStateWithLifecycle()
         val favoriteSongIds by viewModel.favoriteSongIds.collectAsStateWithLifecycle()
@@ -440,10 +442,11 @@ private fun PureMusicApp(
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isLandscape = maxWidth > maxHeight
             val isTabletLayout = when (layoutMode) {
                 LayoutMode.TABLET -> true
                 LayoutMode.PHONE -> false
-                LayoutMode.AUTO -> minOf(maxWidth, maxHeight) >= 560.dp
+                LayoutMode.AUTO -> minOf(maxWidth, maxHeight) >= 560.dp || (isLandscape && maxWidth >= 560.dp)
             }
             val miniPlayerVisible = playerState.currentSong != null && !isTabletLayout
             val bottomContentPadding = PaddingValues(
@@ -465,6 +468,13 @@ private fun PureMusicApp(
                 label = "mainRootSwitch",
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(
+                        if (isLandscape) {
+                            Modifier.displayCutoutPadding().navigationBarsPadding()
+                        } else {
+                            Modifier
+                        },
+                    )
                     .graphicsLayer {
                         scaleX = backdropScale
                         scaleY = backdropScale
@@ -486,7 +496,6 @@ private fun PureMusicApp(
                         fontSlantDegrees = fontSlantDegrees,
                         playbackSpeed = playbackSpeed,
                         fadeInSeconds = fadeInSeconds,
-                        gaplessEnabled = gaplessEnabled,
                         hapticEnabled = hapticEnabled,
                         carModeEnabled = carModeEnabled,
                         keepScreenOn = keepScreenOn,
@@ -510,7 +519,6 @@ private fun PureMusicApp(
                         onChangeFontSlantDegrees = viewModel::setFontSlantDegrees,
                         onSelectPlaybackSpeed = viewModel::setPlaybackSpeed,
                         onSelectFadeInSeconds = viewModel::setFadeInSeconds,
-                        onToggleGapless = viewModel::setGaplessEnabled,
                         onToggleHaptic = viewModel::setHapticEnabled,
                         onToggleCarMode = {
                             viewModel.setCarModeEnabled(it)
@@ -554,6 +562,8 @@ private fun PureMusicApp(
                         playlistCovers = playlistCovers,
                         recentSongs = recentSongs,
                         mostPlayedSongs = mostPlayedSongs,
+                        playCounts = playCounts,
+                        hourlyPlays = hourlyPlays,
                         favoriteSongIds = favoriteSongIds,
                         isLoading = isLoading,
                         searchQuery = searchQuery,
@@ -608,7 +618,14 @@ private fun PureMusicApp(
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .then(
+                            if (isLandscape) {
+                                Modifier.displayCutoutPadding().navigationBarsPadding()
+                            } else {
+                                Modifier
+                            },
+                        ),
                 ) {
                     if (miniPlayerVisible) {
                         MiniPlayerBar(

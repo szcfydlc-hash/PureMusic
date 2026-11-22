@@ -1,5 +1,6 @@
 package com.puremusic.player.data.repository
 
+import java.util.Calendar
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -65,7 +66,6 @@ class PlaylistRepository(private val context: Context) {
         val FONT_SLANT_DEGREES = floatPreferencesKey("font_slant_degrees")
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         val FADE_IN_SECONDS = intPreferencesKey("fade_in_seconds")
-        val GAPLESS_ENABLED = booleanPreferencesKey("gapless_enabled")
         val HAPTIC_ENABLED = booleanPreferencesKey("haptic_enabled")
         val CAR_MODE_ENABLED = booleanPreferencesKey("car_mode_enabled")
         val IMMERSION_STYLE = stringPreferencesKey("immersion_style")
@@ -73,6 +73,7 @@ class PlaylistRepository(private val context: Context) {
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val RECENT_SONG_IDS = stringPreferencesKey("recent_song_ids")
         val PLAY_COUNTS_JSON = stringPreferencesKey("play_counts_json")
+        val HOURLY_PLAYS_JSON = stringPreferencesKey("hourly_plays_json")
         val LYRIC_OFFSETS_JSON = stringPreferencesKey("lyric_offsets_json")
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         val MIN_DURATION_FILTER = stringPreferencesKey("min_duration_filter")
@@ -190,9 +191,6 @@ class PlaylistRepository(private val context: Context) {
         prefs[Keys.KEEP_SCREEN_ON] ?: false
     }
 
-    val gaplessEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
-        prefs[Keys.GAPLESS_ENABLED] ?: true
-    }
 
     val hapticEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.HAPTIC_ENABLED] ?: true
@@ -221,6 +219,10 @@ class PlaylistRepository(private val context: Context) {
 
     val playCountsFlow: Flow<Map<Long, Int>> = context.pureMusicDataStore.data.map { prefs ->
         decodeLongIntMap(prefs[Keys.PLAY_COUNTS_JSON].orEmpty())
+    }
+
+    val hourlyPlaysFlow: Flow<Map<Int, Int>> = context.pureMusicDataStore.data.map { prefs ->
+        decodeIntIntMap(prefs[Keys.HOURLY_PLAYS_JSON].orEmpty())
     }
 
     val lyricOffsetsFlow: Flow<Map<Long, Long>> = context.pureMusicDataStore.data.map { prefs ->
@@ -414,9 +416,6 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { it[Keys.KEEP_SCREEN_ON] = enabled }
     }
 
-    suspend fun setGaplessEnabled(enabled: Boolean) {
-        context.pureMusicDataStore.edit { it[Keys.GAPLESS_ENABLED] = enabled }
-    }
 
     suspend fun setHapticEnabled(enabled: Boolean) {
         context.pureMusicDataStore.edit { it[Keys.HAPTIC_ENABLED] = enabled }
@@ -447,6 +446,11 @@ class PlaylistRepository(private val context: Context) {
             val counts = decodeLongIntMap(prefs[Keys.PLAY_COUNTS_JSON].orEmpty()).toMutableMap()
             counts[songId] = (counts[songId] ?: 0) + 1
             prefs[Keys.PLAY_COUNTS_JSON] = encodeLongIntMap(counts)
+
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY).coerceIn(0, 23)
+            val hourly = decodeIntIntMap(prefs[Keys.HOURLY_PLAYS_JSON].orEmpty()).toMutableMap()
+            hourly[hour] = (hourly[hour] ?: 0) + 1
+            prefs[Keys.HOURLY_PLAYS_JSON] = encodeIntIntMap(hourly)
         }
     }
 
@@ -601,6 +605,27 @@ class PlaylistRepository(private val context: Context) {
                 val k = keys.next()
                 val id = k.toLongOrNull() ?: continue
                 result[id] = obj.optLong(k, 0L)
+            }
+            result
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun encodeIntIntMap(map: Map<Int, Int>): String {
+        val obj = JSONObject()
+        map.forEach { (k, v) -> obj.put(k.toString(), v) }
+        return obj.toString()
+    }
+
+    private fun decodeIntIntMap(json: String): Map<Int, Int> {
+        if (json.isBlank()) return emptyMap()
+        return runCatching {
+            val obj = JSONObject(json)
+            val result = mutableMapOf<Int, Int>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                val h = k.toIntOrNull() ?: continue
+                if (h in 0..23) result[h] = obj.optInt(k, 0)
             }
             result
         }.getOrDefault(emptyMap())

@@ -597,26 +597,27 @@ private fun SpatialGalleryImmersiveView(
     onResetLyricOffset: () -> Unit,
 ) {
     val bgTop by animateColorAsState(
-        targetValue = lerp(Color(0xFF141118), dynamicAccent, 0.36f),
+        targetValue = lerp(Color(0xFF161113), dynamicAccent, 0.34f),
         animationSpec = tween(550),
         label = "galleryBgTop",
     )
     val bgMid by animateColorAsState(
-        targetValue = lerp(Color(0xFF0E0C12), dynamicAccent, 0.22f),
+        targetValue = lerp(Color(0xFF110D0F), dynamicAccent, 0.20f),
         animationSpec = tween(550),
         label = "galleryBgMid",
     )
-    val bgBottom = Color(0xFF0A090C)
+    val bgBottom = Color(0xFF0A0809)
     val ivoryInk = Color(0xFFF3EEE4)
     val mutedInk = Color(0xFF9F9890)
     val cinnabar = Color(0xFFC83E2B)
 
+    // 6-sleeve flagship corridor (1 commanding hero + 5 receding stepped sleeves)
     val stackSongs = remember(song.id, allSongs) {
         if (allSongs.isEmpty()) {
             listOf(song)
         } else {
             val idx = allSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-            List(minOf(7, allSongs.size)) { step ->
+            List(minOf(6, allSongs.size)) { step ->
                 allSongs[(idx + step) % allSongs.size]
             }
         }
@@ -635,7 +636,7 @@ private fun SpatialGalleryImmersiveView(
             .background(
                 Brush.verticalGradient(
                     0.0f to bgTop,
-                    0.48f to bgMid,
+                    0.50f to bgMid,
                     1.0f to bgBottom,
                 ),
             )
@@ -644,47 +645,49 @@ private fun SpatialGalleryImmersiveView(
     ) {
         val stageW = maxWidth
         val stageH = maxHeight
-        val frontSize = min(stageW * 0.62f, stageH * 0.33f)
+        // Commanding foreground hero cover (~72% screen width, max 38% height)
+        val frontSize = min(stageW * 0.72f, stageH * 0.38f)
 
-        // Soft ambient glow behind the 3D sleeve stack
+        // Warm studio ambient backdrop light + subtle glossy floor horizon glow
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    0.0f to dynamicAccent.copy(alpha = 0.28f),
+                    0.0f to dynamicAccent.copy(alpha = 0.26f),
+                    0.65f to dynamicAccent.copy(alpha = 0.08f),
                     1.0f to Color.Transparent,
-                    center = Offset(size.width * 0.46f, size.height * 0.31f),
-                    radius = size.width * 0.68f,
+                    center = Offset(size.width * 0.44f, size.height * 0.30f),
+                    radius = size.width * 0.78f,
                 ),
-                radius = size.width * 0.68f,
-                center = Offset(size.width * 0.46f, size.height * 0.31f),
+                radius = size.width * 0.78f,
+                center = Offset(size.width * 0.44f, size.height * 0.30f),
             )
         }
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            ImmersiveTopBar(
-                title = "",
-                inkColor = ivoryInk,
-                currentStyle = currentStyle,
-                isTranslatingLyrics = isTranslatingLyrics,
-                onSelectStyle = onSelectStyle,
-                currentSpectrumStyle = spectrumStyle,
-                onSelectSpectrumStyle = onSelectSpectrumStyle,
-                onBack = onBackToVinyl,
-                onTranslateLyrics = onTranslateLyrics,
-                onToggleOffsetBar = onToggleOffsetBar,
-                onOpenLyricsSearch = onOpenLyricsSearch,
-                onOpenCoverSearch = onOpenCoverSearch,
-                onOpenFullLyricsSheet = onOpenFullLyricsSheet,
-            )
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                ImmersiveTopBar(
+                    title = "",
+                    inkColor = ivoryInk,
+                    currentStyle = currentStyle,
+                    isTranslatingLyrics = isTranslatingLyrics,
+                    onSelectStyle = onSelectStyle,
+                    currentSpectrumStyle = spectrumStyle,
+                    onSelectSpectrumStyle = onSelectSpectrumStyle,
+                    onBack = onBackToVinyl,
+                    onTranslateLyrics = onTranslateLyrics,
+                    onToggleOffsetBar = onToggleOffsetBar,
+                    onOpenLyricsSearch = onOpenLyricsSearch,
+                    onOpenCoverSearch = onOpenCoverSearch,
+                    onOpenFullLyricsSheet = onOpenFullLyricsSheet,
+                )
+            }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // 3D Diagonal Upper-Right Receding Physical Album Sleeve Stack + True Alpha-Masked Reflection
+            // Full-bleed 3D Flagship Record Gallery Stage (hero + 5 stepped metallic sleeves + peeking vinyl + mirror floor)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -694,8 +697,8 @@ private fun SpatialGalleryImmersiveView(
                             onTap = {
                                 if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 scope.launch {
-                                    tapScale.animateTo(0.95f, tween(80))
-                                    tapScale.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium))
+                                    tapScale.animateTo(0.96f, tween(80))
+                                    tapScale.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMedium))
                                 }
                                 onTogglePlayPause()
                             },
@@ -721,43 +724,46 @@ private fun SpatialGalleryImmersiveView(
                             },
                         )
                     },
-                contentAlignment = Alignment.TopCenter,
+                contentAlignment = Alignment.TopStart,
             ) {
-                val baseX = 0.dp
-                val baseY = 42.dp
-                val dynamicRotY = 18f + (dragOffsetX.value * 0.08f).coerceIn(-8f, 8f)
-                val camDist = 7.4f * density
-                val corridorWidth = frontSize + 108.dp
+                val baseX = (stageW - frontSize) * 0.30f
+                val baseY = 58.dp
+                val dynamicRotY = 16f + (dragOffsetX.value * 0.07f).coerceIn(-7f, 7f)
+                val camDist = 6.2f * density
+
+                // Stepped 1/z recession factors tuned so all 6 sleeves frame cleanly inside screen width
+                val scaleSteps = floatArrayOf(1.00f, 0.88f, 0.78f, 0.70f, 0.63f, 0.57f)
+                val xFractions = floatArrayOf(0.00f, 0.21f, 0.37f, 0.50f, 0.60f, 0.68f)
+                val yLiftDp = floatArrayOf(0f, 18f, 33f, 45f, 54f, 61f)
 
                 Box(
                     modifier = Modifier
+                        .fillMaxSize()
                         .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
                         .graphicsLayer {
                             scaleX = tapScale.value
                             scaleY = tapScale.value
-                        }
-                        .width(corridorWidth)
-                        .height(frontSize * 1.44f),
-                    contentAlignment = Alignment.TopStart,
+                        },
                 ) {
-                    // True 1/z vanishing-point projection (7 jackets converging cleanly toward upper-right vanishing point!)
                     for (depth in (stackSongs.lastIndex downTo 0)) {
                         val itemSong = stackSongs[depth]
                         val isFront = depth == 0
-                        val p = 1f / (1f + depth * 0.23f) // 1.00, 0.81, 0.68, 0.59, 0.52, 0.47, 0.42
-                        val invP = 1f - p
-                        val xShift = baseX + (frontSize * 1.18f * invP)
-                        val yShift = baseY - (34.dp * invP)
-                        val rotY = if (isFront) dynamicRotY else 18f
-                        val sleeveAlpha = (1f - depth * 0.09f).coerceAtLeast(0.38f)
+                        val dIdx = depth.coerceAtMost(scaleSteps.lastIndex)
+                        val p = scaleSteps[dIdx]
+                        val xShift = baseX + (frontSize * xFractions[dIdx])
+                        val yShift = (baseY - yLiftDp[dIdx].dp).coerceAtLeast(2.dp)
+                        val rotY = if (isFront) dynamicRotY else 15f
+                        val sleeveAlpha = (1f - depth * 0.08f).coerceAtLeast(0.46f)
+                        val spineW = 8.5.dp
+                        val topRimH = 3.5.dp
 
-                        // Unified 3D Plane per jacket: jacket + its mirror reflection share ONE graphicsLayer (zero V-gap!)
+                        // Unified 3D plane per sleeve: jacket + peeking vinyl + contact AO + mirror reflection
                         Column(
                             modifier = Modifier
                                 .offset(x = xShift, y = yShift)
-                                .width(frontSize)
+                                .width(frontSize + 18.dp)
                                 .graphicsLayer {
-                                    transformOrigin = TransformOrigin(0.0f, 0.36f)
+                                    transformOrigin = TransformOrigin(0.0f, 0.42f)
                                     scaleX = p
                                     scaleY = p
                                     rotationY = rotY
@@ -765,92 +771,186 @@ private fun SpatialGalleryImmersiveView(
                                     alpha = sleeveAlpha
                                 },
                         ) {
-                            // Physical brushed-silver-edged vinyl jacket matching 1000075911.jpg
                             Box(
                                 modifier = Modifier
-                                    .size(frontSize)
-                                    .shadow(if (isFront) 26.dp else 14.dp, RoundedCornerShape(2.dp), ambientColor = Color.Black)
-                                    .background(Color(0xFFB8B5B0), RoundedCornerShape(2.dp)),
+                                    .width(frontSize + 18.dp)
+                                    .height(frontSize),
                             ) {
-                                Row(modifier = Modifier.fillMaxSize()) {
-                                    // Brushed silver-aluminum left spine thickness (5dp)
-                                    Box(
+                                // Subtle black vinyl LP peeking out to the right on receding sleeves (depths 1..4)
+                                if (depth in 1..4) {
+                                    Canvas(
                                         modifier = Modifier
-                                            .width(5.dp)
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.horizontalGradient(
-                                                    0.0f to Color(0xFFE6E4E0),
-                                                    0.45f to Color(0xFFAFAEA9),
-                                                    0.85f to Color(0xFF6B6A66),
-                                                    1.0f to Color(0xFF3A3937),
-                                                ),
+                                            .align(Alignment.CenterEnd)
+                                            .size(frontSize * 0.86f),
+                                    ) {
+                                        val r = size.minDimension * 0.5f
+                                        val c = Offset(size.width * 0.5f, size.height * 0.5f)
+                                        drawCircle(
+                                            brush = Brush.radialGradient(
+                                                0.0f to Color(0xFF0A0A0B),
+                                                0.72f to Color(0xFF171719),
+                                                0.90f to Color(0xFF28282B),
+                                                1.0f to Color(0xFF0D0D0F),
+                                                center = c,
+                                                radius = r,
                                             ),
-                                    )
-                                    Column(modifier = Modifier.weight(1f).fillMaxSize()) {
-                                        // Crisp brushed-silver top rim thickness (2.5dp)
+                                            radius = r,
+                                            center = c,
+                                        )
+                                        for (g in 1..5) {
+                                            drawCircle(
+                                                color = Color.White.copy(alpha = 0.06f),
+                                                radius = r * (0.64f + g * 0.065f),
+                                                center = c,
+                                                style = Stroke(width = 0.7f),
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Thick metallic-spined physical vinyl jacket
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterStart)
+                                        .size(frontSize)
+                                        .shadow(
+                                            elevation = if (isFront) 32.dp else 18.dp,
+                                            shape = RoundedCornerShape(3.dp),
+                                            ambientColor = Color.Black,
+                                            spotColor = Color.Black,
+                                        )
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(Color(0xFF1E1D1C)),
+                                ) {
+                                    Row(modifier = Modifier.fillMaxSize()) {
+                                        // 8.5dp Machined Brushed-Aluminum 3D Left Spine with specular corner bevel
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(2.5.dp)
+                                                .width(spineW)
+                                                .fillMaxSize()
                                                 .background(
-                                                    Brush.verticalGradient(
-                                                        0.0f to Color(0xFFE4E2DE),
-                                                        1.0f to Color(0xFF9E9D98),
+                                                    Brush.horizontalGradient(
+                                                        0.00f to Color(0xFF6B6A67),
+                                                        0.18f to Color(0xFFEBE9E5),
+                                                        0.46f to Color(0xFFC5C3BE),
+                                                        0.78f to Color(0xFF7D7B77),
+                                                        0.94f to Color(0xFF3E3D3B),
+                                                        1.00f to Color(0xFF1A1918),
                                                     ),
                                                 ),
-                                        )
-                                        Box(
+                                        ) {
+                                            // Vertical sheen gradient along the metallic spine
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(
+                                                        Brush.verticalGradient(
+                                                            0.0f to Color.White.copy(alpha = 0.24f),
+                                                            0.25f to Color.Transparent,
+                                                            0.78f to Color.Black.copy(alpha = 0.18f),
+                                                            1.0f to Color.Black.copy(alpha = 0.36f),
+                                                        ),
+                                                    ),
+                                            )
+                                        }
+
+                                        // Jacket front face + beveled metallic top rim + recessed dark bezel
+                                        Column(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .fillMaxWidth()
-                                                .border(0.7.dp, Color.White.copy(alpha = 0.28f), RectangleShape),
+                                                .fillMaxSize(),
                                         ) {
-                                            AlbumArtwork(
-                                                uri = itemSong.albumArtUri,
-                                                contentDescription = itemSong.album,
-                                                modifier = Modifier.fillMaxSize(),
-                                                cornerRadius = 0.dp,
-                                                iconSize = if (isFront) 48.dp else 32.dp,
-                                            )
-                                            if (isFront) {
-                                                // Subtle diagonal glossy sleeve light sheen
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .background(
-                                                            Brush.linearGradient(
-                                                                0.0f to Color.White.copy(alpha = 0.14f),
-                                                                0.34f to Color.Transparent,
-                                                                0.70f to Color.Transparent,
-                                                                1.0f to Color.Black.copy(alpha = 0.14f),
-                                                            ),
+                                            // 3.5dp Top Metallic Bevel Rim
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(topRimH)
+                                                    .background(
+                                                        Brush.verticalGradient(
+                                                            0.0f to Color(0xFFF0EEEA),
+                                                            0.55f to Color(0xFFB5B3AE),
+                                                            1.0f to Color(0xFF4A4946),
                                                         ),
+                                                    ),
+                                            )
+
+                                            // Recessed dark gunmetal border framing the album cover
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .fillMaxWidth()
+                                                    .background(Color(0xFF161514))
+                                                    .padding(1.5.dp)
+                                                    .border(0.6.dp, Color.White.copy(alpha = 0.22f), RectangleShape),
+                                            ) {
+                                                AlbumArtwork(
+                                                    uri = itemSong.albumArtUri,
+                                                    contentDescription = itemSong.album,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    cornerRadius = 0.dp,
+                                                    iconSize = if (isFront) 54.dp else 34.dp,
                                                 )
-                                            } else {
-                                                // Subtle depth shading on receding jackets
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .background(Color.Black.copy(alpha = (depth * 0.10f).coerceAtMost(0.55f))),
-                                                )
+
+                                                if (isFront) {
+                                                    // Subtle museum-grade diagonal satin glass sheen + soft bottom-right vignette
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxSize()
+                                                            .background(
+                                                                Brush.linearGradient(
+                                                                    0.00f to Color.White.copy(alpha = 0.14f),
+                                                                    0.32f to Color.White.copy(alpha = 0.03f),
+                                                                    0.52f to Color.Transparent,
+                                                                    0.82f to Color.Black.copy(alpha = 0.06f),
+                                                                    1.00f to Color.Black.copy(alpha = 0.20f),
+                                                                ),
+                                                            ),
+                                                    )
+                                                } else {
+                                                    // Inter-sleeve cast shadow from the sleeve directly in front + depth darkening
+                                                    val depthDark = (0.16f + depth * 0.11f).coerceAtMost(0.68f)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxSize()
+                                                            .background(
+                                                                Brush.horizontalGradient(
+                                                                    0.0f to Color.Black.copy(alpha = (depthDark + 0.34f).coerceAtMost(0.84f)),
+                                                                    0.55f to Color.Black.copy(alpha = depthDark + 0.12f),
+                                                                    1.0f to Color.Black.copy(alpha = depthDark),
+                                                                ),
+                                                            ),
+                                                    )
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
 
-                            // Seamless parallel floor mirror reflection (stronger on front, fading cleanly on receding jackets)
-                            if (depth <= 2) {
+                            // Razor-thin dark Contact Ambient Occlusion (AO) line anchoring sleeve onto glossy floor
+                            Box(
+                                modifier = Modifier
+                                    .width(frontSize)
+                                    .height(2.5.dp)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            0.0f to Color.Black.copy(alpha = if (isFront) 0.88f else 0.65f),
+                                            1.0f to Color.Black.copy(alpha = 0.0f),
+                                        ),
+                                    ),
+                            )
+
+                            // Seamless parallel mirror floor reflection (shares exact 3D plane -> zero V-gap)
+                            if (depth <= 3) {
                                 val reflStrength = when (depth) {
-                                    0 -> 0.36f
-                                    1 -> 0.16f
-                                    else -> 0.08f
+                                    0 -> 0.40f
+                                    1 -> 0.20f
+                                    2 -> 0.11f
+                                    else -> 0.06f
                                 }
-                                Box(
+                                Row(
                                     modifier = Modifier
-                                        .padding(start = 5.dp, top = 0.5.dp)
-                                        .width(frontSize - 5.dp)
+                                        .width(frontSize)
                                         .height(frontSize * 0.34f)
                                         .graphicsLayer {
                                             compositingStrategy = CompositingStrategy.Offscreen
@@ -859,20 +959,34 @@ private fun SpatialGalleryImmersiveView(
                                             drawContent()
                                             drawRect(
                                                 brush = Brush.verticalGradient(
-                                                    0.0f to Color.Black.copy(alpha = reflStrength),
-                                                    0.58f to Color.Black.copy(alpha = reflStrength * 0.24f),
-                                                    1.0f to Color.Transparent,
+                                                    0.00f to Color.Black.copy(alpha = reflStrength),
+                                                    0.52f to Color.Black.copy(alpha = reflStrength * 0.26f),
+                                                    1.00f to Color.Transparent,
                                                 ),
                                                 blendMode = BlendMode.DstIn,
                                             )
                                         }
                                         .clip(RectangleShape),
                                 ) {
+                                    // Reflected metallic spine continuation
+                                    Box(
+                                        modifier = Modifier
+                                            .width(spineW)
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.horizontalGradient(
+                                                    0.0f to Color(0xFF4F4E4B),
+                                                    0.35f to Color(0xFFA8A6A1),
+                                                    1.0f to Color(0xFF2B2A28),
+                                                ),
+                                            ),
+                                    )
                                     AlbumArtwork(
                                         uri = itemSong.albumArtUri,
                                         contentDescription = null,
                                         modifier = Modifier
-                                            .size(frontSize - 5.dp)
+                                            .weight(1f)
+                                            .height(frontSize)
                                             .graphicsLayer { scaleY = -1f },
                                         cornerRadius = 0.dp,
                                         iconSize = 32.dp,
@@ -889,7 +1003,7 @@ private fun SpatialGalleryImmersiveView(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp),
+                    .padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -921,29 +1035,33 @@ private fun SpatialGalleryImmersiveView(
             }
 
             if (showOffsetBar) {
-                ImmersiveOffsetStrip(
-                    lyricOffsetMs = lyricOffsetMs,
-                    inkColor = ivoryInk,
-                    accentColor = cinnabar,
-                    onAdjust = onAdjustLyricOffset,
-                    onReset = onResetLyricOffset,
-                )
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                    ImmersiveOffsetStrip(
+                        lyricOffsetMs = lyricOffsetMs,
+                        inkColor = ivoryInk,
+                        accentColor = cinnabar,
+                        onAdjust = onAdjustLyricOffset,
+                        onReset = onResetLyricOffset,
+                    )
+                }
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
-            LiveSpectrumWaveformSeekBar(
-                songId = song.id,
-                positionMs = positionMs,
-                durationMs = durationMs,
-                isPlaying = isPlaying,
-                spectrumBands = spectrumBands,
-                spectrumStyle = spectrumStyle,
-                playedColor = ivoryInk,
-                unplayedColor = Color.White.copy(alpha = 0.24f),
-                needleColor = cinnabar,
-                timestampColor = mutedInk,
-                onSeekTo = onSeekTo,
-            )
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                LiveSpectrumWaveformSeekBar(
+                    songId = song.id,
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    isPlaying = isPlaying,
+                    spectrumBands = spectrumBands,
+                    spectrumStyle = spectrumStyle,
+                    playedColor = ivoryInk,
+                    unplayedColor = Color.White.copy(alpha = 0.24f),
+                    needleColor = cinnabar,
+                    timestampColor = mutedInk,
+                    onSeekTo = onSeekTo,
+                )
+            }
             Spacer(modifier = Modifier.height(10.dp))
         }
     }

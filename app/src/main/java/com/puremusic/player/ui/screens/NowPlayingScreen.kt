@@ -2,7 +2,6 @@ package com.puremusic.player.ui.screens
 
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.animation.AnimatedVisibility
 import android.app.Activity
 import android.net.Uri
 import android.view.WindowManager
@@ -338,483 +337,493 @@ fun NowPlayingScreen(
             return@Box
         }
 
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val isLandscape = maxWidth > maxHeight && maxWidth >= 520.dp
-            val isCompactHeight = maxHeight < 480.dp
-            if (isLandscape) {
-                LandscapeVinylSleeveNowPlaying(
-                    isCompactHeight = isCompactHeight,
-                    onEnterCarMode = { onToggleCarMode(true) },
+        AnimatedContent(
+            targetState = showFullLyrics,
+            transitionSpec = {
+                if (targetState) {
+                    (fadeIn(tween(240)) + scaleIn(initialScale = 0.965f, animationSpec = tween(240))) togetherWith
+                        fadeOut(tween(160))
+                } else {
+                    fadeIn(tween(200)) togetherWith
+                        (fadeOut(tween(180)) + scaleOut(targetScale = 0.97f, animationSpec = tween(180)))
+                }
+            },
+            label = "nowPlayingToImmersive",
+            modifier = Modifier.fillMaxSize(),
+        ) { fullLyricsMode ->
+            if (fullLyricsMode) {
+                ImmersiveLyricsHost(
+                    style = immersionStyle,
+                    onSelectStyle = onSelectImmersionStyle,
+                    spectrumStyle = spectrumStyle,
+                    onSelectSpectrumStyle = onSelectSpectrumStyle,
                     song = song,
-                    playerState = playerState,
-                    durationMs = durationMs,
-                    adjustedPosMs = adjustedPosMs,
+                    allSongs = allSongs,
                     lyrics = lyrics,
+                    audioSpec = audioSpec,
+                    positionMs = playerState.positionMs,
+                    durationMs = durationMs,
+                    isPlaying = playerState.isPlaying,
                     vinylRotationProvider = { vinylAngle.value },
-                    isFavorite = isFavorite,
-                    isDarkTheme = isDarkTheme,
                     lyricFamily = lyricFamily,
                     lyricStyleItalic = lyricStyleItalic,
-                    accentColor = activeAccentColor,
-                    primaryTextColor = primaryTextColor,
-                    secondaryTextColor = secondaryTextColor,
-                    audioSpec = audioSpec,
+                    dynamicAccent = extractedPalette.accent,
+                    isDarkTheme = isDarkTheme,
                     isTranslatingLyrics = isTranslatingLyrics,
-                    onClose = onClose,
+                    lyricOffsetMs = lyricOffsetMs,
+                    onBackToVinyl = { showFullLyrics = false },
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipPrevious = onSkipPrevious,
                     onSkipNext = onSkipNext,
                     onSeekTo = onSeekTo,
-                    singleRepeatRemaining = singleRepeatRemaining,
-                    onOpenRepeatCountDialog = onOpenRepeatCountDialog,
-                    onToggleShuffle = onToggleShuffle,
-                    onCycleRepeat = onCycleRepeat,
-                    onToggleFavorite = { onToggleFavorite(song) },
-                    onOpenQueue = onOpenQueue,
-                    onOpenEqualizer = onOpenEqualizer,
-                    onOpenSleepTimer = onOpenSleepTimer,
-                    onOpenSettings = onOpenSettings,
+                    onTranslateLyrics = onTranslateLyrics,
                     onOpenLyricsSearch = { onOpenLyricsSearch(song) },
                     onOpenCoverSearch = { onOpenCoverSearch(song) },
-                    onTranslateLyrics = onTranslateLyrics,
-                    onOpenFullLyrics = { showFullLyrics = true },
+                    onOpenFullLyricsSheet = onOpenLyrics,
+                    onAdjustLyricOffset = onAdjustLyricOffset,
+                    onResetLyricOffset = onResetLyricOffset,
+                    architecturalGridContent = {
+                        EditorialFullScreenLyricsView(
+                            song = song,
+                            lyrics = lyrics,
+                            positionMs = playerState.positionMs,
+                            durationMs = durationMs,
+                            isPlaying = playerState.isPlaying,
+                            lyricFamily = lyricFamily,
+                            lyricStyleItalic = lyricStyleItalic,
+                            accentColor = activeAccentColor,
+                            primaryTextColor = primaryTextColor,
+                            secondaryTextColor = secondaryTextColor,
+                            onBackToVinyl = { showFullLyrics = false },
+                            onClosePlayer = onClose,
+                            onTogglePlayPause = onTogglePlayPause,
+                            onSkipPrevious = onSkipPrevious,
+                            onSkipNext = onSkipNext,
+                            onSeekTo = onSeekTo,
+                            onOpenLyricsSearch = { onOpenLyricsSearch(song) },
+                            onOpenCoverSearch = { onOpenCoverSearch(song) },
+                            isTranslatingLyrics = isTranslatingLyrics,
+                            onTranslateLyrics = onTranslateLyrics,
+                            onAddToPlaylist = { onAddToPlaylist(song) },
+                            isDarkTheme = isDarkTheme,
+                            onOpenFullLyricsSheet = onOpenLyrics,
+                            audioSpec = audioSpec,
+                            lyricOffsetMs = lyricOffsetMs,
+                            onAdjustLyricOffset = onAdjustLyricOffset,
+                            onResetLyricOffset = onResetLyricOffset,
+                            currentImmersionStyle = immersionStyle,
+                            onSelectImmersionStyle = onSelectImmersionStyle,
+                            currentSpectrumStyle = spectrumStyle,
+                            onSelectSpectrumStyle = onSelectSpectrumStyle,
+                        )
+                    },
                 )
             } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .navigationBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // 1. Edge-to-Edge 4-Row Manually Swipeable & Tappable Poster Wall + Giant 180g Glossy Vinyl
-            InteractivePosterWallHeader(
-                currentSong = song,
-                allSongs = allSongs,
-                vinylRotationProvider = { vinylAngle.value },
-                backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-                backIconTint = primaryTextColor,
-                sleepTimerRemainingMs = sleepTimerRemainingMs,
-                accentColor = activeAccentColor,
-                onClose = onClose,
-                onSelectSong = onSelectSongFromWall,
-                onOpenSleepTimer = onOpenSleepTimer,
-                onLongPressVinyl = { onOpenCoverSearch(song) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1.22f),
-            )
-
-            // 2. Refined Editorial Track Metadata, Lyrics, Progress & Controls (supports swipe left/right to skip, swipe down to close)
-            var dragTotalX by remember { mutableFloatStateOf(0f) }
-            var dragTotalY by remember { mutableFloatStateOf(0f) }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pointerInput(song.id) {
-                        detectDragGestures(
-                            onDragStart = {
-                                dragTotalX = 0f
-                                dragTotalY = 0f
-                            },
-                            onDrag = { _, dragAmount ->
-                                dragTotalX += dragAmount.x
-                                dragTotalY += dragAmount.y
-                            },
-                            onDragEnd = {
-                                val absX = kotlin.math.abs(dragTotalX)
-                                val absY = kotlin.math.abs(dragTotalY)
-                                if (absY > absX && dragTotalY > 110f) {
-                                    onClose()
-                                }
-                            },
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val isLandscape = maxWidth > maxHeight && maxWidth >= 520.dp
+                    val isCompactHeight = maxHeight < 480.dp
+                    if (isLandscape) {
+                        LandscapeVinylSleeveNowPlaying(
+                            isCompactHeight = isCompactHeight,
+                            onEnterCarMode = { onToggleCarMode(true) },
+                            song = song,
+                            playerState = playerState,
+                            durationMs = durationMs,
+                            adjustedPosMs = adjustedPosMs,
+                            lyrics = lyrics,
+                            vinylRotationProvider = { vinylAngle.value },
+                            isFavorite = isFavorite,
+                            isDarkTheme = isDarkTheme,
+                            lyricFamily = lyricFamily,
+                            lyricStyleItalic = lyricStyleItalic,
+                            accentColor = activeAccentColor,
+                            primaryTextColor = primaryTextColor,
+                            secondaryTextColor = secondaryTextColor,
+                            audioSpec = audioSpec,
+                            isTranslatingLyrics = isTranslatingLyrics,
+                            onClose = onClose,
+                            onTogglePlayPause = onTogglePlayPause,
+                            onSkipPrevious = onSkipPrevious,
+                            onSkipNext = onSkipNext,
+                            onSeekTo = onSeekTo,
+                            singleRepeatRemaining = singleRepeatRemaining,
+                            onOpenRepeatCountDialog = onOpenRepeatCountDialog,
+                            onToggleShuffle = onToggleShuffle,
+                            onCycleRepeat = onCycleRepeat,
+                            onToggleFavorite = { onToggleFavorite(song) },
+                            onOpenQueue = onOpenQueue,
+                            onOpenEqualizer = onOpenEqualizer,
+                            onOpenSleepTimer = onOpenSleepTimer,
+                            onOpenSettings = onOpenSettings,
+                            onOpenLyricsSearch = { onOpenLyricsSearch(song) },
+                            onOpenCoverSearch = { onOpenCoverSearch(song) },
+                            onTranslateLyrics = onTranslateLyrics,
+                            onOpenFullLyrics = { showFullLyrics = true },
                         )
-                    }
-                    .padding(horizontal = 26.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Spacer(modifier = Modifier.height(10.dp))
-
-                AnimatedContent(
-                    targetState = song.title to song.artist,
-                    transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(180)) },
-                    label = "titleTransition",
-                ) { (title, artist) ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.3).sp,
-                            ),
-                            color = primaryTextColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = artist,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = secondaryTextColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
-                        if (audioSpec.displayText.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            AudioSpecStamp(
-                                spec = audioSpec,
-                                accentColor = activeAccentColor,
-                                outlineColor = MaterialTheme.colorScheme.outline,
-                                secondaryTextColor = secondaryTextColor,
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
+                    } else {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { showFullLyrics = !showFullLyrics },
+                        .fillMaxSize()
+                        .navigationBarsPadding(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
                 ) {
-                    if (activeLyric != null) {
+                    // 1. Edge-to-Edge 4-Row Manually Swipeable & Tappable Poster Wall + Giant 180g Glossy Vinyl
+                    InteractivePosterWallHeader(
+                        currentSong = song,
+                        allSongs = allSongs,
+                        vinylRotationProvider = { vinylAngle.value },
+                        backButtonBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+                        backIconTint = primaryTextColor,
+                        sleepTimerRemainingMs = sleepTimerRemainingMs,
+                        accentColor = activeAccentColor,
+                        onClose = onClose,
+                        onSelectSong = onSelectSongFromWall,
+                        onOpenSleepTimer = onOpenSleepTimer,
+                        onLongPressVinyl = { onOpenCoverSearch(song) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1.22f),
+                    )
+
+                    // 2. Refined Editorial Track Metadata, Lyrics, Progress & Controls (supports swipe left/right to skip, swipe down to close)
+                    var dragTotalX by remember { mutableFloatStateOf(0f) }
+                    var dragTotalY by remember { mutableFloatStateOf(0f) }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pointerInput(song.id) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        dragTotalX = 0f
+                                        dragTotalY = 0f
+                                    },
+                                    onDrag = { _, dragAmount ->
+                                        dragTotalX += dragAmount.x
+                                        dragTotalY += dragAmount.y
+                                    },
+                                    onDragEnd = {
+                                        val absX = kotlin.math.abs(dragTotalX)
+                                        val absY = kotlin.math.abs(dragTotalY)
+                                        if (absY > absX && dragTotalY > 110f) {
+                                            onClose()
+                                        }
+                                    },
+                                )
+                            }
+                            .padding(horizontal = 26.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         AnimatedContent(
-                            targetState = activeLyric,
-                            transitionSpec = {
-                                (fadeIn(tween(240)) + slideInVertically(tween(240)) { it / 3 }) togetherWith
-                                    (fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it / 3 })
-                            },
-                            label = "vinylLyricPreview",
-                        ) { line ->
+                            targetState = song.title to song.artist,
+                            transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(180)) },
+                            label = "titleTransition",
+                        ) { (title, artist) ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = line.primaryText,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontFamily = lyricFamily,
-                                        fontStyle = lyricStyleItalic,
-                                        fontWeight = FontWeight.SemiBold,
+                                    text = title,
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = (-0.3).sp,
                                     ),
                                     color = primaryTextColor,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     textAlign = TextAlign.Center,
                                 )
-                                if (!line.secondaryText.isNullOrBlank()) {
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = line.secondaryText,
-                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = lyricFamily),
-                                        color = secondaryTextColor,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.Center,
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = artist,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = secondaryTextColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                )
+                                if (audioSpec.displayText.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    AudioSpecStamp(
+                                        spec = audioSpec,
+                                        accentColor = activeAccentColor,
+                                        outlineColor = MaterialTheme.colorScheme.outline,
+                                        secondaryTextColor = secondaryTextColor,
                                     )
                                 }
                             }
                         }
-                    } else {
-                        Text(
-                            text = if (song.album.equals(song.title, ignoreCase = true)) {
-                                "歌手 : ${song.artist}"
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showFullLyrics = !showFullLyrics },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            if (activeLyric != null) {
+                                AnimatedContent(
+                                    targetState = activeLyric,
+                                    transitionSpec = {
+                                        (fadeIn(tween(240)) + slideInVertically(tween(240)) { it / 3 }) togetherWith
+                                            (fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it / 3 })
+                                    },
+                                    label = "vinylLyricPreview",
+                                ) { line ->
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = line.primaryText,
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                fontFamily = lyricFamily,
+                                                fontStyle = lyricStyleItalic,
+                                                fontWeight = FontWeight.SemiBold,
+                                            ),
+                                            color = primaryTextColor,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Center,
+                                        )
+                                        if (!line.secondaryText.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = line.secondaryText,
+                                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = lyricFamily),
+                                                color = secondaryTextColor,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                textAlign = TextAlign.Center,
+                                            )
+                                        }
+                                    }
+                                }
                             } else {
-                                "专辑 : ${song.album}"
-                            },
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = lyricFamily,
-                                fontStyle = lyricStyleItalic,
-                                fontWeight = FontWeight.Medium,
-                            ),
-                            color = secondaryTextColor.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
+                                Text(
+                                    text = if (song.album.equals(song.title, ignoreCase = true)) {
+                                        "歌手 : ${song.artist}"
+                                    } else {
+                                        "专辑 : ${song.album}"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = lyricFamily,
+                                        fontStyle = lyricStyleItalic,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                    color = secondaryTextColor.copy(alpha = 0.85f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f, fill = false))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        ThinSeekBar(
+                            positionMs = playerState.positionMs,
+                            durationMs = durationMs,
+                            activeLineColor = primaryTextColor.copy(alpha = 0.78f),
+                            accentColor = activeAccentColor,
+                            trackColor = secondaryTextColor.copy(alpha = 0.28f),
+                            onSeekTo = onSeekTo,
                         )
-                    }
-                }
 
-                Spacer(modifier = Modifier.weight(1f, fill = false))
-                Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = formatDuration(playerState.positionMs),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = secondaryTextColor,
+                            )
+                            Text(
+                                text = formatDuration(playerState.durationMs),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = secondaryTextColor,
+                            )
+                        }
 
-                ThinSeekBar(
-                    positionMs = playerState.positionMs,
-                    durationMs = durationMs,
-                    activeLineColor = primaryTextColor.copy(alpha = 0.78f),
-                    accentColor = activeAccentColor,
-                    trackColor = secondaryTextColor.copy(alpha = 0.28f),
-                    onSeekTo = onSeekTo,
-                )
+                        Spacer(modifier = Modifier.weight(1f, fill = false))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = formatDuration(playerState.positionMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = secondaryTextColor,
-                    )
-                    Text(
-                        text = formatDuration(playerState.durationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = secondaryTextColor,
-                    )
-                }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(onClick = onToggleShuffle) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Shuffle,
+                                    contentDescription = "随机播放",
+                                    tint = if (playerState.shuffleEnabled) activeAccentColor else primaryTextColor.copy(alpha = 0.85f),
+                                    modifier = Modifier.size(21.dp),
+                                )
+                            }
 
-                Spacer(modifier = Modifier.weight(1f, fill = false))
-                Spacer(modifier = Modifier.height(8.dp))
+                            IconButton(onClick = onSkipPrevious) {
+                                Icon(
+                                    imageVector = Icons.Rounded.SkipPrevious,
+                                    contentDescription = "上一首",
+                                    tint = primaryTextColor,
+                                    modifier = Modifier.size(27.dp),
+                                )
+                            }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onToggleShuffle) {
-                        Icon(
-                            imageVector = Icons.Rounded.Shuffle,
-                            contentDescription = "随机播放",
-                            tint = if (playerState.shuffleEnabled) activeAccentColor else primaryTextColor.copy(alpha = 0.85f),
-                            modifier = Modifier.size(21.dp),
-                        )
-                    }
-
-                    IconButton(onClick = onSkipPrevious) {
-                        Icon(
-                            imageVector = Icons.Rounded.SkipPrevious,
-                            contentDescription = "上一首",
-                            tint = primaryTextColor,
-                            modifier = Modifier.size(27.dp),
-                        )
-                    }
-
-                    FilledIconButton(
-                        onClick = {
-                            if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onTogglePlayPause()
-                        },
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = when {
-                                liquidGlassEnabled -> activeAccentColor
-                                isDarkTheme -> Color(0xFFF2ECE1)
-                                else -> primaryTextColor
-                            },
-                            contentColor = when {
-                                liquidGlassEnabled -> Color.White
-                                isDarkTheme -> Color(0xFF141110)
-                                else -> baseCanvas
-                            },
-                        ),
-                        modifier = Modifier
-                            .size(66.dp)
-                            .then(if (liquidGlassEnabled) Modifier.shadow(10.dp, CircleShape) else Modifier),
-                    ) {
-                        Icon(
-                            imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                            modifier = Modifier.size(34.dp),
-                        )
-                    }
-
-                    IconButton(onClick = onSkipNext) {
-                        Icon(
-                            imageVector = Icons.Rounded.SkipNext,
-                            contentDescription = "下一首",
-                            tint = primaryTextColor,
-                            modifier = Modifier.size(27.dp),
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .combinedClickable(
+                            FilledIconButton(
                                 onClick = {
                                     if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onCycleRepeat()
+                                    onTogglePlayPause()
                                 },
-                                onLongClick = {
-                                    if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onOpenRepeatCountDialog()
-                                },
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = when {
-                                singleRepeatRemaining > 0 -> Icons.Rounded.RepeatOne
-                                playerState.repeatMode == RepeatMode.ONE -> Icons.Rounded.RepeatOne
-                                else -> Icons.Rounded.Repeat
-                            },
-                            contentDescription = "循环模式（长按设置复听次数）",
-                            tint = if (singleRepeatRemaining > 0 || playerState.repeatMode != RepeatMode.OFF) {
-                                activeAccentColor
-                            } else {
-                                primaryTextColor.copy(alpha = 0.85f)
-                            },
-                            modifier = Modifier.size(21.dp),
-                        )
-                        if (singleRepeatRemaining > 0) {
+                                shape = CircleShape,
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = when {
+                                        liquidGlassEnabled -> activeAccentColor
+                                        isDarkTheme -> Color(0xFFF2ECE1)
+                                        else -> primaryTextColor
+                                    },
+                                    contentColor = when {
+                                        liquidGlassEnabled -> Color.White
+                                        isDarkTheme -> Color(0xFF141110)
+                                        else -> baseCanvas
+                                    },
+                                ),
+                                modifier = Modifier
+                                    .size(66.dp)
+                                    .then(if (liquidGlassEnabled) Modifier.shadow(10.dp, CircleShape) else Modifier),
+                            ) {
+                                Icon(
+                                    imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                    contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                                    modifier = Modifier.size(34.dp),
+                                )
+                            }
+
+                            IconButton(onClick = onSkipNext) {
+                                Icon(
+                                    imageVector = Icons.Rounded.SkipNext,
+                                    contentDescription = "下一首",
+                                    tint = primaryTextColor,
+                                    modifier = Modifier.size(27.dp),
+                                )
+                            }
+
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(top = 4.dp, end = 2.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(activeAccentColor)
-                                    .padding(horizontal = 4.dp, vertical = 0.5.dp),
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .combinedClickable(
+                                        onClick = {
+                                            if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onCycleRepeat()
+                                        },
+                                        onLongClick = {
+                                            if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onOpenRepeatCountDialog()
+                                        },
+                                    ),
+                                contentAlignment = Alignment.Center,
                             ) {
-                                Text(
-                                    text = "×$singleRepeatRemaining",
-                                    fontSize = 9.sp,
-                                    lineHeight = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
+                                Icon(
+                                    imageVector = when {
+                                        singleRepeatRemaining > 0 -> Icons.Rounded.RepeatOne
+                                        playerState.repeatMode == RepeatMode.ONE -> Icons.Rounded.RepeatOne
+                                        else -> Icons.Rounded.Repeat
+                                    },
+                                    contentDescription = "循环模式（长按设置复听次数）",
+                                    tint = if (singleRepeatRemaining > 0 || playerState.repeatMode != RepeatMode.OFF) {
+                                        activeAccentColor
+                                    } else {
+                                        primaryTextColor.copy(alpha = 0.85f)
+                                    },
+                                    modifier = Modifier.size(21.dp),
+                                )
+                                if (singleRepeatRemaining > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(top = 4.dp, end = 2.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(activeAccentColor)
+                                            .padding(horizontal = 4.dp, vertical = 0.5.dp),
+                                    ) {
+                                        Text(
+                                            text = "×$singleRepeatRemaining",
+                                            fontSize = 9.sp,
+                                            lineHeight = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f, fill = false))
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(onClick = { onToggleFavorite(song) }) {
+                                Icon(
+                                    imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                    contentDescription = "喜欢",
+                                    tint = if (isFavorite) animatedAccent else primaryTextColor.copy(alpha = 0.82f),
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+
+                            IconButton(onClick = onOpenQueue) {
+                                Icon(
+                                    imageVector = Icons.Rounded.QueueMusic,
+                                    contentDescription = "播放队列",
+                                    tint = primaryTextColor.copy(alpha = 0.82f),
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+
+                            IconButton(onClick = onOpenEqualizer) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Tune,
+                                    contentDescription = "音效与均衡器",
+                                    tint = primaryTextColor.copy(alpha = 0.82f),
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+
+                            IconButton(onClick = { showFullLyrics = !showFullLyrics }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Lyrics,
+                                    contentDescription = "歌词",
+                                    tint = if (lyrics.isNotEmpty()) animatedAccent else primaryTextColor.copy(alpha = 0.82f),
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+
+                            IconButton(onClick = onOpenSettings) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Settings,
+                                    contentDescription = "外观与设置",
+                                    tint = primaryTextColor.copy(alpha = 0.82f),
+                                    modifier = Modifier.size(22.dp),
                                 )
                             }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.weight(1f, fill = false))
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = { onToggleFavorite(song) }) {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            contentDescription = "喜欢",
-                            tint = if (isFavorite) animatedAccent else primaryTextColor.copy(alpha = 0.82f),
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-
-                    IconButton(onClick = onOpenQueue) {
-                        Icon(
-                            imageVector = Icons.Rounded.QueueMusic,
-                            contentDescription = "播放队列",
-                            tint = primaryTextColor.copy(alpha = 0.82f),
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-
-                    IconButton(onClick = onOpenEqualizer) {
-                        Icon(
-                            imageVector = Icons.Rounded.Tune,
-                            contentDescription = "音效与均衡器",
-                            tint = primaryTextColor.copy(alpha = 0.82f),
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-
-                    IconButton(onClick = { showFullLyrics = !showFullLyrics }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Lyrics,
-                            contentDescription = "歌词",
-                            tint = if (lyrics.isNotEmpty()) animatedAccent else primaryTextColor.copy(alpha = 0.82f),
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = "外观与设置",
-                            tint = primaryTextColor.copy(alpha = 0.82f),
-                            modifier = Modifier.size(22.dp),
-                        )
                     }
                 }
             }
-        }
-            }
-        }
-
-        AnimatedVisibility(
-            visible = showFullLyrics,
-            enter = fadeIn(tween(260)) + scaleIn(initialScale = 0.96f, animationSpec = tween(260)),
-            exit = fadeOut(tween(180)) + scaleOut(targetScale = 0.97f, animationSpec = tween(180)),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            ImmersiveLyricsHost(
-                style = immersionStyle,
-                onSelectStyle = onSelectImmersionStyle,
-                spectrumStyle = spectrumStyle,
-                onSelectSpectrumStyle = onSelectSpectrumStyle,
-                song = song,
-                allSongs = allSongs,
-                lyrics = lyrics,
-                audioSpec = audioSpec,
-                positionMs = playerState.positionMs,
-                durationMs = durationMs,
-                isPlaying = playerState.isPlaying,
-                vinylRotationProvider = { vinylAngle.value },
-                lyricFamily = lyricFamily,
-                lyricStyleItalic = lyricStyleItalic,
-                dynamicAccent = extractedPalette.accent,
-                isDarkTheme = isDarkTheme,
-                isTranslatingLyrics = isTranslatingLyrics,
-                lyricOffsetMs = lyricOffsetMs,
-                onBackToVinyl = { showFullLyrics = false },
-                onTogglePlayPause = onTogglePlayPause,
-                onSkipPrevious = onSkipPrevious,
-                onSkipNext = onSkipNext,
-                onSeekTo = onSeekTo,
-                onTranslateLyrics = onTranslateLyrics,
-                onOpenLyricsSearch = { onOpenLyricsSearch(song) },
-                onOpenCoverSearch = { onOpenCoverSearch(song) },
-                onOpenFullLyricsSheet = onOpenLyrics,
-                onAdjustLyricOffset = onAdjustLyricOffset,
-                onResetLyricOffset = onResetLyricOffset,
-                architecturalGridContent = {
-                    EditorialFullScreenLyricsView(
-                        song = song,
-                        lyrics = lyrics,
-                        positionMs = playerState.positionMs,
-                        durationMs = durationMs,
-                        isPlaying = playerState.isPlaying,
-                        lyricFamily = lyricFamily,
-                        lyricStyleItalic = lyricStyleItalic,
-                        accentColor = activeAccentColor,
-                        primaryTextColor = primaryTextColor,
-                        secondaryTextColor = secondaryTextColor,
-                        onBackToVinyl = { showFullLyrics = false },
-                        onClosePlayer = onClose,
-                        onTogglePlayPause = onTogglePlayPause,
-                        onSkipPrevious = onSkipPrevious,
-                        onSkipNext = onSkipNext,
-                        onSeekTo = onSeekTo,
-                        onOpenLyricsSearch = { onOpenLyricsSearch(song) },
-                        onOpenCoverSearch = { onOpenCoverSearch(song) },
-                        isTranslatingLyrics = isTranslatingLyrics,
-                        onTranslateLyrics = onTranslateLyrics,
-                        onAddToPlaylist = { onAddToPlaylist(song) },
-                        isDarkTheme = isDarkTheme,
-                        onOpenFullLyricsSheet = onOpenLyrics,
-                        audioSpec = audioSpec,
-                        lyricOffsetMs = lyricOffsetMs,
-                        onAdjustLyricOffset = onAdjustLyricOffset,
-                        onResetLyricOffset = onResetLyricOffset,
-                        currentImmersionStyle = immersionStyle,
-                        onSelectImmersionStyle = onSelectImmersionStyle,
-                        currentSpectrumStyle = spectrumStyle,
-                        onSelectSpectrumStyle = onSelectSpectrumStyle,
-                    )
-                },
-            )
         }
     }
 }

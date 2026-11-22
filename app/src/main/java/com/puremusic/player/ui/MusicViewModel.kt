@@ -253,11 +253,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = false,
     )
 
-    val gaplessEnabled: StateFlow<Boolean> = playlistRepository.gaplessEnabledFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = true,
-    )
 
     val hapticEnabled: StateFlow<Boolean> = playlistRepository.hapticEnabledFlow.stateIn(
         scope = viewModelScope,
@@ -411,6 +406,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList(),
+    )
+
+    val playCounts: StateFlow<Map<Long, Int>> = playlistRepository.playCountsFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyMap(),
+    )
+
+    val hourlyPlays: StateFlow<Map<Int, Int>> = playlistRepository.hourlyPlaysFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyMap(),
     )
 
     private val _playerState = MutableStateFlow(PlayerUiState())
@@ -878,9 +885,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.setKeepScreenOn(enabled) }
     }
 
-    fun setGaplessEnabled(enabled: Boolean) {
-        viewModelScope.launch { playlistRepository.setGaplessEnabled(enabled) }
-    }
 
     fun setHapticEnabled(enabled: Boolean) {
         viewModelScope.launch { playlistRepository.setHapticEnabled(enabled) }

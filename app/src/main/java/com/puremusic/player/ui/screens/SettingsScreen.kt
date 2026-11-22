@@ -1,5 +1,6 @@
 package com.puremusic.player.ui.screens
 
+import com.puremusic.player.ui.theme.LocalLayoutDensity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -140,7 +141,6 @@ fun SettingsScreen(
     fontSlantDegrees: Float,
     playbackSpeed: Float,
     fadeInSeconds: Int,
-    gaplessEnabled: Boolean = true,
     hapticEnabled: Boolean = true,
     carModeEnabled: Boolean = false,
     keepScreenOn: Boolean,
@@ -164,7 +164,6 @@ fun SettingsScreen(
     onChangeFontSlantDegrees: (Float) -> Unit,
     onSelectPlaybackSpeed: (Float) -> Unit,
     onSelectFadeInSeconds: (Int) -> Unit,
-    onToggleGapless: (Boolean) -> Unit = {},
     onToggleHaptic: (Boolean) -> Unit = {},
     onToggleCarMode: (Boolean) -> Unit = {},
     onToggleKeepScreenOn: (Boolean) -> Unit,
@@ -301,7 +300,7 @@ fun SettingsScreen(
                     top = 6.dp,
                     bottom = 24.dp + bottomContentPadding.calculateBottomPadding(),
                 ),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(layoutDensity.sectionGapDp.dp),
             ) {
                 item(key = "sec_appearance") {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1181,32 +1180,6 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(
-                            text = "无缝衔接播放 (Gapless)",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        Text(
-                            text = "预缓冲音轨消除现场/组曲切歌停顿",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = gaplessEnabled,
-                        onCheckedChange = onToggleGapless,
-                        colors = switchColors,
-                    )
-                }
-                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text(
                             text = "细腻触觉反馈",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
@@ -1312,7 +1285,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v2.0.1",
+                            text = "v2.1.1",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold,
@@ -1558,6 +1531,7 @@ private fun BookSettingsCard(
     liquidGlassEnabled: Boolean,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val density = LocalLayoutDensity.current
     val shape = RoundedCornerShape(radius)
     Column(
         modifier = Modifier
@@ -1565,7 +1539,7 @@ private fun BookSettingsCard(
             .clip(shape)
             .background(cardBg)
             .border(0.75.dp, outlineColor, shape)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = density.cardVerticalPaddingDp.dp),
         content = content,
     )
 }
@@ -1601,7 +1575,7 @@ private fun SegmentedOptionBar(
                         },
                     )
                     .clickable { onSelect(index) }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = LocalLayoutDensity.current.controlHeightPaddingDp.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1626,11 +1600,12 @@ private fun SettingsListRow(
     value: String,
     onClick: () -> Unit,
 ) {
+    val density = LocalLayoutDensity.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 11.dp),
+            .padding(vertical = density.settingRowPaddingDp.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -1665,11 +1640,12 @@ private fun SettingsActionIconRow(
     outlineColor: Color,
     onClick: () -> Unit,
 ) {
+    val density = LocalLayoutDensity.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(vertical = density.settingRowPaddingDp.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

@@ -160,10 +160,14 @@ enum class LayoutDensity(
     val artSizeDp: Int,
     val rowVerticalPaddingDp: Int,
     val gridSpacingDp: Int,
+    val cardVerticalPaddingDp: Int,
+    val sectionGapDp: Int,
+    val settingRowPaddingDp: Int,
+    val controlHeightPaddingDp: Int,
 ) {
-    COMPACT("紧凑", 42, 5, 7),
-    STANDARD("标准", 50, 9, 10),
-    SPACIOUS("宽松", 58, 14, 14),
+    COMPACT("紧凑", 40, 4, 7, 9, 10, 7, 6),
+    STANDARD("标准", 50, 9, 12, 14, 16, 11, 8),
+    SPACIOUS("宽松", 60, 15, 18, 20, 22, 16, 11),
 }
 
 enum class MainTab(val label: String) {
