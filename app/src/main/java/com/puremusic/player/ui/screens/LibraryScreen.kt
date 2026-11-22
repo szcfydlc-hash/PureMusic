@@ -1148,6 +1148,7 @@ private fun TabletLeftSidebar(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SongsTabContent(
     songs: List<Song>,
