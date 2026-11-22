@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.core.view.WindowCompat
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
+import com.puremusic.player.data.model.KaraokeLyricMode
 import com.puremusic.player.data.model.AppFontWeight
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
@@ -169,6 +170,7 @@ val LocalMiniPlayerHeightDp = compositionLocalOf { 58 }
 val LocalHapticEnabled = compositionLocalOf { true }
 val LocalCustomFontVersion = compositionLocalOf { 0 }
 val LocalAppFontWeightValue = compositionLocalOf { 400 }
+val LocalKaraokeLyricMode = compositionLocalOf { KaraokeLyricMode.SMART }
 
 fun sidebarColorFor(isDark: Boolean): Color = if (isDark) Color(0xFF1A1A1C) else Color(0xFFEEECE7)
 

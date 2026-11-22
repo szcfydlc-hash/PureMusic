@@ -103,6 +103,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
+import com.puremusic.player.data.model.KaraokeLyricMode
 import com.puremusic.player.data.model.AppFontWeight
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
@@ -162,6 +163,8 @@ fun SettingsScreen(
     onSelectFontWeight: (AppFontWeight) -> Unit,
     onChangeFontWeightValue: (Int) -> Unit = {},
     onChangeFontSlantDegrees: (Float) -> Unit,
+    karaokeLyricMode: KaraokeLyricMode = KaraokeLyricMode.SMART,
+    onSelectKaraokeLyricMode: (KaraokeLyricMode) -> Unit = {},
     onSelectPlaybackSpeed: (Float) -> Unit,
     onSelectFadeInSeconds: (Int) -> Unit,
     onToggleHaptic: (Boolean) -> Unit = {},
@@ -977,6 +980,54 @@ fun SettingsScreen(
                     )
                     Text("16°", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = outlineColor.copy(alpha = 0.65f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "逐字歌词模式",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = karaokeLyricMode.desc,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    KaraokeLyricMode.entries.forEach { mode ->
+                        val sel = mode == karaokeLyricMode
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (sel) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                                .border(0.75.dp, if (sel) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(10.dp))
+                                .clickable { onSelectKaraokeLyricMode(mode) }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = mode.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
             }
 
                     }
@@ -1285,7 +1336,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.00",
+                            text = "v1.01",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold,

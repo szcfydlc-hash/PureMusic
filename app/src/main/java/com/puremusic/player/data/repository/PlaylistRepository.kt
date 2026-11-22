@@ -21,6 +21,7 @@ import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.ImmersionLyricStyle
+import com.puremusic.player.data.model.KaraokeLyricMode
 import com.puremusic.player.data.model.SpectrumStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
@@ -70,6 +71,7 @@ class PlaylistRepository(private val context: Context) {
         val CAR_MODE_ENABLED = booleanPreferencesKey("car_mode_enabled")
         val IMMERSION_STYLE = stringPreferencesKey("immersion_style")
         val SPECTRUM_STYLE = stringPreferencesKey("spectrum_style")
+        val KARAOKE_LYRIC_MODE = stringPreferencesKey("karaoke_lyric_mode")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val RECENT_SONG_IDS = stringPreferencesKey("recent_song_ids")
         val PLAY_COUNTS_JSON = stringPreferencesKey("play_counts_json")
@@ -208,6 +210,11 @@ class PlaylistRepository(private val context: Context) {
     val spectrumStyleFlow: Flow<SpectrumStyle> = context.pureMusicDataStore.data.map { prefs ->
         val raw = prefs[Keys.SPECTRUM_STYLE]
         SpectrumStyle.entries.firstOrNull { it.name == raw } ?: SpectrumStyle.SILK_RIBBON
+    }
+
+    val karaokeLyricModeFlow: Flow<KaraokeLyricMode> = context.pureMusicDataStore.data.map { prefs ->
+        val raw = prefs[Keys.KARAOKE_LYRIC_MODE]
+        KaraokeLyricMode.entries.firstOrNull { it.name == raw } ?: KaraokeLyricMode.SMART
     }
 
     val recentSongIdsFlow: Flow<List<Long>> = context.pureMusicDataStore.data.map { prefs ->
@@ -431,6 +438,10 @@ class PlaylistRepository(private val context: Context) {
 
     suspend fun setSpectrumStyle(style: SpectrumStyle) {
         context.pureMusicDataStore.edit { it[Keys.SPECTRUM_STYLE] = style.name }
+    }
+
+    suspend fun setKaraokeLyricMode(mode: KaraokeLyricMode) {
+        context.pureMusicDataStore.edit { it[Keys.KARAOKE_LYRIC_MODE] = mode.name }
     }
 
     suspend fun recordSongPlayed(songId: Long) {

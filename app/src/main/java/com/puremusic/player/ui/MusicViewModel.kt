@@ -23,6 +23,7 @@ import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.ImmersionLyricStyle
+import com.puremusic.player.data.model.KaraokeLyricMode
 import com.puremusic.player.data.model.SpectrumStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
@@ -277,6 +278,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SpectrumStyle.SILK_RIBBON,
+    )
+
+    val karaokeLyricMode: StateFlow<KaraokeLyricMode> = playlistRepository.karaokeLyricModeFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = KaraokeLyricMode.SMART,
     )
 
     val lyricOffsets: StateFlow<Map<Long, Long>> = playlistRepository.lyricOffsetsFlow.stateIn(
@@ -901,6 +908,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSpectrumStyle(style: SpectrumStyle) {
         viewModelScope.launch { playlistRepository.setSpectrumStyle(style) }
+    }
+
+    fun setKaraokeLyricMode(mode: KaraokeLyricMode) {
+        viewModelScope.launch { playlistRepository.setKaraokeLyricMode(mode) }
     }
 
     fun adjustCurrentLyricOffset(deltaMs: Long) {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.os.Environment
 import com.puremusic.player.data.model.LyricLine
+import com.puremusic.player.data.model.LyricWord
 import com.puremusic.player.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -286,40 +287,144 @@ class LyricsRepository(private val context: Context) {
             .replace("&nbsp;", " ")
     }
 
+    private val enhancedWordRegex = Regex("""<(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?>([^<]*)""")
+    private val yrcLineRegex = Regex("""^\[(\d+),(\d+)](.+)$""")
+    private val yrcWordRegex = Regex("""\((\d+),(\d+),\d+\)([^\(]*)""")
+    private val ttmlLineRegex = Regex("""<p[^>]*begin="([^"]+)"[^>]*>([\s\S]*?)</p>""", RegexOption.IGNORE_CASE)
+    private val ttmlSpanRegex = Regex("""<span[^>]*begin="([^"]+)"[^>]*end="([^"]+)"[^>]*>([^<]*)</span>""", RegexOption.IGNORE_CASE)
+
+    private fun parseClockToMs(clock: String): Long {
+        val parts = clock.trim().split(":")
+        return when (parts.size) {
+            3 -> {
+                val h = parts[0].toLongOrNull() ?: 0L
+                val m = parts[1].toLongOrNull() ?: 0L
+                val s = ((parts[2].toDoubleOrNull() ?: 0.0) * 1000.0).toLong()
+                h * 3_600_000L + m * 60_000L + s
+            }
+            2 -> {
+                val m = parts[0].toLongOrNull() ?: 0L
+                val s = ((parts[1].toDoubleOrNull() ?: 0.0) * 1000.0).toLong()
+                m * 60_000L + s
+            }
+            else -> ((clock.removeSuffix("s").toDoubleOrNull() ?: 0.0) * 1000.0).toLong()
+        }
+    }
+
+    private fun parseTimeTagMs(minStr: String, secStr: String, fracRaw: String): Long {
+        val minutes = minStr.toLongOrNull() ?: 0L
+        val seconds = secStr.toLongOrNull() ?: 0L
+        val millis = when (fracRaw.length) {
+            0 -> 0L
+            1 -> (fracRaw.toLongOrNull() ?: 0L) * 100L
+            2 -> (fracRaw.toLongOrNull() ?: 0L) * 10L
+            else -> fracRaw.take(3).toLongOrNull() ?: 0L
+        }
+        return minutes * 60_000L + seconds * 1_000L + millis
+    }
+
+    private fun parseTtml(raw: String): List<LyricLine> {
+        val out = mutableListOf<LyricLine>()
+        ttmlLineRegex.findAll(raw).forEach { m ->
+            val startMs = parseClockToMs(m.groupValues[1])
+            val inner = m.groupValues[2]
+            val words = mutableListOf<LyricWord>()
+            ttmlSpanRegex.findAll(inner).forEach { sm ->
+                val ws = parseClockToMs(sm.groupValues[1])
+                val we = parseClockToMs(sm.groupValues[2]).coerceAtLeast(ws + 60L)
+                val wt = decodeHtmlEntities(sm.groupValues[3])
+                if (wt.isNotEmpty()) words.add(LyricWord(wt, ws, we))
+            }
+            val fullText = if (words.isNotEmpty()) {
+                words.joinToString("") { it.text }.trim()
+            } else {
+                decodeHtmlEntities(inner.replace(Regex("<[^>]+>"), "").trim())
+            }
+            if (fullText.isNotEmpty()) {
+                out.add(LyricLine(timeMs = startMs, primaryText = fullText, words = words))
+            }
+        }
+        return out.sortedBy { it.timeMs }
+    }
+
+    private fun parseYrc(raw: String): List<LyricLine> {
+        val out = mutableListOf<LyricLine>()
+        raw.lineSequence().forEach { line ->
+            val lm = yrcLineRegex.matchEntire(line.trim()) ?: return@forEach
+            val lineStart = lm.groupValues[1].toLongOrNull() ?: return@forEach
+            val body = lm.groupValues[3]
+            val words = mutableListOf<LyricWord>()
+            yrcWordRegex.findAll(body).forEach { wm ->
+                val ws = wm.groupValues[1].toLongOrNull() ?: lineStart
+                val wd = (wm.groupValues[2].toLongOrNull() ?: 120L).coerceAtLeast(40L)
+                val wt = decodeHtmlEntities(wm.groupValues[3])
+                if (wt.isNotEmpty()) words.add(LyricWord(wt, ws, ws + wd))
+            }
+            if (words.isNotEmpty()) {
+                val fullText = words.joinToString("") { it.text }.trim()
+                if (fullText.isNotEmpty()) {
+                    out.add(LyricLine(timeMs = lineStart, primaryText = fullText, words = words))
+                }
+            }
+        }
+        return out.sortedBy { it.timeMs }
+    }
+
     fun parseLrc(raw: String): List<LyricLine> {
-        val rawEntries = mutableListOf<Pair<Long, String>>()
+        // 1. Detect TTML word-by-word XML lyrics
+        if (raw.contains("<tt", ignoreCase = true) && raw.contains("<p", ignoreCase = true)) {
+            val ttml = parseTtml(raw)
+            if (ttml.isNotEmpty()) return ttml
+        }
+        // 2. Detect YRC word-by-word lyrics
+        if (raw.lineSequence().any { yrcLineRegex.matches(it.trim()) }) {
+            val yrc = parseYrc(raw)
+            if (yrc.isNotEmpty()) return yrc
+        }
+
+        // 3. Standard & Enhanced LRC (<mm:ss.xx> inline word tags)
+        val rawEntries = mutableListOf<Triple<Long, String, List<LyricWord>>>()
         raw.lineSequence().forEach { line ->
             val matches = timeTagRegex.findAll(line).toList()
             if (matches.isEmpty()) return@forEach
-            val text = decodeHtmlEntities(line.replace(timeTagRegex, "").trim())
-            if (text.isEmpty()) return@forEach
+            val bodyRaw = line.replace(timeTagRegex, "").trim()
+            if (bodyRaw.isEmpty()) return@forEach
+
+            val wordMatches = enhancedWordRegex.findAll(bodyRaw).toList()
+            val parsedWords = mutableListOf<LyricWord>()
+            val cleanText = if (wordMatches.isNotEmpty()) {
+                val tmp = wordMatches.map { wm ->
+                    val ws = parseTimeTagMs(wm.groupValues[1], wm.groupValues[2], wm.groupValues[3])
+                    ws to decodeHtmlEntities(wm.groupValues[4])
+                }.filter { it.second.isNotEmpty() }
+                tmp.forEachIndexed { idx, (ws, wt) ->
+                    val nextWs = tmp.getOrNull(idx + 1)?.first ?: (ws + 450L)
+                    parsedWords.add(LyricWord(wt, ws, nextWs.coerceAtLeast(ws + 60L)))
+                }
+                parsedWords.joinToString("") { it.text }.trim()
+            } else {
+                decodeHtmlEntities(bodyRaw)
+            }
+            if (cleanText.isEmpty()) return@forEach
 
             matches.forEach { match ->
-                val minutes = match.groupValues[1].toLongOrNull() ?: 0L
-                val seconds = match.groupValues[2].toLongOrNull() ?: 0L
-                val fracRaw = match.groupValues[3]
-                val millis = when (fracRaw.length) {
-                    0 -> 0L
-                    1 -> (fracRaw.toLongOrNull() ?: 0L) * 100L
-                    2 -> (fracRaw.toLongOrNull() ?: 0L) * 10L
-                    else -> fracRaw.take(3).toLongOrNull() ?: 0L
-                }
-                val totalMs = minutes * 60_000L + seconds * 1_000L + millis
-                rawEntries.add(totalMs to text)
+                val totalMs = parseTimeTagMs(match.groupValues[1], match.groupValues[2], match.groupValues[3])
+                rawEntries.add(Triple(totalMs, cleanText, parsedWords))
             }
         }
 
         if (rawEntries.isEmpty()) return emptyList()
-        val grouped = linkedMapOf<Long, MutableList<String>>()
-        rawEntries.sortedBy { it.first }.forEach { (timeMs, text) ->
-            grouped.getOrPut(timeMs) { mutableListOf() }.add(text)
+        val grouped = linkedMapOf<Long, MutableList<Pair<String, List<LyricWord>>>>()
+        rawEntries.sortedBy { it.first }.forEach { (timeMs, text, words) ->
+            grouped.getOrPut(timeMs) { mutableListOf() }.add(text to words)
         }
 
-        return grouped.entries.map { (timeMs, lines) ->
+        return grouped.entries.map { (timeMs, items) ->
             LyricLine(
                 timeMs = timeMs,
-                primaryText = lines.first(),
-                secondaryText = lines.getOrNull(1),
+                primaryText = items.first().first,
+                secondaryText = items.getOrNull(1)?.first,
+                words = items.first().second,
             )
         }
     }

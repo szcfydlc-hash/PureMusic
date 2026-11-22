@@ -65,6 +65,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import android.provider.OpenableColumns
 import com.puremusic.player.ui.components.SingleTrackRepeatDialog
 import android.widget.Toast
@@ -125,6 +126,7 @@ import com.puremusic.player.ui.components.SongInfoDialog
 import com.puremusic.player.ui.screens.LibraryScreen
 import com.puremusic.player.ui.screens.NowPlayingScreen
 import com.puremusic.player.ui.screens.SettingsScreen
+import com.puremusic.player.ui.theme.LocalKaraokeLyricMode
 import com.puremusic.player.ui.theme.PureMusicTheme
 import com.puremusic.player.ui.theme.resolveLyricFontFamily
 
@@ -183,6 +185,7 @@ private fun PureMusicApp(
     val layoutDensity by viewModel.layoutDensity.collectAsStateWithLifecycle()
     val fontScale by viewModel.fontScale.collectAsStateWithLifecycle()
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
+    val karaokeLyricMode by viewModel.karaokeLyricMode.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
     val floatingControlsEnabled by viewModel.floatingControlsEnabled.collectAsStateWithLifecycle()
     val liquidGlassLevel by viewModel.liquidGlassLevel.collectAsStateWithLifecycle()
@@ -239,6 +242,7 @@ private fun PureMusicApp(
         }
     }
 
+    CompositionLocalProvider(LocalKaraokeLyricMode provides karaokeLyricMode) {
     PureMusicTheme(
         backgroundStyle = backgroundStyle,
         accentColor = accentColor,
@@ -538,6 +542,8 @@ private fun PureMusicApp(
                         onSelectFontWeight = viewModel::setFontWeight,
                         onChangeFontWeightValue = viewModel::setFontWeightValue,
                         onChangeFontSlantDegrees = viewModel::setFontSlantDegrees,
+                        karaokeLyricMode = karaokeLyricMode,
+                        onSelectKaraokeLyricMode = viewModel::setKaraokeLyricMode,
                         onSelectPlaybackSpeed = viewModel::setPlaybackSpeed,
                         onSelectFadeInSeconds = viewModel::setFadeInSeconds,
                         onToggleHaptic = viewModel::setHapticEnabled,
@@ -923,6 +929,7 @@ private fun PureMusicApp(
             )
         }
     }
+    }
 }
 
 @Composable
@@ -1278,31 +1285,26 @@ private fun PureMusicSplashOverlay(isDark: Boolean) {
                     contentAlignment = Alignment.Center,
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val embossInk = Color(0xFFF4E8D4).copy(alpha = 0.90f)
-                        val sw = 3.2f
-                        val emCx = size.width * 0.47f
-                        val emCy = size.height * 0.52f
-                        val emR = size.width * 0.255f
-                        drawCircle(color = embossInk, radius = emR, center = Offset(emCx, emCy), style = Stroke(width = sw))
-                        drawCircle(color = embossInk, radius = emR * 0.32f, center = Offset(emCx, emCy), style = Stroke(width = sw))
-                        drawCircle(color = embossInk, radius = 4f, center = Offset(emCx, emCy))
+                        // Brand-new Icon #1 emblem: 5 harmoniously proportioned champagne-ivory sonic micro-capsules
+                        val embossInk = Color(0xFFF6EFE2)
+                        val heights = floatArrayOf(0.24f, 0.44f, 0.64f, 0.44f, 0.24f)
+                        val barW = size.width * 0.068f
+                        val gap = size.width * 0.056f
+                        val totalW = heights.size * barW + (heights.size - 1) * gap
+                        val startX = (size.width - totalW) * 0.5f
+                        val cy = size.height * 0.52f
+                        val reveal = (0.35f + 0.65f * riseProgress.value).coerceIn(0.35f, 1f)
 
-                        val pivX = emCx + emR * 1.15f
-                        val pivY = emCy - emR * 0.82f
-                        val pivR = emR * 0.28f
-                        drawCircle(color = embossInk, radius = pivR, center = Offset(pivX, pivY), style = Stroke(width = sw))
-                        drawLine(
-                            color = embossInk,
-                            start = Offset(pivX, pivY + pivR * 0.3f),
-                            end = Offset(pivX, emCy + emR * 0.16f),
-                            strokeWidth = sw,
-                        )
-                        drawLine(
-                            color = embossInk,
-                            start = Offset(pivX, emCy + emR * 0.16f),
-                            end = Offset(emCx + emR * 0.62f, emCy + emR * 0.66f),
-                            strokeWidth = sw,
-                        )
+                        heights.forEachIndexed { idx, hFrac ->
+                            val barH = size.height * hFrac * reveal
+                            val x = startX + idx * (barW + gap)
+                            drawRoundRect(
+                                color = embossInk,
+                                topLeft = Offset(x, cy - barH * 0.5f),
+                                size = androidx.compose.ui.geometry.Size(barW, barH),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barW * 0.5f, barW * 0.5f),
+                            )
+                        }
                     }
                 }
             }

@@ -43,11 +43,24 @@ data class Playlist(
     val songIds: List<Long>,
 )
 
+data class LyricWord(
+    val text: String,
+    val startMs: Long,
+    val endMs: Long,
+)
+
 data class LyricLine(
     val timeMs: Long,
     val primaryText: String,
     val secondaryText: String? = null,
+    val words: List<LyricWord> = emptyList(),
 )
+
+enum class KaraokeLyricMode(val label: String, val desc: String) {
+    SMART("智能逐字", "优先真逐字，普通 LRC 平滑流动"),
+    EXACT_ONLY("仅真逐字", "仅增强 LRC / YRC / TTML 逐字"),
+    CLASSIC("经典整行", "安静柔和整行切换"),
+}
 
 data class ScanStatus(
     val isScanning: Boolean = false,

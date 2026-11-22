@@ -91,13 +91,17 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.font.FontFamily
@@ -111,6 +115,8 @@ import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import com.puremusic.player.data.model.AudioTechSpec
 import com.puremusic.player.data.model.ImmersionLyricStyle
+import com.puremusic.player.data.model.KaraokeLyricMode
+import com.puremusic.player.data.model.LyricWord
 import com.puremusic.player.data.model.SpectrumStyle
 import com.puremusic.player.data.model.LyricLine
 import com.puremusic.player.data.model.Song
@@ -118,6 +124,7 @@ import com.puremusic.player.service.AudioSpectrumBus
 import com.puremusic.player.ui.components.AlbumArtwork
 import com.puremusic.player.ui.components.formatDuration
 import com.puremusic.player.ui.theme.LocalAppFontWeightValue
+import com.puremusic.player.ui.theme.LocalKaraokeLyricMode
 import com.puremusic.player.ui.theme.LocalHapticEnabled
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -515,6 +522,8 @@ private fun VinylStudyImmersiveView(
             ThreeSlotAutoFitLyricsStage(
                 lyrics = lyrics,
                 activeIdx = activeIdx,
+                positionMs = positionMs + lyricOffsetMs,
+                isPlaying = isPlaying,
                 lyricFamily = lyricFamily,
                 lyricStyleItalic = lyricStyleItalic,
                 activeColor = inkPrimary,
@@ -1020,6 +1029,8 @@ private fun SpatialGalleryImmersiveView(
                 ThreeSlotAutoFitLyricsStage(
                     lyrics = lyrics,
                     activeIdx = activeIdx,
+                    positionMs = positionMs + lyricOffsetMs,
+                    isPlaying = isPlaying,
                     lyricFamily = lyricFamily,
                     lyricStyleItalic = lyricStyleItalic,
                     activeColor = ivoryInk,
@@ -1365,6 +1376,8 @@ private fun VinylLightfieldImmersiveView(
             ThreeSlotAutoFitLyricsStage(
                 lyrics = lyrics,
                 activeIdx = activeIdx,
+                positionMs = positionMs + lyricOffsetMs,
+                isPlaying = isPlaying,
                 lyricFamily = lyricFamily,
                 lyricStyleItalic = lyricStyleItalic,
                 activeColor = ivoryInk,
@@ -2049,9 +2062,71 @@ private fun splitBilingualLyric(line: LyricLine): Pair<String, String?> {
  * - With translation: Line 1 (prev lyric, fixed 13sp) | Line 2 (active original lyric, auto-scaled in fixed box so 100% complete) | Line 3 (active translation, fixed 13sp).
  */
 @Composable
+private fun rememberSmoothLyricPosMs(
+    anchorPosMs: Long,
+    isPlaying: Boolean,
+): Long {
+    var smoothMs by remember(anchorPosMs) { mutableLongStateOf(anchorPosMs) }
+    LaunchedEffect(anchorPosMs, isPlaying) {
+        smoothMs = anchorPosMs
+        if (!isPlaying) return@LaunchedEffect
+        val baseElapsed = android.os.SystemClock.elapsedRealtime()
+        while (AudioSpectrumBus.isVisualizerActive) {
+            withFrameNanos {
+                val delta = (android.os.SystemClock.elapsedRealtime() - baseElapsed).coerceIn(0L, 1200L)
+                smoothMs = anchorPosMs + delta
+            }
+        }
+    }
+    return smoothMs
+}
+
+private fun synthesizeSmartWords(text: String, startMs: Long, endMs: Long): List<LyricWord> {
+    if (text.isBlank()) return emptyList()
+    val safeDur = ((endMs - startMs) * 0.90f).toLong().coerceIn(800L, 10_000L)
+    val tokens = mutableListOf<String>()
+    val sb = StringBuilder()
+    for (ch in text) {
+        val isCjk = ch.code in 0x4E00..0x9FFF || ch.code in 0x3040..0x30FF || ch.code in 0xAC00..0xD7AF
+        if (isCjk) {
+            if (sb.isNotEmpty()) { tokens.add(sb.toString()); sb.clear() }
+            tokens.add(ch.toString())
+        } else if (ch == ' ') {
+            sb.append(ch)
+            tokens.add(sb.toString())
+            sb.clear()
+        } else {
+            sb.append(ch)
+        }
+    }
+    if (sb.isNotEmpty()) tokens.add(sb.toString())
+    if (tokens.isEmpty()) return emptyList()
+
+    val weights = tokens.map { tok ->
+        val trimmed = tok.trim()
+        when {
+            trimmed.isEmpty() -> 0.4f
+            trimmed.length == 1 && trimmed[0].code >= 0x4E00 -> 1.15f
+            else -> (trimmed.length * 0.42f).coerceIn(0.8f, 2.8f)
+        }
+    }
+    val totalWeight = weights.sum().coerceAtLeast(1f)
+    var cursor = startMs
+    return tokens.mapIndexed { idx, tok ->
+        val slice = (safeDur * (weights[idx] / totalWeight)).toLong().coerceAtLeast(50L)
+        val wStart = cursor
+        val wEnd = (cursor + slice).coerceAtLeast(wStart + 50L)
+        cursor = wEnd
+        LyricWord(tok, wStart, wEnd)
+    }
+}
+
+@Composable
 private fun ThreeSlotAutoFitLyricsStage(
     lyrics: List<LyricLine>,
     activeIdx: Int,
+    positionMs: Long = 0L,
+    isPlaying: Boolean = false,
     lyricFamily: FontFamily,
     lyricStyleItalic: FontStyle,
     activeColor: Color,
@@ -2165,19 +2240,68 @@ private fun ThreeSlotAutoFitLyricsStage(
                     chosen
                 }
 
-                Text(
-                    text = line2Text,
-                    style = TextStyle(
-                        fontFamily = lyricFamily,
-                        fontStyle = lyricStyleItalic,
-                        fontSize = fittedFontSp.sp,
-                        fontWeight = activeWeight,
-                        lineHeight = (fittedFontSp * 1.32f).sp,
+                val karaokeMode = LocalKaraokeLyricMode.current
+                val activeLine = lyrics[activeIdx]
+                val nextLineStart = lyrics.getOrNull(activeIdx + 1)?.timeMs ?: (activeLine.timeMs + 4200L)
+                val enableKaraoke = when (karaokeMode) {
+                    KaraokeLyricMode.CLASSIC -> false
+                    KaraokeLyricMode.EXACT_ONLY -> activeLine.words.isNotEmpty()
+                    KaraokeLyricMode.SMART -> true
+                }
+
+                if (!enableKaraoke) {
+                    Text(
+                        text = line2Text,
+                        style = TextStyle(
+                            fontFamily = lyricFamily,
+                            fontStyle = lyricStyleItalic,
+                            fontSize = fittedFontSp.sp,
+                            fontWeight = activeWeight,
+                            lineHeight = (fittedFontSp * 1.32f).sp,
+                            textAlign = textAlign,
+                        ),
+                        color = activeColor,
                         textAlign = textAlign,
-                    ),
-                    color = activeColor,
-                    textAlign = textAlign,
-                )
+                    )
+                } else {
+                    val smoothPosMs = rememberSmoothLyricPosMs(positionMs, isPlaying)
+                    val words = remember(activeLine.timeMs, line2Text, activeLine.words, nextLineStart) {
+                        if (activeLine.words.isNotEmpty()) activeLine.words
+                        else synthesizeSmartWords(line2Text, activeLine.timeMs, nextLineStart)
+                    }
+                    val unsungColor = activeColor.copy(alpha = 0.30f)
+                    val glowShadow = remember(activeColor) {
+                        Shadow(color = activeColor.copy(alpha = 0.28f), offset = Offset(0f, 0f), blurRadius = 10f)
+                    }
+                    val annotated = buildAnnotatedString {
+                        words.forEach { w ->
+                            val spanDur = (w.endMs - w.startMs).coerceAtLeast(40L).toFloat()
+                            val p = ((smoothPosMs - w.startMs) / spanDur).coerceIn(0f, 1f)
+                            val col = lerp(unsungColor, activeColor, p)
+                            val isActiveWord = p in 0.05f..0.95f
+                            withStyle(
+                                SpanStyle(
+                                    color = col,
+                                    shadow = if (isActiveWord) glowShadow else null,
+                                ),
+                            ) {
+                                append(w.text)
+                            }
+                        }
+                    }
+                    Text(
+                        text = annotated,
+                        style = TextStyle(
+                            fontFamily = lyricFamily,
+                            fontStyle = lyricStyleItalic,
+                            fontSize = fittedFontSp.sp,
+                            fontWeight = activeWeight,
+                            lineHeight = (fittedFontSp * 1.32f).sp,
+                            textAlign = textAlign,
+                        ),
+                        textAlign = textAlign,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
