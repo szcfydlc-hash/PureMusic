@@ -263,7 +263,12 @@ fun NowPlayingScreen(
     }
     val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
-    val activeAccentColor = if (liquidGlassEnabled) animatedAccent else MaterialTheme.colorScheme.primary
+    val rawAccentColor = if (liquidGlassEnabled) animatedAccent else MaterialTheme.colorScheme.primary
+    val activeAccentColor = if (isDarkTheme && rawAccentColor.luminance() < 0.28f) {
+        Color(0xFFE6C896)
+    } else {
+        rawAccentColor
+    }
     val darkBgTop by animateColorAsState(
         targetValue = lerp(Color(0xFF231F20), extractedPalette.accent, 0.56f),
         animationSpec = tween(durationMillis = 550),
@@ -392,6 +397,8 @@ fun NowPlayingScreen(
                         onResetLyricOffset = onResetLyricOffset,
                         currentImmersionStyle = immersionStyle,
                         onSelectImmersionStyle = onSelectImmersionStyle,
+                        currentSpectrumStyle = spectrumStyle,
+                        onSelectSpectrumStyle = onSelectSpectrumStyle,
                     )
                 },
             )
@@ -1764,6 +1771,8 @@ private fun EditorialFullScreenLyricsView(
     onResetLyricOffset: () -> Unit = {},
     currentImmersionStyle: ImmersionLyricStyle = ImmersionLyricStyle.ARCHITECTURAL_GRID,
     onSelectImmersionStyle: (ImmersionLyricStyle) -> Unit = {},
+    currentSpectrumStyle: SpectrumStyle = SpectrumStyle.SILK_RIBBON,
+    onSelectSpectrumStyle: (SpectrumStyle) -> Unit = {},
 ) {
     val effectivePosMs = (positionMs + lyricOffsetMs).coerceAtLeast(0L)
     val activeIdx = remember(lyrics, effectivePosMs) {
@@ -1863,69 +1872,18 @@ private fun EditorialFullScreenLyricsView(
                             modifier = Modifier.size(24.dp),
                         )
                     }
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 0.dp,
-                        border = BorderStroke(0.75.dp, outlineColor),
-                    ) {
-                        ImmersionLyricStyle.entries.forEach { option ->
-                            val isSelected = option == currentImmersionStyle
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = option.label,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                    )
-                                },
-                                trailingIcon = if (isSelected) {
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Check,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    onSelectImmersionStyle(option)
-                                },
-                            )
-                        }
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            thickness = 0.5.dp,
-                            color = outlineColor.copy(alpha = 0.4f),
-                        )
-                        DropdownMenuItem(
-                            text = { Text("全部歌词列表", style = MaterialTheme.typography.bodyMedium) },
-                            onClick = { menuExpanded = false; onOpenFullLyricsSheet() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(if (showOffsetBar) "隐藏歌词微调" else "歌词时间微调 (±0.5s)") },
-                            onClick = { menuExpanded = false; showOffsetBar = !showOffsetBar },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("在线匹配 / 导入歌词") },
-                            onClick = { menuExpanded = false; onOpenLyricsSearch() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("更换封面") },
-                            onClick = { menuExpanded = false; onOpenCoverSearch() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("添加到歌单") },
-                            onClick = { menuExpanded = false; onAddToPlaylist() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("收起播放页") },
-                            onClick = { menuExpanded = false; onClosePlayer() },
+                    if (menuExpanded) {
+                        ImmersiveControlSheet(
+                            isDarkSurface = isDarkTheme,
+                            currentStyle = currentImmersionStyle,
+                            currentSpectrumStyle = currentSpectrumStyle,
+                            onSelectStyle = onSelectImmersionStyle,
+                            onSelectSpectrumStyle = onSelectSpectrumStyle,
+                            onToggleOffsetBar = { menuExpanded = false; showOffsetBar = !showOffsetBar },
+                            onOpenFullLyricsSheet = { menuExpanded = false; onOpenFullLyricsSheet() },
+                            onOpenLyricsSearch = { menuExpanded = false; onOpenLyricsSearch() },
+                            onOpenCoverSearch = { menuExpanded = false; onOpenCoverSearch() },
+                            onDismiss = { menuExpanded = false },
                         )
                     }
                 }
@@ -2340,37 +2298,46 @@ private fun AudioSpecStamp(
     outlineColor: Color,
     secondaryTextColor: Color,
 ) {
-    val stampShape = RoundedCornerShape(4.dp)
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.35f
+    val hiResColor = if (isDark) Color(0xFFE6C896) else accentColor
+    val hiResBg = if (isDark) hiResColor.copy(alpha = 0.12f) else accentColor.copy(alpha = 0.10f)
+    val hiResBorder = if (isDark) hiResColor.copy(alpha = 0.62f) else accentColor.copy(alpha = 0.55f)
+    val specBg = if (isDark) Color.White.copy(alpha = 0.07f) else Color.Transparent
+    val specBorder = if (isDark) Color.White.copy(alpha = 0.24f) else outlineColor.copy(alpha = 0.85f)
+    val specText = if (isDark) Color(0xFFEDE6DA).copy(alpha = 0.88f) else secondaryTextColor
+
+    val stampShape = RoundedCornerShape(5.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (spec.isHiRes) {
             Box(
                 modifier = Modifier
                     .clip(stampShape)
-                    .background(accentColor.copy(alpha = 0.14f))
-                    .border(0.6.dp, accentColor.copy(alpha = 0.55f), stampShape)
-                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                    .background(hiResBg)
+                    .border(0.7.dp, hiResBorder, stampShape)
+                    .padding(horizontal = 6.dp, vertical = 1.5.dp),
             ) {
                 Text(
                     text = "Hi-Res",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp),
-                    color = accentColor,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, lineHeight = 12.sp),
+                    color = hiResColor,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
         Box(
             modifier = Modifier
                 .clip(stampShape)
-                .border(0.6.dp, outlineColor.copy(alpha = 0.85f), stampShape)
-                .padding(horizontal = 6.dp, vertical = 1.dp),
+                .background(specBg)
+                .border(0.7.dp, specBorder, stampShape)
+                .padding(horizontal = 7.dp, vertical = 1.5.dp),
         ) {
             Text(
                 text = spec.displayText,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp),
-                color = secondaryTextColor,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, lineHeight = 12.sp),
+                color = specText,
                 maxLines = 1,
             )
         }
