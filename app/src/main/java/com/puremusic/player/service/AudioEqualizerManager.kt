@@ -6,11 +6,14 @@ import com.puremusic.player.data.model.EqualizerState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.pow
 
 object AudioEqualizerManager {
 
     private var equalizer: Equalizer? = null
     private var attachedSessionId: Int = -1
+    @Volatile var preampLinearGain: Float = 1.0f
+        private set
 
     private val _state = MutableStateFlow(EqualizerState())
     val state: StateFlow<EqualizerState> = _state.asStateFlow()
@@ -44,7 +47,7 @@ object AudioEqualizerManager {
         val eq = equalizer ?: return
         runCatching {
             val range = eq.bandLevelRange
-            val clamped = levelMb.coerceIn(range[0].toInt(), range[1].toInt()).toShort()
+            val clamped = levelMb.coerceIn(range[0].toInt().coerceAtLeast(-1200), range[1].toInt().coerceAtMost(1000)).toShort()
             eq.setBandLevel(bandIndex.toShort(), clamped)
             publishSnapshot(eq, customPreset = true)
         }
@@ -71,6 +74,7 @@ object AudioEqualizerManager {
         runCatching { equalizer?.release() }
         equalizer = null
         attachedSessionId = -1
+        preampLinearGain = 1.0f
     }
 
     private fun publishSnapshot(
@@ -98,6 +102,17 @@ object AudioEqualizerManager {
             customPreset -> -1
             forcedPresetIndex != null -> forcedPresetIndex
             else -> runCatching { eq.currentPreset.toInt() }.getOrDefault(-1)
+        }
+
+        // Automatic anti-clipping pre-amp headroom so positive EQ boosts NEVER overflow 0 dBFS / crackle
+        val maxBoostMb = bands.maxOfOrNull { it.levelMb }?.coerceAtLeast(0) ?: 0
+        preampLinearGain = if (eq.enabled && maxBoostMb > 0) {
+            val attenDb = (maxBoostMb / 100.0) + 1.5
+            10.0.pow(-attenDb / 20.0).toFloat().coerceIn(0.20f, 1.0f)
+        } else if (eq.enabled) {
+            0.90f // Gentle -1dB safety headroom whenever EQ DSP is active
+        } else {
+            1.0f
         }
 
         _state.value = EqualizerState(

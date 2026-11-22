@@ -252,6 +252,8 @@ object AudioSpectrumBus {
 @UnstableApi
 class SpectrumAudioProcessor : BaseAudioProcessor() {
 
+    private var smoothedGain = 1.0f
+
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         return when (inputAudioFormat.encoding) {
             C.ENCODING_PCM_16BIT,
@@ -277,7 +279,52 @@ class SpectrumAudioProcessor : BaseAudioProcessor() {
         )
 
         val out = replaceOutputBuffer(remaining)
-        out.put(inputBuffer)
+        val targetGain = AudioEqualizerManager.preampLinearGain
+        val enc = inputAudioFormat.encoding
+
+        // Bit-transparent fast path when EQ is off and gain has settled to 1.0f
+        if (targetGain >= 0.999f && smoothedGain >= 0.999f) {
+            out.put(inputBuffer)
+            out.flip()
+            return
+        }
+
+        // Smooth anti-clipping pre-amp attenuation (eliminates EQ digital clipping & crackling!)
+        when (enc) {
+            C.ENCODING_PCM_16BIT -> {
+                val isLe = inputBuffer.order() == ByteOrder.LITTLE_ENDIAN
+                var i = pos
+                while (i + 1 < limit) {
+                    smoothedGain += (targetGain - smoothedGain) * 0.004f
+                    val b0 = inputBuffer.get(i).toInt()
+                    val b1 = inputBuffer.get(i + 1).toInt()
+                    val s = if (isLe) ((b1 shl 8) or (b0 and 0xFF)).toShort() else ((b0 shl 8) or (b1 and 0xFF)).toShort()
+                    val scaled = (s * smoothedGain).toInt().coerceIn(-32768, 32767)
+                    if (isLe) {
+                        out.put((scaled and 0xFF).toByte())
+                        out.put(((scaled shr 8) and 0xFF).toByte())
+                    } else {
+                        out.put(((scaled shr 8) and 0xFF).toByte())
+                        out.put((scaled and 0xFF).toByte())
+                    }
+                    i += 2
+                }
+                inputBuffer.position(limit)
+            }
+            C.ENCODING_PCM_FLOAT -> {
+                var i = pos
+                while (i + 3 < limit) {
+                    smoothedGain += (targetGain - smoothedGain) * 0.004f
+                    val f = (inputBuffer.getFloat(i) * smoothedGain).coerceIn(-1f, 1f)
+                    out.putFloat(f)
+                    i += 4
+                }
+                inputBuffer.position(limit)
+            }
+            else -> {
+                out.put(inputBuffer)
+            }
+        }
         out.flip()
     }
 }

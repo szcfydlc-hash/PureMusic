@@ -46,7 +46,10 @@ import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -715,7 +718,7 @@ private fun SpatialGalleryImmersiveView(
             ) {
                 val baseX = 14.dp
                 val baseY = 48.dp
-                val dynamicRotY = -28f + (dragOffsetX.value * 0.10f).coerceIn(-10f, 12f)
+                val dynamicRotY = 24f + (dragOffsetX.value * 0.10f).coerceIn(-10f, 10f)
                 val camDist = 6.2f * density
                 Box(
                     modifier = Modifier
@@ -744,7 +747,7 @@ private fun SpatialGalleryImmersiveView(
                                     scaleX = scaleFactor
                                     scaleY = scaleFactor
                                     transformOrigin = TransformOrigin(0.0f, 0.5f)
-                                    rotationY = -28f
+                                    rotationY = 24f
                                     cameraDistance = camDist
                                     alpha = sleeveAlpha
                                 }
@@ -788,6 +791,42 @@ private fun SpatialGalleryImmersiveView(
                                 }
                             }
                         }
+                    }
+
+                    // Aligned 3D alpha-masked glossy floor reflection beneath front jacket
+                    Box(
+                        modifier = Modifier
+                            .offset(x = baseX, y = baseY + frontSize + 3.dp)
+                            .width(frontSize)
+                            .height(frontSize * 0.34f)
+                            .graphicsLayer {
+                                transformOrigin = TransformOrigin(0.0f, 0.5f)
+                                rotationY = dynamicRotY
+                                cameraDistance = camDist
+                                compositingStrategy = CompositingStrategy.Offscreen
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        0.0f to Color.Black.copy(alpha = 0.38f),
+                                        0.55f to Color.Black.copy(alpha = 0.10f),
+                                        1.0f to Color.Transparent,
+                                    ),
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            }
+                            .clip(RectangleShape),
+                    ) {
+                        AlbumArtwork(
+                            uri = song.albumArtUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(frontSize)
+                                .graphicsLayer { scaleY = -1f },
+                            cornerRadius = 2.dp,
+                            iconSize = 32.dp,
+                        )
                     }
 
                     // Front-most active 3D physical vinyl jacket with tangible cardboard spine + glossy sleeve sheen
@@ -850,41 +889,7 @@ private fun SpatialGalleryImmersiveView(
                         }
                     }
 
-                    // Aligned 3D alpha-masked glossy floor reflection beneath front jacket
-                    Box(
-                        modifier = Modifier
-                            .offset(x = baseX, y = baseY + frontSize + 2.dp)
-                            .width(frontSize)
-                            .height(frontSize * 0.34f)
-                            .graphicsLayer {
-                                transformOrigin = TransformOrigin(0.0f, 0.5f)
-                                rotationY = dynamicRotY
-                                cameraDistance = camDist
-                                compositingStrategy = CompositingStrategy.Offscreen
-                            }
-                            .drawWithContent {
-                                drawContent()
-                                drawRect(
-                                    brush = Brush.verticalGradient(
-                                        0.0f to Color.Black.copy(alpha = 0.38f),
-                                        0.55f to Color.Black.copy(alpha = 0.10f),
-                                        1.0f to Color.Transparent,
-                                    ),
-                                    blendMode = BlendMode.DstIn,
-                                )
-                            }
-                            .clip(RectangleShape),
-                    ) {
-                        AlbumArtwork(
-                            uri = song.albumArtUri,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(frontSize)
-                                .graphicsLayer { scaleY = -1f },
-                            cornerRadius = 2.dp,
-                            iconSize = 32.dp,
-                        )
-                    }
+
                 }
             }
 
@@ -1818,110 +1823,30 @@ private fun ImmersiveTopBar(
                         modifier = Modifier.size(22.dp),
                     )
                 }
-                val menuBg = if (isDarkSurface) Color(0xFF1F1D1B) else Color(0xFFFAF6EE)
-                val menuBorder = if (isDarkSurface) Color.White.copy(alpha = 0.14f) else Color(0xFFDCD5C7)
-                val menuText = if (isDarkSurface) Color(0xFFF2ECE1) else Color(0xFF1E1B18)
-                val menuAccent = if (isDarkSurface) Color(0xFFD8B888) else Color(0xFFC83E2B)
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                    containerColor = menuBg,
-                    tonalElevation = 0.dp,
-                    border = BorderStroke(0.75.dp, menuBorder),
-                ) {
-                    ImmersionLyricStyle.entries.forEach { option ->
-                        val isSelected = option == currentStyle
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = option.label,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isSelected) menuAccent else menuText,
-                                )
-                            },
-                            trailingIcon = if (isSelected) {
-                                {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        tint = menuAccent,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onSelectStyle(option)
-                            },
-                        )
-                    }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        thickness = 0.5.dp,
-                        color = menuBorder,
-                    )
-                    SpectrumStyle.entries.forEach { spOpt ->
-                        val spSelected = spOpt == currentSpectrumStyle
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = "频谱 · ${spOpt.label}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (spSelected) menuAccent else menuText,
-                                )
-                            },
-                            trailingIcon = if (spSelected) {
-                                {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        tint = menuAccent,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onSelectSpectrumStyle(spOpt)
-                            },
-                        )
-                    }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        thickness = 0.5.dp,
-                        color = menuBorder,
-                    )
-                    DropdownMenuItem(
-                        text = { Text("歌词时间轴微调", style = MaterialTheme.typography.bodyMedium, color = menuText) },
-                        onClick = {
+                if (menuExpanded) {
+                    ImmersiveControlSheet(
+                        isDarkSurface = isDarkSurface,
+                        currentStyle = currentStyle,
+                        currentSpectrumStyle = currentSpectrumStyle,
+                        onSelectStyle = onSelectStyle,
+                        onSelectSpectrumStyle = onSelectSpectrumStyle,
+                        onToggleOffsetBar = {
                             menuExpanded = false
                             onToggleOffsetBar()
                         },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("查看完整歌词列表", style = MaterialTheme.typography.bodyMedium, color = menuText) },
-                        onClick = {
+                        onOpenFullLyricsSheet = {
                             menuExpanded = false
                             onOpenFullLyricsSheet()
                         },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("在线匹配歌词", style = MaterialTheme.typography.bodyMedium, color = menuText) },
-                        onClick = {
+                        onOpenLyricsSearch = {
                             menuExpanded = false
                             onOpenLyricsSearch()
                         },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("搜索替换封面", style = MaterialTheme.typography.bodyMedium, color = menuText) },
-                        onClick = {
+                        onOpenCoverSearch = {
                             menuExpanded = false
                             onOpenCoverSearch()
                         },
+                        onDismiss = { menuExpanded = false },
                     )
                 }
             }
@@ -2250,6 +2175,157 @@ private fun SongInfoSpecHeader(
                             color = artistColor.copy(alpha = 0.90f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ImmersiveControlSheet(
+    isDarkSurface: Boolean,
+    currentStyle: ImmersionLyricStyle,
+    currentSpectrumStyle: SpectrumStyle,
+    onSelectStyle: (ImmersionLyricStyle) -> Unit,
+    onSelectSpectrumStyle: (SpectrumStyle) -> Unit,
+    onToggleOffsetBar: () -> Unit,
+    onOpenFullLyricsSheet: () -> Unit,
+    onOpenLyricsSearch: () -> Unit,
+    onOpenCoverSearch: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetBg = if (isDarkSurface) Color(0xFF1A1917) else Color(0xFFFAF6EE)
+    val pillBg = if (isDarkSurface) Color.White.copy(alpha = 0.07f) else Color(0xFFEFE9DC)
+    val borderColor = if (isDarkSurface) Color.White.copy(alpha = 0.12f) else Color(0xFFDAD2C3)
+    val ink = if (isDarkSurface) Color(0xFFF2ECE1) else Color(0xFF1E1B18)
+    val muted = if (isDarkSurface) Color(0xFF9C948A) else Color(0xFF6B655D)
+    val accent = if (isDarkSurface) Color(0xFFD8B888) else Color(0xFFC83E2B)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = sheetBg,
+        scrimColor = Color.Black.copy(alpha = 0.36f),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Row 1: 4 Immersion Scenes (single compact row, live preview!)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "沉浸场景",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = muted,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ImmersionLyricStyle.entries.forEach { option ->
+                        val selected = option == currentStyle
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (selected) accent.copy(alpha = 0.18f) else pillBg)
+                                .border(
+                                    width = if (selected) 1.dp else 0.6.dp,
+                                    color = if (selected) accent else borderColor,
+                                    shape = RoundedCornerShape(10.dp),
+                                )
+                                .clickable { onSelectStyle(option) }
+                                .padding(vertical = 9.dp, horizontal = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = option.label,
+                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                                color = if (selected) accent else ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Row 2: 4 Live Audio Spectrums (single compact row, live preview!)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "实时频谱",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = muted,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SpectrumStyle.entries.forEach { spOpt ->
+                        val selected = spOpt == currentSpectrumStyle
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (selected) accent.copy(alpha = 0.18f) else pillBg)
+                                .border(
+                                    width = if (selected) 1.dp else 0.6.dp,
+                                    color = if (selected) accent else borderColor,
+                                    shape = RoundedCornerShape(10.dp),
+                                )
+                                .clickable { onSelectSpectrumStyle(spOpt) }
+                                .padding(vertical = 9.dp, horizontal = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = spOpt.label,
+                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                                color = if (selected) accent else ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(thickness = 0.5.dp, color = borderColor.copy(alpha = 0.6f))
+
+            // Row 3: 4 Compact Tool Pills
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val actions = listOf(
+                    "时间微调" to onToggleOffsetBar,
+                    "完整歌词" to onOpenFullLyricsSheet,
+                    "匹配歌词" to onOpenLyricsSearch,
+                    "替换封面" to onOpenCoverSearch,
+                )
+                actions.forEach { (label, action) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(pillBg)
+                            .clickable(onClick = action)
+                            .padding(vertical = 9.dp, horizontal = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                            color = ink.copy(alpha = 0.88f),
+                            maxLines = 1,
                         )
                     }
                 }
