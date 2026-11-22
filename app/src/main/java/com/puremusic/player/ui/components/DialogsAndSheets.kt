@@ -1,5 +1,8 @@
 package com.puremusic.player.ui.components
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -711,6 +714,11 @@ fun QueueBottomSheet(
     onSelectIndex: (Int) -> Unit,
     onRemoveIndex: (Int) -> Unit,
 ) {
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = (currentIndex - 2).coerceAtLeast(0),
+    )
+    val scope = rememberCoroutineScope()
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.background,
@@ -724,12 +732,54 @@ fun QueueBottomSheet(
                 .fillMaxWidth()
                 .padding(bottom = 24.dp),
         ) {
-            Text(
-                text = "当前播放队列 (${queue.size})",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "当前播放队列",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = "${queue.size} 首",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+                if (currentIndex in queue.indices) {
+                    Text(
+                        text = "定位当前",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                scope.launch {
+                                    listState.animateScrollToItem((currentIndex - 2).coerceAtLeast(0))
+                                }
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+            }
             HorizontalDivider(thickness = 0.75.dp, color = MaterialTheme.colorScheme.outline)
             if (queue.isEmpty()) {
                 Text(
@@ -739,44 +789,70 @@ fun QueueBottomSheet(
                     modifier = Modifier.padding(20.dp),
                 )
             } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                    itemsIndexed(queue) { index, song ->
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.heightIn(max = 460.dp),
+                ) {
+                    itemsIndexed(queue, key = { idx, s -> "${s.id}_$idx" }) { index, song ->
                         val isCurrent = index == currentIndex
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .background(
+                                    if (isCurrent) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                    } else {
+                                        Color.Transparent
+                                    },
+                                )
                                 .clickable {
                                     onSelectIndex(index)
                                     onDismiss()
                                 }
-                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                                .padding(start = 14.dp, end = 10.dp, top = 9.dp, bottom = 9.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (isCurrent) {
-                                Icon(
-                                    imageVector = Icons.Rounded.GraphicEq,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            } else {
-                                Text(
-                                    text = "${index + 1}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.width(20.dp),
-                                )
+                            Box(
+                                modifier = Modifier.width(36.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (isCurrent) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.GraphicEq,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                } else {
+                                    Text(
+                                        text = "${index + 1}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
                             }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            AlbumArtwork(
+                                uri = song.albumArtUri,
+                                contentDescription = song.title,
+                                modifier = Modifier.size(40.dp),
+                                cornerRadius = 6.dp,
+                                iconSize = 18.dp,
+                            )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = song.title,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
                                     color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                                Spacer(modifier = Modifier.height(1.dp))
                                 Text(
                                     text = song.artist,
                                     style = MaterialTheme.typography.bodySmall,
@@ -785,19 +861,22 @@ fun QueueBottomSheet(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            IconButton(onClick = { onRemoveIndex(index) }) {
+                            IconButton(
+                                onClick = { onRemoveIndex(index) },
+                                modifier = Modifier.size(36.dp),
+                            ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Close,
                                     contentDescription = "从队列移除",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                    modifier = Modifier.size(17.dp),
                                 )
                             }
                         }
                         HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 20.dp),
+                            modifier = Modifier.padding(start = 56.dp, end = 16.dp),
                             thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
                         )
                     }
                 }

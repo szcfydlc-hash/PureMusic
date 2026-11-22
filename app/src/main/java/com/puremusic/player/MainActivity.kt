@@ -1,5 +1,12 @@
 package com.puremusic.player
 
+import kotlin.math.abs
+import com.puremusic.player.ui.theme.LocalHapticEnabled
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.displayCutoutPadding
 import android.Manifest
 import android.content.pm.PackageManager
@@ -917,85 +924,41 @@ private fun PureMusicBottomNavBar(
         MainTab.PLAYLISTS to Icons.Rounded.QueueMusic,
         MainTab.SETTINGS to Icons.Rounded.Settings,
     )
-    // Track press state across all 4 tabs so pressing any tab illuminates the capsule edge in FULL tier!
     val tabInteractions = remember { List(4) { MutableInteractionSource() } }
     val pressedStates = tabInteractions.map { it.collectIsPressedAsState().value }
     val anyTabPressed = pressedStates.any { it }
 
     if (floating) {
-        // Detached Centered Floating Pill Dock (strictly controlled by floatingControlsEnabled!)
         val capsuleShape = RoundedCornerShape(32.dp)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 22.dp, vertical = 10.dp),
+                .padding(horizontal = 20.dp, vertical = 10.dp),
         ) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
+                    .height(60.dp)
                     .liquidGlass(
                         enabled = liquidGlassEnabled,
                         shape = capsuleShape,
                         isPressed = anyTabPressed,
                     )
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceAround,
+                    .padding(horizontal = 6.dp, vertical = 5.dp),
             ) {
-                items.forEachIndexed { idx, (tab, icon) ->
-                    val selected = tab == activeTab
-                    val pressed = pressedStates[idx]
-                    val tint = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                    }
-                    val pillShape = RoundedCornerShape(22.dp)
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(pillShape)
-                            .then(
-                                if (selected || pressed) {
-                                    Modifier.background(
-                                        MaterialTheme.colorScheme.primary.copy(
-                                            alpha = if (pressed) 0.16f else 0.10f,
-                                        ),
-                                    )
-                                } else {
-                                    Modifier
-                                },
-                            )
-                            .clickable(
-                                interactionSource = tabInteractions[idx],
-                                indication = null,
-                                onClick = { onSelectTab(tab) },
-                            )
-                            .padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = tab.label,
-                            tint = tint,
-                            modifier = Modifier.size(21.dp),
-                        )
-                        Text(
-                            text = tab.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = tint,
-                            maxLines = 1,
-                        )
-                    }
-                }
+                LiquidGlassSlidingTabRow(
+                    items = items,
+                    activeTab = activeTab,
+                    tabInteractions = tabInteractions,
+                    pressedStates = pressedStates,
+                    liquidGlassEnabled = liquidGlassEnabled,
+                    pillRadius = 24.dp,
+                    onSelectTab = onSelectTab,
+                )
             }
         }
     } else {
-        // Docked Edge-to-Edge Footer (supports both flat archival paper & docked translucent glass!)
         val dockedShape = RoundedCornerShape(0.dp)
         Column(
             modifier = Modifier
@@ -1019,48 +982,179 @@ private fun PureMusicBottomNavBar(
                     color = MaterialTheme.colorScheme.outline,
                 )
             }
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp)
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceAround,
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
             ) {
-                items.forEachIndexed { idx, (tab, icon) ->
-                    val selected = tab == activeTab
-                    val tint = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable(
-                                interactionSource = tabInteractions[idx],
-                                indication = null,
-                                onClick = { onSelectTab(tab) },
+                LiquidGlassSlidingTabRow(
+                    items = items,
+                    activeTab = activeTab,
+                    tabInteractions = tabInteractions,
+                    pressedStates = pressedStates,
+                    liquidGlassEnabled = liquidGlassEnabled,
+                    pillRadius = 18.dp,
+                    onSelectTab = onSelectTab,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiquidGlassSlidingTabRow(
+    items: List<Pair<MainTab, ImageVector>>,
+    activeTab: MainTab,
+    tabInteractions: List<MutableInteractionSource>,
+    pressedStates: List<Boolean>,
+    liquidGlassEnabled: Boolean,
+    pillRadius: androidx.compose.ui.unit.Dp,
+    onSelectTab: (MainTab) -> Unit,
+) {
+    val selectedIdx = items.indexOfFirst { it.first == activeTab }.coerceAtLeast(0)
+    val indicatorPos = remember { Animatable(selectedIdx.toFloat()) }
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val accent = MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(selectedIdx) {
+        indicatorPos.animateTo(
+            targetValue = selectedIdx.toFloat(),
+            animationSpec = spring(
+                dampingRatio = 0.66f,
+                stiffness = 340f,
+            ),
+        )
+    }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val tabWidth = maxWidth / items.size
+        val pillHeight = maxHeight
+        val travel = abs(indicatorPos.value - selectedIdx.toFloat()).coerceIn(0f, 1.5f)
+        // Liquid droplet elastic stretch-and-squash during glide
+        val stretchX = 1f + (travel * 0.18f).coerceAtMost(0.20f)
+        val squashY = 1f - (travel * 0.08f).coerceAtMost(0.08f)
+        val pillShape = RoundedCornerShape(pillRadius)
+
+        // 1. Continuous Elastic Liquid Glass Lens Pill sliding beneath icons
+        Box(
+            modifier = Modifier
+                .offset(x = tabWidth * indicatorPos.value)
+                .width(tabWidth)
+                .height(pillHeight)
+                .graphicsLayer {
+                    scaleX = stretchX
+                    scaleY = squashY
+                }
+                .then(
+                    if (liquidGlassEnabled) {
+                        Modifier
+                            .shadow(
+                                elevation = if (isDark) 8.dp else 6.dp,
+                                shape = pillShape,
+                                ambientColor = accent.copy(alpha = 0.25f),
+                                spotColor = Color.Black.copy(alpha = if (isDark) 0.45f else 0.18f),
                             )
-                            .padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = tab.label,
-                            tint = tint,
-                            modifier = Modifier.size(22.dp),
-                        )
-                        Text(
-                            text = tab.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = tint,
-                            maxLines = 1,
-                        )
-                    }
+                            .clip(pillShape)
+                            .background(
+                                Brush.verticalGradient(
+                                    0.00f to if (isDark) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.82f),
+                                    0.45f to if (isDark) accent.copy(alpha = 0.16f) else accent.copy(alpha = 0.08f),
+                                    1.00f to if (isDark) accent.copy(alpha = 0.24f) else accent.copy(alpha = 0.15f),
+                                ),
+                            )
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.verticalGradient(
+                                    0.0f to Color.White.copy(alpha = if (isDark) 0.36f else 0.92f),
+                                    0.5f to Color.White.copy(alpha = if (isDark) 0.10f else 0.32f),
+                                    1.0f to accent.copy(alpha = if (isDark) 0.30f else 0.22f),
+                                ),
+                                shape = pillShape,
+                            )
+                    } else {
+                        Modifier
+                            .clip(pillShape)
+                            .background(accent.copy(alpha = 0.10f))
+                    },
+                ),
+        ) {
+            // Subtle optical specular top reflection gleam inside the liquid glass droplet
+            if (liquidGlassEnabled) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawOval(
+                        brush = Brush.verticalGradient(
+                            0.0f to Color.White.copy(alpha = if (isDark) 0.22f else 0.65f),
+                            1.0f to Color.Transparent,
+                        ),
+                        topLeft = Offset(size.width * 0.16f, size.height * 0.06f),
+                        size = Size(size.width * 0.68f, size.height * 0.34f),
+                    )
+                }
+            }
+        }
+
+        // 2. Foreground 4 Interactive Tabs with Micro-Bounce
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items.forEachIndexed { idx, (tab, icon) ->
+                val selected = tab == activeTab
+                val pressed = pressedStates[idx]
+                val iconScale by animateFloatAsState(
+                    targetValue = when {
+                        pressed -> 0.90f
+                        selected -> 1.09f
+                        else -> 1.0f
+                    },
+                    animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+                    label = "navIconBounce_$idx",
+                )
+                val tint = if (selected) {
+                    accent
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = tabInteractions[idx],
+                            indication = null,
+                            onClick = {
+                                if (!selected && hapticEnabled) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                onSelectTab(tab)
+                            },
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = tab.label,
+                        tint = tint,
+                        modifier = Modifier
+                            .size(21.dp)
+                            .graphicsLayer {
+                                scaleX = iconScale
+                                scaleY = iconScale
+                            },
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = tab.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = tint,
+                        maxLines = 1,
+                    )
                 }
             }
         }
