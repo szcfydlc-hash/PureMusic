@@ -726,17 +726,17 @@ private fun SpatialGalleryImmersiveView(
                     },
                 contentAlignment = Alignment.TopStart,
             ) {
-                // Center the entire 5-sleeve architectural fan horizontally inside the viewport
-                val totalFanW = frontSize * 1.36f
+                // Option C: Architectural Collector Hardcover Array — Razor-strict 1-point vanishing perspective
+                val totalFanW = frontSize * 1.40f
                 val baseX = ((stageW - totalFanW) * 0.50f).coerceAtLeast(14.dp)
                 val baseY = 24.dp
-                val dynamicRotY = 17f + (dragOffsetX.value * 0.07f).coerceIn(-7f, 7f)
-                val camDist = 7.5f * density
+                val dynamicRotY = 15f + (dragOffsetX.value * 0.06f).coerceIn(-6f, 6f)
+                val camDist = 11.5f * density
 
-                // Strict mathematical perspective: monotonically shrinking scale + evenly decaying exposed right-edge sliver
-                // Right-edge steps: +0.120, +0.095, +0.075, +0.058 -> zero chaotic gaps, zero jumping heights!
-                val scaleSteps = floatArrayOf(1.00f, 0.90f, 0.81f, 0.73f, 0.66f)
-                val rightProtrude = floatArrayOf(0.00f, 0.120f, 0.215f, 0.290f, 0.348f)
+                // Decisive monotonic scale steps + rhythmic decaying spacing (+0.135, +0.110, +0.090, +0.070)
+                // High cameraDistance eliminates perspective tilt distortion so top/bottom edges stay strictly monotonic!
+                val scaleSteps = floatArrayOf(1.00f, 0.87f, 0.76f, 0.67f, 0.59f)
+                val rightProtrude = floatArrayOf(0.00f, 0.135f, 0.245f, 0.335f, 0.405f)
 
                 Box(
                     modifier = Modifier
@@ -752,13 +752,12 @@ private fun SpatialGalleryImmersiveView(
                         val isFront = depth == 0
                         val dIdx = depth.coerceAtMost(scaleSteps.lastIndex)
                         val p = scaleSteps[dIdx]
-                        // Exact right-edge alignment formula: xShift + frontSize * p == baseX + frontSize * (1 + rightProtrude[dIdx])
                         val xShift = baseX + frontSize * (1.0f - p + rightProtrude[dIdx])
                         val yShift = baseY
-                        val rotY = if (isFront) dynamicRotY else 17f
-                        val sleeveAlpha = (1f - depth * 0.10f).coerceAtLeast(0.52f)
-                        val spineW = 8.5.dp
-                        val topRimH = 3.5.dp
+                        val rotY = if (isFront) dynamicRotY else 15f
+                        val sleeveAlpha = (1f - depth * 0.09f).coerceAtLeast(0.56f)
+                        val spineW = 9.5.dp
+                        val topRimH = 3.2.dp
 
                         // Unified 3D plane per sleeve anchored at vertical center (0f, 0.50f) so top & bottom edges follow straight vanishing lines
                         Column(
@@ -826,65 +825,62 @@ private fun SpatialGalleryImmersiveView(
                                         .background(Color(0xFF1E1D1C)),
                                 ) {
                                     Row(modifier = Modifier.fillMaxSize()) {
-                                        // 8.5dp Machined Brushed-Aluminum 3D Left Spine with specular corner bevel
+                                        // Option C: 9.5dp Matte-Anodized Dark Titanium Collector Spine with warm gallery edge highlight
                                         Box(
                                             modifier = Modifier
                                                 .width(spineW)
                                                 .fillMaxSize()
                                                 .background(
                                                     Brush.horizontalGradient(
-                                                        0.00f to Color(0xFF6B6A67),
-                                                        0.18f to Color(0xFFEBE9E5),
-                                                        0.46f to Color(0xFFC5C3BE),
-                                                        0.78f to Color(0xFF7D7B77),
-                                                        0.94f to Color(0xFF3E3D3B),
-                                                        1.00f to Color(0xFF1A1918),
+                                                        0.00f to Color(0xFF4A4845),
+                                                        0.16f to Color(0xFF6B6863),
+                                                        0.44f to Color(0xFF3A3836),
+                                                        0.78f to Color(0xFF232220),
+                                                        0.94f to Color(0xFF141312),
+                                                        1.00f to Color(0xFF0A0909),
                                                     ),
                                                 ),
                                         ) {
-                                            // Vertical sheen gradient along the metallic spine
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxSize()
                                                     .background(
                                                         Brush.verticalGradient(
-                                                            0.0f to Color.White.copy(alpha = 0.24f),
-                                                            0.25f to Color.Transparent,
-                                                            0.78f to Color.Black.copy(alpha = 0.18f),
-                                                            1.0f to Color.Black.copy(alpha = 0.36f),
+                                                            0.0f to Color(0xFFF3ECE0).copy(alpha = 0.22f),
+                                                            0.22f to Color.Transparent,
+                                                            0.76f to Color.Black.copy(alpha = 0.26f),
+                                                            1.0f to Color.Black.copy(alpha = 0.48f),
                                                         ),
                                                     ),
                                             )
                                         }
 
-                                        // Jacket front face + beveled metallic top rim + recessed dark bezel
+                                        // Collector hardcover face + dark titanium overhead spotlight bevel rim
                                         Column(
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .fillMaxSize(),
                                         ) {
-                                            // 3.5dp Top Metallic Bevel Rim
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .height(topRimH)
                                                     .background(
                                                         Brush.verticalGradient(
-                                                            0.0f to Color(0xFFF0EEEA),
-                                                            0.55f to Color(0xFFB5B3AE),
-                                                            1.0f to Color(0xFF4A4946),
+                                                            0.0f to Color(0xFF7D7973),
+                                                            0.45f to Color(0xFF3D3B38),
+                                                            1.0f to Color(0xFF151413),
                                                         ),
                                                     ),
                                             )
 
-                                            // Recessed dark gunmetal border framing the album cover
                                             Box(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .fillMaxWidth()
-                                                    .background(Color(0xFF161514))
-                                                    .padding(1.5.dp)
-                                                    .border(0.6.dp, Color.White.copy(alpha = 0.22f), RectangleShape),
+                                                    .background(Color(0xFF121110))
+                                                    .padding(1.2.dp)
+                                                    .border(0.5.dp, Color.White.copy(alpha = if (isFront) 0.14f else 0.08f), RectangleShape),
                                             ) {
                                                 AlbumArtwork(
                                                     uri = itemSong.albumArtUri,
@@ -895,30 +891,30 @@ private fun SpatialGalleryImmersiveView(
                                                 )
 
                                                 if (isFront) {
-                                                    // Subtle museum-grade diagonal satin glass sheen + soft bottom-right vignette
+                                                    // Satin-matte laminated cover overhead gallery light falloff
                                                     Box(
                                                         modifier = Modifier
                                                             .fillMaxSize()
                                                             .background(
                                                                 Brush.linearGradient(
-                                                                    0.00f to Color.White.copy(alpha = 0.14f),
-                                                                    0.32f to Color.White.copy(alpha = 0.03f),
-                                                                    0.52f to Color.Transparent,
-                                                                    0.82f to Color.Black.copy(alpha = 0.06f),
-                                                                    1.00f to Color.Black.copy(alpha = 0.20f),
+                                                                    0.00f to Color(0xFFFFFAF0).copy(alpha = 0.11f),
+                                                                    0.28f to Color.White.copy(alpha = 0.02f),
+                                                                    0.56f to Color.Transparent,
+                                                                    0.84f to Color.Black.copy(alpha = 0.10f),
+                                                                    1.00f to Color.Black.copy(alpha = 0.26f),
                                                                 ),
                                                             ),
                                                     )
                                                 } else {
-                                                    // Inter-sleeve cast shadow from the sleeve directly in front + depth darkening
-                                                    val depthDark = (0.16f + depth * 0.11f).coerceAtMost(0.68f)
+                                                    // Rich directional shadow cast from the sleeve in front + atmospheric depth haze
+                                                    val depthDark = (0.20f + depth * 0.13f).coerceAtMost(0.72f)
                                                     Box(
                                                         modifier = Modifier
                                                             .fillMaxSize()
                                                             .background(
                                                                 Brush.horizontalGradient(
-                                                                    0.0f to Color.Black.copy(alpha = (depthDark + 0.34f).coerceAtMost(0.84f)),
-                                                                    0.55f to Color.Black.copy(alpha = depthDark + 0.12f),
+                                                                    0.0f to Color.Black.copy(alpha = (depthDark + 0.36f).coerceAtMost(0.88f)),
+                                                                    0.48f to Color.Black.copy(alpha = depthDark + 0.14f),
                                                                     1.0f to Color.Black.copy(alpha = depthDark),
                                                                 ),
                                                             ),

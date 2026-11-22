@@ -50,6 +50,7 @@ import com.puremusic.player.data.repository.OnlineMetadataRepository
 import com.puremusic.player.data.repository.SongMetaOverride
 import com.puremusic.player.data.repository.PlaylistRepository
 import com.puremusic.player.service.AudioEqualizerManager
+import com.puremusic.player.service.AudioSpectrumBus
 import com.puremusic.player.service.PlaybackService
 import com.puremusic.player.service.SleepTimerManager
 import kotlinx.coroutines.Job
@@ -1237,7 +1238,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     lastTickerSongId = curId
                     lastTickerPosMs = pos
-                    _playerState.update { it.copy(positionMs = pos, durationMs = dur) }
+                    if (AudioSpectrumBus.isVisualizerActive) {
+                        _playerState.update { it.copy(positionMs = pos, durationMs = dur) }
+                    }
                     val fadeMs = fadeInSeconds.value * 1000L
                     if (fadeMs > 0L && dur > fadeMs * 2L && fadeInJob?.isActive != true) {
                         val remaining = (dur - pos).coerceAtLeast(0L)
@@ -1248,7 +1251,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }
-                delay(400L)
+                // Low-power 1500ms background cadence vs crisp 400ms foreground cadence
+                delay(if (AudioSpectrumBus.isVisualizerActive) 400L else 1500L)
                 if (System.currentTimeMillis() % 5000L < 450L) {
                     persistCurrentPlayback()
                 }

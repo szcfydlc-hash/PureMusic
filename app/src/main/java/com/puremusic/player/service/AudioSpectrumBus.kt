@@ -36,6 +36,7 @@ object AudioSpectrumBus {
     private val _beatEnergy = MutableStateFlow(0f)
     val beatEnergy: StateFlow<Float> = _beatEnergy.asStateFlow()
 
+    @Volatile var isVisualizerActive: Boolean = true
     @Volatile var lastPcmTimestampMs: Long = 0L
         private set
 
@@ -65,6 +66,7 @@ object AudioSpectrumBus {
         channelCount: Int,
         encoding: Int,
     ) {
+        if (!isVisualizerActive) return // Zero-CPU bypass when screen is off or app is backgrounded
         val now = SystemClock.uptimeMillis()
         lastPcmTimestampMs = now
         if (now - lastEmitMs < 15L) return // ~65 fps true real-time FFT

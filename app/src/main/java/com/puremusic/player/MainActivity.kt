@@ -103,6 +103,7 @@ import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MainTab
 import com.puremusic.player.data.model.Song
+import com.puremusic.player.service.AudioSpectrumBus
 import com.puremusic.player.ui.MusicViewModel
 import com.puremusic.player.data.model.Playlist
 import com.puremusic.player.ui.components.AddToPlaylistDialog
@@ -155,6 +156,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             PureMusicApp()
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        AudioSpectrumBus.isVisualizerActive = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AudioSpectrumBus.isVisualizerActive = false
+        AudioSpectrumBus.resetToIdle()
     }
 }
 
