@@ -611,13 +611,13 @@ private fun SpatialGalleryImmersiveView(
     val mutedInk = Color(0xFF9F9890)
     val cinnabar = Color(0xFFC83E2B)
 
-    // 6-sleeve flagship corridor (1 commanding hero + 5 receding stepped sleeves)
+    // 5-sleeve architectural corridor (1 commanding hero + 4 mathematically receding sleeves)
     val stackSongs = remember(song.id, allSongs) {
         if (allSongs.isEmpty()) {
             listOf(song)
         } else {
             val idx = allSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-            List(minOf(6, allSongs.size)) { step ->
+            List(minOf(5, allSongs.size)) { step ->
                 allSongs[(idx + step) % allSongs.size]
             }
         }
@@ -726,15 +726,17 @@ private fun SpatialGalleryImmersiveView(
                     },
                 contentAlignment = Alignment.TopStart,
             ) {
-                val baseX = (stageW - frontSize) * 0.30f
-                val baseY = 58.dp
-                val dynamicRotY = 16f + (dragOffsetX.value * 0.07f).coerceIn(-7f, 7f)
-                val camDist = 6.2f * density
+                // Center the entire 5-sleeve architectural fan horizontally inside the viewport
+                val totalFanW = frontSize * 1.36f
+                val baseX = ((stageW - totalFanW) * 0.50f).coerceAtLeast(14.dp)
+                val baseY = 24.dp
+                val dynamicRotY = 17f + (dragOffsetX.value * 0.07f).coerceIn(-7f, 7f)
+                val camDist = 7.5f * density
 
-                // Stepped 1/z recession factors tuned so all 6 sleeves frame cleanly inside screen width
-                val scaleSteps = floatArrayOf(1.00f, 0.88f, 0.78f, 0.70f, 0.63f, 0.57f)
-                val xFractions = floatArrayOf(0.00f, 0.21f, 0.37f, 0.50f, 0.60f, 0.68f)
-                val yLiftDp = floatArrayOf(0f, 18f, 33f, 45f, 54f, 61f)
+                // Strict mathematical perspective: monotonically shrinking scale + evenly decaying exposed right-edge sliver
+                // Right-edge steps: +0.120, +0.095, +0.075, +0.058 -> zero chaotic gaps, zero jumping heights!
+                val scaleSteps = floatArrayOf(1.00f, 0.90f, 0.81f, 0.73f, 0.66f)
+                val rightProtrude = floatArrayOf(0.00f, 0.120f, 0.215f, 0.290f, 0.348f)
 
                 Box(
                     modifier = Modifier
@@ -750,20 +752,21 @@ private fun SpatialGalleryImmersiveView(
                         val isFront = depth == 0
                         val dIdx = depth.coerceAtMost(scaleSteps.lastIndex)
                         val p = scaleSteps[dIdx]
-                        val xShift = baseX + (frontSize * xFractions[dIdx])
-                        val yShift = (baseY - yLiftDp[dIdx].dp).coerceAtLeast(2.dp)
-                        val rotY = if (isFront) dynamicRotY else 15f
-                        val sleeveAlpha = (1f - depth * 0.08f).coerceAtLeast(0.46f)
+                        // Exact right-edge alignment formula: xShift + frontSize * p == baseX + frontSize * (1 + rightProtrude[dIdx])
+                        val xShift = baseX + frontSize * (1.0f - p + rightProtrude[dIdx])
+                        val yShift = baseY
+                        val rotY = if (isFront) dynamicRotY else 17f
+                        val sleeveAlpha = (1f - depth * 0.10f).coerceAtLeast(0.52f)
                         val spineW = 8.5.dp
                         val topRimH = 3.5.dp
 
-                        // Unified 3D plane per sleeve: jacket + peeking vinyl + contact AO + mirror reflection
+                        // Unified 3D plane per sleeve anchored at vertical center (0f, 0.50f) so top & bottom edges follow straight vanishing lines
                         Column(
                             modifier = Modifier
                                 .offset(x = xShift, y = yShift)
-                                .width(frontSize + 18.dp)
+                                .width(frontSize + 14.dp)
                                 .graphicsLayer {
-                                    transformOrigin = TransformOrigin(0.0f, 0.42f)
+                                    transformOrigin = TransformOrigin(0.0f, 0.50f)
                                     scaleX = p
                                     scaleY = p
                                     rotationY = rotY
@@ -773,15 +776,15 @@ private fun SpatialGalleryImmersiveView(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .width(frontSize + 18.dp)
+                                    .width(frontSize + 14.dp)
                                     .height(frontSize),
                             ) {
-                                // Subtle black vinyl LP peeking out to the right on receding sleeves (depths 1..4)
-                                if (depth in 1..4) {
+                                // Subtle black vinyl LP peeking cleanly on receding sleeves (depths 1..3)
+                                if (depth in 1..3) {
                                     Canvas(
                                         modifier = Modifier
                                             .align(Alignment.CenterEnd)
-                                            .size(frontSize * 0.86f),
+                                            .size(frontSize * 0.84f),
                                     ) {
                                         val r = size.minDimension * 0.5f
                                         val c = Offset(size.width * 0.5f, size.height * 0.5f)

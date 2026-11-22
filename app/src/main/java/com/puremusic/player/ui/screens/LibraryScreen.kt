@@ -2488,108 +2488,6 @@ private fun ListeningReportView(
                 }
             }
 
-            // 2. 24-Hour Listening Rhythm Chart Card
-            item(key = "report_24h_chart") {
-                val peakHour = remember(hourlyPlays) {
-                    hourlyPlays.entries.maxByOrNull { it.value }?.takeIf { it.value > 0 }?.key
-                }
-                val peakPeriodLabel = remember(peakHour) {
-                    when (peakHour) {
-                        null -> null
-                        in 5..10 -> "清晨偏爱 · ${peakHour}:00"
-                        in 11..16 -> "午后偏爱 · ${peakHour}:00"
-                        in 17..21 -> "傍晚偏爱 · ${peakHour}:00"
-                        else -> "深夜偏爱 · ${peakHour}:00"
-                    }
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(cardShape)
-                        .background(surfaceColor)
-                        .border(0.75.dp, outlineColor, cardShape)
-                        .padding(16.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "24h 聆听节律",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = inkColor,
-                        )
-                        if (peakPeriodLabel != null) {
-                            Text(
-                                text = peakPeriodLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = accentColor,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    val maxHourCount = remember(hourlyPlays) { hourlyPlays.values.maxOrNull() ?: 0 }
-                    if (maxHourCount > 0) {
-                        Canvas(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(104.dp),
-                        ) {
-                            val step = size.width / 24f
-                            val barW = (step * 0.42f).coerceIn(2.5f, 7f)
-                            for (h in 0 until 24) {
-                                val c = hourlyPlays[h] ?: 0
-                                val ratio = if (c > 0) (c.toFloat() / maxHourCount.toFloat()).coerceIn(0.10f, 1f) else 0.04f
-                                val barH = size.height * ratio
-                                val x = h * step + (step - barW) * 0.5f
-                                val col = when {
-                                    c == 0 -> inkColor.copy(alpha = 0.10f)
-                                    h == peakHour -> accentColor
-                                    else -> inkColor.copy(alpha = 0.72f)
-                                }
-                                drawRoundRect(
-                                    color = col,
-                                    topLeft = Offset(x, size.height - barH),
-                                    size = Size(barW, barH),
-                                    cornerRadius = CornerRadius(barW * 0.5f, barW * 0.5f),
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            listOf("00:00", "06:00", "12:00", "18:00", "23:00").forEach { lbl ->
-                                Text(
-                                    text = lbl,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = mutedColor,
-                                )
-                            }
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(68.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "继续聆听本地唱片后，将自动记录你的 24 小时听歌节律",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = mutedColor,
-                            )
-                        }
-                    }
-                }
-            }
-
             // 3. Top Played Tracks Card (seamlessly retains all functionality of 常听曲目)
             item(key = "report_top_songs") {
                 Column(
@@ -2704,7 +2602,7 @@ private fun ListeningReportView(
                 }
             }
 
-            // 4. Top Artists Progress Bar Card
+            // 4. Editorial Favorite Artists Card (Serif Rank + Circular Cover Avatar + 2.5dp Ribbon)
             if (topArtists.isNotEmpty()) {
                 item(key = "report_top_artists") {
                     val maxArtistPlays = topArtists.first().second.coerceAtLeast(1)
@@ -2714,60 +2612,116 @@ private fun ListeningReportView(
                             .clip(cardShape)
                             .background(surfaceColor)
                             .border(0.75.dp, outlineColor, cardShape)
-                            .padding(16.dp),
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
                     ) {
-                        Text(
-                            text = "偏爱歌手",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = inkColor,
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "偏爱歌手",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = inkColor,
+                            )
+                            Text(
+                                text = "TOP ${topArtists.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = mutedColor,
+                                letterSpacing = 1.sp,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
                         topArtists.forEachIndexed { idx, (artist, cnt) ->
                             val frac = (cnt.toFloat() / maxArtistPlays.toFloat()).coerceIn(0.08f, 1f)
-                            Column(
+                            val coverUri = artist.songs.firstOrNull { it.albumArtUri != null }?.albumArtUri
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(10.dp))
                                     .clickable { onSelectArtist(artist) }
-                                    .padding(vertical = 6.dp, horizontal = 2.dp),
+                                    .padding(vertical = 9.dp, horizontal = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = artist.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
-                                        color = inkColor,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Text(
-                                        text = "$cnt 次",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = mutedColor,
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(5.dp))
+                                Text(
+                                    text = String.format(java.util.Locale.US, "%02d", idx + 1),
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (idx == 0) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (idx == 0) accentColor else mutedColor,
+                                    modifier = Modifier.width(28.dp),
+                                )
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(4.dp)
+                                        .size(38.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        .border(0.8.dp, outlineColor, CircleShape)
+                                        .padding(1.5.dp)
+                                        .clip(CircleShape),
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(frac)
-                                            .fillMaxHeight()
-                                            .clip(CircleShape)
-                                            .background(if (idx == 0) accentColor else inkColor.copy(alpha = 0.65f)),
+                                    AlbumArtwork(
+                                        uri = coverUri,
+                                        contentDescription = artist.name,
+                                        modifier = Modifier.fillMaxSize(),
+                                        cornerRadius = 19.dp,
+                                        iconSize = 16.dp,
                                     )
                                 }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.Bottom,
+                                    ) {
+                                        Text(
+                                            text = artist.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            color = inkColor,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Row(verticalAlignment = Alignment.Bottom) {
+                                            Text(
+                                                text = "$cnt",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (idx == 0) accentColor else inkColor,
+                                            )
+                                            Text(
+                                                text = " 次",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = mutedColor,
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.5.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(frac)
+                                                .fillMaxHeight()
+                                                .clip(CircleShape)
+                                                .background(if (idx == 0) accentColor else inkColor.copy(alpha = 0.62f)),
+                                        )
+                                    }
+                                }
+                            }
+                            if (idx < topArtists.lastIndex) {
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = outlineColor.copy(alpha = 0.55f),
+                                )
                             }
                         }
                     }
