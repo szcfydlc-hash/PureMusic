@@ -19,7 +19,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.sp
+import com.puremusic.player.data.model.BackgroundStyle
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -63,6 +68,7 @@ import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,7 +76,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -266,7 +274,12 @@ private fun PureMusicApp(
         val coverSearchError by viewModel.coverSearchError.collectAsStateWithLifecycle()
 
         var activeMainTab by remember { mutableStateOf(MainTab.LIBRARY) }
-        var showNowPlaying by remember { mutableStateOf(false) }
+        var showSplash by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        delay(1150L)
+        showSplash = false
+    }
+    var showNowPlaying by remember { mutableStateOf(false) }
         var showEqualizer by remember { mutableStateOf(false) }
     var showRepeatCountDialog by remember { mutableStateOf(false) }
         var showSleepTimer by remember { mutableStateOf(false) }
@@ -677,6 +690,14 @@ private fun PureMusicApp(
                     onResetLyricOffset = viewModel::resetCurrentLyricOffset,
                 )
             }
+
+            AnimatedVisibility(
+                visible = showSplash,
+                enter = fadeIn(tween(120)),
+                exit = fadeOut(tween(420)),
+            ) {
+                PureMusicSplashOverlay(isDark = backgroundStyle == BackgroundStyle.DEEP_INK)
+            }
         }
 
         if (showCreatePlaylist) {
@@ -1067,6 +1088,115 @@ private fun PermissionPromptScreen(
             Button(onClick = onRequestPermission) {
                 Text("授予音乐读取权限")
             }
+        }
+    }
+}
+
+@Composable
+private fun PureMusicSplashOverlay(isDark: Boolean) {
+    val bgColor = if (isDark) Color(0xFF141312) else Color(0xFFF5F0E6)
+    val inkPrimary = if (isDark) Color(0xFFF2ECE1) else Color(0xFF1E1B18)
+    val inkMuted = if (isDark) Color(0xFF9C9388) else Color(0xFF8C7E6D)
+    val cinnabar = Color(0xFFA9321E)
+
+    val riseProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) {
+        riseProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 720),
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bgColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {},
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier.size(width = 180.dp, height = 228.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                // Rising 96-groove glossy black vinyl LP emerging out of top of cinnabar sleeve
+                val discOffsetY = (-24f - riseProgress.value * 44f).dp
+                Canvas(
+                    modifier = Modifier
+                        .size(144.dp)
+                        .offset(y = discOffsetY),
+                ) {
+                    val r = size.minDimension / 2f
+                    val c = Offset(size.width / 2f, size.height / 2f)
+                    drawCircle(color = Color(0xFF0D0D0F), radius = r, center = c)
+                    for (i in 0..16) {
+                        val f = 0.46f + i * 0.03f
+                        drawCircle(
+                            color = if (i % 2 == 0) Color.White.copy(alpha = 0.11f) else Color.Black.copy(alpha = 0.35f),
+                            radius = r * f,
+                            center = c,
+                            style = Stroke(width = 1.0f),
+                        )
+                    }
+                    drawCircle(color = cinnabar, radius = r * 0.34f, center = c)
+                }
+
+                // Matte cinnabar-red square archival sleeve embossed with geometric turntable mark
+                Box(
+                    modifier = Modifier
+                        .size(164.dp)
+                        .shadow(18.dp, androidx.compose.ui.graphics.RectangleShape, ambientColor = Color.Black.copy(alpha = 0.32f))
+                        .background(cinnabar),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val embossInk = Color(0xFFF4E8D4).copy(alpha = 0.90f)
+                        val sw = 3.2f
+                        val emCx = size.width * 0.47f
+                        val emCy = size.height * 0.52f
+                        val emR = size.width * 0.255f
+                        drawCircle(color = embossInk, radius = emR, center = Offset(emCx, emCy), style = Stroke(width = sw))
+                        drawCircle(color = embossInk, radius = emR * 0.32f, center = Offset(emCx, emCy), style = Stroke(width = sw))
+                        drawCircle(color = embossInk, radius = 4f, center = Offset(emCx, emCy))
+
+                        val pivX = emCx + emR * 1.15f
+                        val pivY = emCy - emR * 0.82f
+                        val pivR = emR * 0.28f
+                        drawCircle(color = embossInk, radius = pivR, center = Offset(pivX, pivY), style = Stroke(width = sw))
+                        drawLine(
+                            color = embossInk,
+                            start = Offset(pivX, pivY + pivR * 0.3f),
+                            end = Offset(pivX, emCy + emR * 0.16f),
+                            strokeWidth = sw,
+                        )
+                        drawLine(
+                            color = embossInk,
+                            start = Offset(pivX, emCy + emR * 0.16f),
+                            end = Offset(emCx + emR * 0.62f, emCy + emR * 0.66f),
+                            strokeWidth = sw,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(26.dp))
+            Text(
+                text = "简约音乐",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 4.sp,
+                ),
+                color = inkPrimary,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "PURE MUSIC · HI-RES AUDIO",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.sp),
+                color = inkMuted,
+            )
         }
     }
 }

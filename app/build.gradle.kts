@@ -12,8 +12,8 @@ android {
         applicationId = "com.puremusic.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 68
-        versionName = "1.8.3"
+        versionCode = 73
+        versionName = "1.9.2"
 
         vectorDrawables {
             useSupportLibrary = true

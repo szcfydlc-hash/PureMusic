@@ -148,13 +148,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val fontStyle: StateFlow<AppFontStyle> = playlistRepository.fontStyleFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = AppFontStyle.SERIF,
+        initialValue = AppFontStyle.SANS,
     )
 
     val lyricFontStyle: StateFlow<LyricFontStyle> = playlistRepository.lyricFontStyleFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = LyricFontStyle.SERIF_ITALIC,
+        initialValue = LyricFontStyle.SANS,
     )
 
     val backgroundStyle: StateFlow<BackgroundStyle> = playlistRepository.backgroundStyleFlow.stateIn(
@@ -1402,10 +1402,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             _customFontName.value = null
             _customFontVersion.value += 1
             if (fontStyle.value == AppFontStyle.CUSTOM) {
-                playlistRepository.setFontStyle(AppFontStyle.SERIF)
+                playlistRepository.setFontStyle(AppFontStyle.SANS)
             }
             if (lyricFontStyle.value == LyricFontStyle.CUSTOM) {
-                playlistRepository.setLyricFontStyle(LyricFontStyle.SERIF_ITALIC)
+                playlistRepository.setLyricFontStyle(LyricFontStyle.SANS)
             }
         }
     }

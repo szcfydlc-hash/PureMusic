@@ -9,6 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import android.content.Context
 import android.graphics.Typeface
+import android.os.Build
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import com.puremusic.player.data.model.LyricFontStyle
@@ -167,6 +168,7 @@ val LocalMiniPlayerStyle = compositionLocalOf { MiniPlayerStyle.CLASSIC_BOOK }
 val LocalMiniPlayerHeightDp = compositionLocalOf { 58 }
 val LocalHapticEnabled = compositionLocalOf { true }
 val LocalCustomFontVersion = compositionLocalOf { 0 }
+val LocalAppFontWeightValue = compositionLocalOf { 400 }
 
 fun sidebarColorFor(isDark: Boolean): Color = if (isDark) Color(0xFF1A1A1C) else Color(0xFFEEECE7)
 
@@ -298,8 +300,9 @@ fun PureMusicTheme(
     }
 
     val themeContext = LocalContext.current
-    val family = remember(fontStyle, customFontVersion) {
-        resolveAppFontFamily(themeContext, fontStyle)
+    val clampedWeight = fontWeightValue.coerceIn(200, 900)
+    val family = remember(fontStyle, customFontVersion, clampedWeight) {
+        resolveAppFontFamily(themeContext, fontStyle, clampedWeight)
     }
     val clampedSlant = fontSlantDegrees.coerceIn(0f, 16f)
     val textFontStyle = if (fontStyle == AppFontStyle.SERIF_ITALIC && clampedSlant < 0.5f) {
@@ -362,6 +365,7 @@ fun PureMusicTheme(
         LocalMiniPlayerHeightDp provides miniPlayerHeightDp,
         LocalHapticEnabled provides hapticEnabled,
         LocalCustomFontVersion provides customFontVersion,
+        LocalAppFontWeightValue provides clampedWeight,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
@@ -371,43 +375,61 @@ fun PureMusicTheme(
     }
 }
 
-fun resolveAppFontFamily(context: Context, style: AppFontStyle): FontFamily {
+private fun applyWeightToTypeface(base: Typeface, weightValue: Int, italic: Boolean = false): FontFamily {
+    val w = weightValue.coerceIn(200, 900)
+    val weighted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        Typeface.create(base, w, italic)
+    } else {
+        val styleInt = when {
+            w >= 600 && italic -> Typeface.BOLD_ITALIC
+            w >= 600 -> Typeface.BOLD
+            italic -> Typeface.ITALIC
+            else -> Typeface.NORMAL
+        }
+        Typeface.create(base, styleInt)
+    }
+    return FontFamily(weighted)
+}
+
+fun resolveAppFontFamily(context: Context, style: AppFontStyle, weightValue: Int = 400): FontFamily {
     return when (style) {
-        AppFontStyle.SERIF, AppFontStyle.SERIF_ITALIC -> FontFamily.Serif
-        AppFontStyle.SANS -> FontFamily.SansSerif
-        AppFontStyle.MONOSPACE -> FontFamily.Monospace
-        AppFontStyle.WENKAI -> loadAssetFontOrFallback(context, "fonts/lxgw_wenkai_lite.ttf", FontFamily.Serif)
-        AppFontStyle.PLAYFAIR -> loadAssetFontOrFallback(context, "fonts/playfair_italic.ttf", FontFamily.Serif)
-        AppFontStyle.INTER -> loadAssetFontOrFallback(context, "fonts/inter_regular.ttf", FontFamily.SansSerif)
-        AppFontStyle.CUSTOM -> loadCustomUserFontOrFallback(context, FontFamily.Serif)
+        AppFontStyle.SERIF -> applyWeightToTypeface(Typeface.SERIF, weightValue, false)
+        AppFontStyle.SERIF_ITALIC -> applyWeightToTypeface(Typeface.SERIF, weightValue, true)
+        AppFontStyle.SANS -> applyWeightToTypeface(Typeface.SANS_SERIF, weightValue, false)
+        AppFontStyle.MONOSPACE -> applyWeightToTypeface(Typeface.MONOSPACE, weightValue, false)
+        AppFontStyle.WENKAI -> loadAssetFontOrFallback(context, "fonts/lxgw_wenkai_lite.ttf", Typeface.SERIF, weightValue)
+        AppFontStyle.PLAYFAIR -> loadAssetFontOrFallback(context, "fonts/playfair_italic.ttf", Typeface.SERIF, weightValue)
+        AppFontStyle.INTER -> loadAssetFontOrFallback(context, "fonts/inter_regular.ttf", Typeface.SANS_SERIF, weightValue)
+        AppFontStyle.CUSTOM -> loadCustomUserFontOrFallback(context, Typeface.SANS_SERIF, weightValue)
     }
 }
 
-fun resolveLyricFontFamily(context: Context, style: LyricFontStyle): FontFamily {
+fun resolveLyricFontFamily(context: Context, style: LyricFontStyle, weightValue: Int = 400): FontFamily {
     return when (style) {
-        LyricFontStyle.SERIF, LyricFontStyle.SERIF_ITALIC -> FontFamily.Serif
-        LyricFontStyle.SANS -> FontFamily.SansSerif
-        LyricFontStyle.MONOSPACE -> FontFamily.Monospace
-        LyricFontStyle.WENKAI -> loadAssetFontOrFallback(context, "fonts/lxgw_wenkai_lite.ttf", FontFamily.Serif)
-        LyricFontStyle.PLAYFAIR -> loadAssetFontOrFallback(context, "fonts/playfair_italic.ttf", FontFamily.Serif)
-        LyricFontStyle.CUSTOM -> loadCustomUserFontOrFallback(context, FontFamily.Serif)
+        LyricFontStyle.SERIF -> applyWeightToTypeface(Typeface.SERIF, weightValue, false)
+        LyricFontStyle.SERIF_ITALIC -> applyWeightToTypeface(Typeface.SERIF, weightValue, true)
+        LyricFontStyle.SANS -> applyWeightToTypeface(Typeface.SANS_SERIF, weightValue, false)
+        LyricFontStyle.MONOSPACE -> applyWeightToTypeface(Typeface.MONOSPACE, weightValue, false)
+        LyricFontStyle.WENKAI -> loadAssetFontOrFallback(context, "fonts/lxgw_wenkai_lite.ttf", Typeface.SERIF, weightValue)
+        LyricFontStyle.PLAYFAIR -> loadAssetFontOrFallback(context, "fonts/playfair_italic.ttf", Typeface.SERIF, weightValue)
+        LyricFontStyle.CUSTOM -> loadCustomUserFontOrFallback(context, Typeface.SANS_SERIF, weightValue)
     }
 }
 
-private fun loadAssetFontOrFallback(context: Context, assetPath: String, fallback: FontFamily): FontFamily {
+private fun loadAssetFontOrFallback(context: Context, assetPath: String, fallback: Typeface, weightValue: Int): FontFamily {
     return runCatching {
         val tf = Typeface.createFromAsset(context.assets, assetPath)
-        FontFamily(tf)
-    }.getOrDefault(fallback)
+        applyWeightToTypeface(tf, weightValue, false)
+    }.getOrElse { applyWeightToTypeface(fallback, weightValue, false) }
 }
 
-private fun loadCustomUserFontOrFallback(context: Context, fallback: FontFamily): FontFamily {
+private fun loadCustomUserFontOrFallback(context: Context, fallback: Typeface, weightValue: Int): FontFamily {
     return runCatching {
         val fontFile = File(File(context.filesDir, "custom_fonts"), "user_font.ttf")
         if (fontFile.exists() && fontFile.length() > 1024L) {
-            FontFamily(Typeface.createFromFile(fontFile))
+            applyWeightToTypeface(Typeface.createFromFile(fontFile), weightValue, false)
         } else {
-            fallback
+            applyWeightToTypeface(fallback, weightValue, false)
         }
-    }.getOrDefault(fallback)
+    }.getOrElse { applyWeightToTypeface(fallback, weightValue, false) }
 }

@@ -85,6 +85,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration
+import com.puremusic.player.ui.theme.LocalAppFontWeightValue
 import com.puremusic.player.ui.theme.LocalCustomFontVersion
 import com.puremusic.player.ui.theme.resolveLyricFontFamily
 import androidx.compose.animation.core.animateFloatAsState
@@ -256,8 +257,9 @@ fun NowPlayingScreen(
     }
 
     val customFontVer = LocalCustomFontVersion.current
-    val lyricFamily = remember(lyricFontStyle, customFontVer) {
-        resolveLyricFontFamily(context, lyricFontStyle)
+    val appWeightVal = LocalAppFontWeightValue.current
+    val lyricFamily = remember(lyricFontStyle, customFontVer, appWeightVal) {
+        resolveLyricFontFamily(context, lyricFontStyle, appWeightVal)
     }
     val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
@@ -337,6 +339,7 @@ fun NowPlayingScreen(
                 song = song,
                 allSongs = allSongs,
                 lyrics = lyrics,
+                audioSpec = audioSpec,
                 positionMs = playerState.positionMs,
                 durationMs = durationMs,
                 isPlaying = playerState.isPlaying,

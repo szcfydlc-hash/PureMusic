@@ -101,13 +101,13 @@ class PlaylistRepository(private val context: Context) {
     val fontStyleFlow: Flow<AppFontStyle> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.FONT_STYLE]?.let { name ->
             AppFontStyle.entries.firstOrNull { it.name == name }
-        } ?: AppFontStyle.SERIF
+        } ?: AppFontStyle.SANS
     }
 
     val lyricFontStyleFlow: Flow<LyricFontStyle> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.LYRIC_FONT_STYLE]?.let { name ->
             LyricFontStyle.entries.firstOrNull { it.name == name }
-        } ?: LyricFontStyle.SERIF_ITALIC
+        } ?: LyricFontStyle.SANS
     }
 
     val backgroundStyleFlow: Flow<BackgroundStyle> = context.pureMusicDataStore.data.map { prefs ->
@@ -474,8 +474,8 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { prefs ->
             val epoch = prefs[Keys.PREF_STYLE_EPOCH] ?: 0
             if (epoch < 8) {
-                prefs[Keys.FONT_STYLE] = AppFontStyle.SERIF.name
-                prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SERIF_ITALIC.name
+                prefs[Keys.FONT_STYLE] = AppFontStyle.SANS.name
+                prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SANS.name
                 prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
                 prefs[Keys.LIQUID_GLASS_ENABLED] = false
                 prefs[Keys.ACCENT_COLOR] = AppAccentColor.CINNABAR_RED.name
@@ -487,8 +487,8 @@ class PlaylistRepository(private val context: Context) {
     suspend fun resetAppearance() {
         context.pureMusicDataStore.edit { prefs ->
             prefs[Keys.PLAYER_THEME] = PlayerTheme.POSTER_WALL.name
-            prefs[Keys.FONT_STYLE] = AppFontStyle.SERIF.name
-            prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SERIF_ITALIC.name
+            prefs[Keys.FONT_STYLE] = AppFontStyle.SANS.name
+            prefs[Keys.LYRIC_FONT_STYLE] = LyricFontStyle.SANS.name
             prefs[Keys.BACKGROUND_STYLE] = BackgroundStyle.WARM_PAPER.name
             prefs[Keys.LAYOUT_MODE] = LayoutMode.AUTO.name
             prefs[Keys.LAYOUT_DENSITY] = LayoutDensity.STANDARD.name

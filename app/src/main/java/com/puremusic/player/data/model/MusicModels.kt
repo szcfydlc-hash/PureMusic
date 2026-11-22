@@ -196,7 +196,7 @@ enum class AppFontWeight(val label: String, val weightValue: Int) {
     LIGHT("纤细", 300),
     NORMAL("常规", 400),
     MEDIUM("适中", 500),
-    SEMIBOLD("加粗", 600),
+    SEMIBOLD("加粗", 700),
 }
 
 data class AudioTechSpec(
