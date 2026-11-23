@@ -187,8 +187,6 @@ private fun PureMusicApp(
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val karaokeLyricMode by viewModel.karaokeLyricMode.collectAsStateWithLifecycle()
     val translationSettings by viewModel.translationSettings.collectAsStateWithLifecycle()
-    val offlineModelsReady by viewModel.offlineModelsReady.collectAsStateWithLifecycle()
-    val isDownloadingOfflineModels by viewModel.isDownloadingOfflineModels.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
     val floatingControlsEnabled by viewModel.floatingControlsEnabled.collectAsStateWithLifecycle()
     val liquidGlassLevel by viewModel.liquidGlassLevel.collectAsStateWithLifecycle()
@@ -550,10 +548,7 @@ private fun PureMusicApp(
                         karaokeLyricMode = karaokeLyricMode,
                         onSelectKaraokeLyricMode = viewModel::setKaraokeLyricMode,
                         translationSettings = translationSettings,
-                        offlineModelsReady = offlineModelsReady,
-                        isDownloadingOfflineModels = isDownloadingOfflineModels,
                         onUpdateTranslationSettings = viewModel::updateTranslationSettings,
-                        onPredownloadOfflineModels = viewModel::predownloadOfflineTranslationModels,
                         onSelectPlaybackSpeed = viewModel::setPlaybackSpeed,
                         onSelectFadeInSeconds = viewModel::setFadeInSeconds,
                         onToggleVolumeNormalization = viewModel::setVolumeNormalization,

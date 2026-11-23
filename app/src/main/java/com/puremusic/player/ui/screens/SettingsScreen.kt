@@ -79,7 +79,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.rounded.FolderCopy
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.OfflineBolt
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.foundation.layout.widthIn
@@ -109,7 +108,6 @@ import androidx.compose.ui.unit.sp
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.KaraokeLyricMode
-import com.puremusic.player.data.model.LyricTranslationEngine
 import com.puremusic.player.data.model.TranslationSettings
 import com.puremusic.player.data.model.AppFontWeight
 import com.puremusic.player.data.model.BackgroundStyle
@@ -174,10 +172,7 @@ fun SettingsScreen(
     karaokeLyricMode: KaraokeLyricMode = KaraokeLyricMode.SMART,
     onSelectKaraokeLyricMode: (KaraokeLyricMode) -> Unit = {},
     translationSettings: TranslationSettings = TranslationSettings(),
-    offlineModelsReady: Boolean = false,
-    isDownloadingOfflineModels: Boolean = false,
     onUpdateTranslationSettings: (TranslationSettings) -> Unit = {},
-    onPredownloadOfflineModels: () -> Unit = {},
     onSelectPlaybackSpeed: (Float) -> Unit,
     onSelectFadeInSeconds: (Int) -> Unit,
     onToggleVolumeNormalization: (Boolean) -> Unit = {},
@@ -1044,7 +1039,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Card 4.5: 歌词翻译（离线模型 + 在线接口自由切换）
+            // Card 4.5: 歌词翻译（公开免费在线接口 / 可选自定义 Key）
             var showCustomApiDialog by remember { mutableStateOf(false) }
             BookSettingsCard(
                 cardBg = cardBg,
@@ -1060,126 +1055,14 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = "点击播放页「译」键时使用的翻译引擎",
+                    text = "默认使用公开免费接口（MyMemory），点「译」自动缓存双语",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-
-                // 2-Segment Engine Selector
-                val trackShape = RoundedCornerShape(20.dp)
-                val pillShape = RoundedCornerShape(17.dp)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                        .clip(trackShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
-                        .border(0.75.dp, outlineColor, trackShape)
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    LyricTranslationEngine.entries.forEach { eng ->
-                        val sel = eng == translationSettings.engine
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .then(
-                                    if (sel) {
-                                        Modifier
-                                            .clip(pillShape)
-                                            .background(MaterialTheme.colorScheme.surface)
-                                            .border(0.5.dp, outlineColor.copy(alpha = 0.75f), pillShape)
-                                    } else {
-                                        Modifier.clip(pillShape)
-                                    },
-                                )
-                                .clickable {
-                                    onUpdateTranslationSettings(translationSettings.copy(engine = eng))
-                                },
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = if (eng == LyricTranslationEngine.OFFLINE_MLKIT) {
-                                    Icons.Rounded.OfflineBolt
-                                } else {
-                                    Icons.Rounded.Language
-                                },
-                                contentDescription = null,
-                                tint = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = eng.shortLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium,
-                                color = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
                 HorizontalDivider(thickness = 0.5.dp, color = outlineColor.copy(alpha = 0.65f))
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Row 1: Offline ML Kit Language Pack status & Pre-download
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text(
-                            text = "离线语言包（英 / 日 / 韩 → 中文）",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (offlineModelsReady) {
-                                "本地模型已就绪，离线可直接使用"
-                            } else {
-                                "约 30MB · 首次翻译自动下载，之后完全离线"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    val btnShape = RoundedCornerShape(16.dp)
-                    Box(
-                        modifier = Modifier
-                            .clip(btnShape)
-                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.75f), btnShape)
-                            .clickable(enabled = !isDownloadingOfflineModels) { onPredownloadOfflineModels() }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = when {
-                                isDownloadingOfflineModels -> "下载中..."
-                                offlineModelsReady -> "已就绪"
-                                else -> "预下载"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = outlineColor.copy(alpha = 0.65f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Row 2: Online API Configuration (Public Free MyMemory vs Custom OpenAI-Compatible API)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1191,7 +1074,7 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                         Text(
-                            text = "自定义在线 API（选填）",
+                            text = "在线翻译接口",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onBackground,
@@ -1199,9 +1082,9 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (translationSettings.customApiKey.isNotBlank()) {
-                                "已配置自定义 Key · 模型：${translationSettings.customModel}"
+                                "当前：自定义 API · 模型 ${translationSettings.customModel}"
                             } else {
-                                "当前：公开免费接口（MyMemory） · 点击可自填 Key"
+                                "当前：公开免费（MyMemory） · 点击可自填 API Key"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1209,7 +1092,7 @@ fun SettingsScreen(
                     }
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        contentDescription = "配置在线 API",
+                        contentDescription = "配置在线翻译接口",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )

@@ -25,7 +25,6 @@ import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.ImmersionLyricStyle
 import android.widget.Toast
 import com.puremusic.player.data.model.KaraokeLyricMode
-import com.puremusic.player.data.model.LyricTranslationEngine
 import com.puremusic.player.data.model.TranslationSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -303,11 +302,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = TranslationSettings(),
     )
 
-    private val _isDownloadingOfflineModels = MutableStateFlow(false)
-    val isDownloadingOfflineModels: StateFlow<Boolean> = _isDownloadingOfflineModels.asStateFlow()
 
-    private val _offlineModelsReady = MutableStateFlow(false)
-    val offlineModelsReady: StateFlow<Boolean> = _offlineModelsReady.asStateFlow()
 
     val lyricOffsets: StateFlow<Map<Long, Long>> = playlistRepository.lyricOffsetsFlow.stateIn(
         scope = viewModelScope,
@@ -947,28 +942,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.updateTranslationSettings(settings) }
     }
 
-    fun refreshOfflineModelStatus() {
-        viewModelScope.launch {
-            val downloaded = onlineMetadataRepository.checkOfflineModelsDownloaded()
-            _offlineModelsReady.value = downloaded.contains("en") && downloaded.contains("zh")
-        }
-    }
 
-    fun predownloadOfflineTranslationModels() {
-        if (_isDownloadingOfflineModels.value) return
-        viewModelScope.launch {
-            _isDownloadingOfflineModels.value = true
-            showToast("正在下载英/日/韩离线翻译包（约 30MB）...")
-            val res = onlineMetadataRepository.predownloadOfflineModels()
-            res.onSuccess { msg ->
-                _offlineModelsReady.value = true
-                showToast(msg)
-            }.onFailure { err ->
-                showToast(err.message ?: "离线语言包下载失败，请检查网络")
-            }
-            _isDownloadingOfflineModels.value = false
-        }
-    }
 
     private suspend fun showToast(msg: String) = withContext(Dispatchers.Main) {
         Toast.makeText(getApplication(), msg, Toast.LENGTH_SHORT).show()
@@ -1086,9 +1060,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val currentSettings = translationSettings.value
         viewModelScope.launch {
             _isTranslatingLyrics.value = true
-            val engineTip = if (currentSettings.engine == LyricTranslationEngine.OFFLINE_MLKIT) {
-                "正在使用离线模型翻译歌词..."
-            } else if (currentSettings.customApiKey.isNotBlank()) {
+            val engineTip = if (currentSettings.customApiKey.isNotBlank()) {
                 "正在使用自定义接口翻译歌词..."
             } else {
                 "正在使用公开免费接口翻译歌词..."

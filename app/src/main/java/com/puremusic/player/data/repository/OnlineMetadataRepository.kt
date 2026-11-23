@@ -7,19 +7,8 @@ import android.net.Uri
 import com.puremusic.player.data.model.LyricLine
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
-import com.google.android.gms.tasks.Task
-import com.google.mlkit.common.model.DownloadConditions
-import com.google.mlkit.common.model.RemoteModelManager
-import com.google.mlkit.nl.translate.TranslateLanguage
-import com.google.mlkit.nl.translate.TranslateRemoteModel
-import com.google.mlkit.nl.translate.Translation
-import com.google.mlkit.nl.translate.TranslatorOptions
-import com.puremusic.player.data.model.LyricTranslationEngine
 import com.puremusic.player.data.model.TranslationSettings
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -327,35 +316,6 @@ class OnlineMetadataRepository(private val context: Context) {
         if (target.exists()) runCatching { target.delete() }
     }
 
-    suspend fun checkOfflineModelsDownloaded(): Set<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            val models = RemoteModelManager.getInstance()
-                .getDownloadedModels(TranslateRemoteModel::class.java)
-                .awaitTask()
-            models.map { it.language }.toSet()
-        }.getOrDefault(emptySet())
-    }
-
-    suspend fun predownloadOfflineModels(): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            val conditions = DownloadConditions.Builder().build()
-            val langs = listOf(TranslateLanguage.ENGLISH, TranslateLanguage.JAPANESE, TranslateLanguage.KOREAN)
-            for (src in langs) {
-                val options = TranslatorOptions.Builder()
-                    .setSourceLanguage(src)
-                    .setTargetLanguage(TranslateLanguage.CHINESE)
-                    .build()
-                val client = Translation.getClient(options)
-                try {
-                    client.downloadModelIfNeeded(conditions).awaitTask()
-                } finally {
-                    client.close()
-                }
-            }
-            "英 / 日 / 韩离线翻译包已下载就绪"
-        }
-    }
-
     suspend fun translateLyricsToBilingualLrc(
         lines: List<LyricLine>,
         settings: TranslationSettings = TranslationSettings(),
@@ -367,15 +327,10 @@ class OnlineMetadataRepository(private val context: Context) {
         val uniqueTexts = lines.map { it.primaryText.trim() }.filter { it.isNotBlank() }.distinct()
         if (uniqueTexts.isEmpty()) return@withContext Result.failure(IllegalArgumentException("暂无有效歌词文本"))
 
-        val translatedMapResult: Result<Map<String, String>> = when (settings.engine) {
-            LyricTranslationEngine.OFFLINE_MLKIT -> translateWithMlKit(uniqueTexts, srcLang)
-            LyricTranslationEngine.ONLINE_API -> {
-                if (settings.customApiKey.isNotBlank()) {
-                    translateWithCustomOpenAiApi(uniqueTexts, settings)
-                } else {
-                    translateWithMyMemoryApi(uniqueTexts, srcLang)
-                }
-            }
+        val translatedMapResult: Result<Map<String, String>> = if (settings.customApiKey.isNotBlank()) {
+            translateWithCustomOpenAiApi(uniqueTexts, settings)
+        } else {
+            translateWithMyMemoryApi(uniqueTexts, srcLang)
         }
 
         translatedMapResult.mapCatching { map ->
@@ -411,36 +366,11 @@ class OnlineMetadataRepository(private val context: Context) {
             }
         }
         return when {
-            jpKana >= 4 -> TranslateLanguage.JAPANESE
-            koHangul >= 4 -> TranslateLanguage.KOREAN
-            cyrillic >= 6 -> TranslateLanguage.RUSSIAN
+            jpKana >= 4 -> "ja"
+            koHangul >= 4 -> "ko"
+            cyrillic >= 6 -> "ru"
             cjk > latin && jpKana == 0 && koHangul == 0 -> null
-            else -> TranslateLanguage.ENGLISH
-        }
-    }
-
-    private suspend fun translateWithMlKit(
-        texts: List<String>,
-        srcLang: String,
-    ): Result<Map<String, String>> = runCatching {
-        val options = TranslatorOptions.Builder()
-            .setSourceLanguage(srcLang)
-            .setTargetLanguage(TranslateLanguage.CHINESE)
-            .build()
-        val translator = Translation.getClient(options)
-        try {
-            translator.downloadModelIfNeeded(DownloadConditions.Builder().build()).awaitTask()
-            val out = LinkedHashMap<String, String>(texts.size)
-            for (t in texts) {
-                val res = runCatching { translator.translate(t).awaitTask() }.getOrNull()
-                if (!res.isNullOrBlank()) {
-                    out[t] = res.trim()
-                }
-            }
-            if (out.isEmpty()) error("离线翻译返回为空，请重试")
-            out
-        } finally {
-            translator.close()
+            else -> "en"
         }
     }
 
@@ -448,12 +378,7 @@ class OnlineMetadataRepository(private val context: Context) {
         texts: List<String>,
         srcLang: String,
     ): Result<Map<String, String>> = runCatching {
-        val langPair = when (srcLang) {
-            TranslateLanguage.JAPANESE -> "ja|zh-CN"
-            TranslateLanguage.KOREAN -> "ko|zh-CN"
-            TranslateLanguage.RUSSIAN -> "ru|zh-CN"
-            else -> "en|zh-CN"
-        }
+        val langPair = "$srcLang|zh-CN"
         val out = LinkedHashMap<String, String>(texts.size)
         val sep = " ||| "
         var i = 0
@@ -480,7 +405,6 @@ class OnlineMetadataRepository(private val context: Context) {
                         if (cleaned.isNotBlank()) out[batch[idx]] = cleaned
                     }
                 } else {
-                    // Fallback line-by-line if batch delimiter was altered
                     for (line in batch) {
                         val singleUrl = "https://api.mymemory.translated.net/get?q=${URLEncoder.encode(line, "UTF-8")}&langpair=${URLEncoder.encode(langPair, "UTF-8")}"
                         val sBody = runCatching { httpGetText(singleUrl) }.getOrNull() ?: continue
@@ -490,7 +414,7 @@ class OnlineMetadataRepository(private val context: Context) {
                 }
             }
         }
-        if (out.isEmpty()) error("公开翻译接口暂不可用，请检查网络或切换离线模型")
+        if (out.isEmpty()) error("公开翻译接口暂不可用，请检查网络或配置自定义 API Key")
         out
     }
 
@@ -553,15 +477,6 @@ class OnlineMetadataRepository(private val context: Context) {
         }
         if (out.isEmpty()) error("自定义接口未返回有效译文，请检查配置")
         out
-    }
-
-    private suspend fun <T> Task<T>.awaitTask(): T = suspendCancellableCoroutine { cont ->
-        addOnSuccessListener { result ->
-            if (cont.isActive) cont.resume(result)
-        }
-        addOnFailureListener { exc ->
-            if (cont.isActive) cont.resumeWithException(exc)
-        }
     }
 
     private fun formatLrcTimestamp(timeMs: Long): String {

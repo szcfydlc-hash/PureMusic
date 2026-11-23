@@ -231,7 +231,7 @@ class PlaylistRepository(private val context: Context) {
     val translationSettingsFlow: Flow<TranslationSettings> = context.pureMusicDataStore.data.map { prefs ->
         val engRaw = prefs[Keys.TRANSLATION_ENGINE]
         val engine = LyricTranslationEngine.entries.firstOrNull { it.name == engRaw }
-            ?: LyricTranslationEngine.OFFLINE_MLKIT
+            ?: LyricTranslationEngine.ONLINE_API
         TranslationSettings(
             engine = engine,
             customBaseUrl = prefs[Keys.TRANSLATE_BASE_URL].orEmpty(),
