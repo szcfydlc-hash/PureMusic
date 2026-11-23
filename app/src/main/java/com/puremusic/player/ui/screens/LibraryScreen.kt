@@ -115,6 +115,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.SolidColor
@@ -1894,102 +1895,116 @@ private fun PlaylistsTabContent(
         ),
         verticalArrangement = Arrangement.spacedBy(density.gridSpacingDp.dp),
     ) {
-        // 1. Hero Card: 我喜欢的音乐 (Stacked 3-cover vinyl trio + duration + conditional play button)
+        // 1. Hero Card: 我喜欢的音乐 (Icon-Cohesive Cinnabar Vinyl Sleeve + Peeking 180g LP)
         item(key = "favorites_hero") {
-            val favThumbs = remember(favoriteSongs) { favoriteSongs.mapNotNull { it.albumArtUri }.distinct().take(3) }
-            Row(
+            val sleeveTop = accentColor
+            val sleeveBottom = lerp(accentColor, Color(0xFF1A0805), 0.24f)
+            val ivory = Color(0xFFF6EFE2)
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(cardShape)
-                    .background(surfaceColor)
-                    .border(0.8.dp, outlineColor, cardShape)
-                    .clickable(onClick = onOpenFavorites)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .height(114.dp)
+                    .clickable(onClick = onOpenFavorites),
+                contentAlignment = Alignment.CenterStart,
             ) {
-                if (favThumbs.isNotEmpty()) {
-                    // Layered 3-sleeve archival thumbnail stack
-                    Box(
-                        modifier = Modifier
-                            .width(66.dp)
-                            .height(56.dp),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        favThumbs.reversed().forEachIndexed { revIdx, uri ->
-                            val layerIdx = favThumbs.lastIndex - revIdx
-                            val sizeDp = (52 - layerIdx * 5).dp
-                            val xOff = (layerIdx * 9).dp
-                            Box(
-                                modifier = Modifier
-                                    .offset(x = xOff)
-                                    .size(sizeDp)
-                                    .shadow(if (layerIdx == 0) 6.dp else 2.dp, RoundedCornerShape(6.dp))
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .border(0.7.dp, surfaceColor, RoundedCornerShape(6.dp)),
-                            ) {
-                                AlbumArtwork(
-                                    uri = uri,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    cornerRadius = 6.dp,
-                                    iconSize = 20.dp,
-                                )
-                            }
-                        }
+                // Peeking grooved 180g black vinyl LP emerging cleanly on the right (echoing Icon #1!)
+                Canvas(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 6.dp)
+                        .size(102.dp),
+                ) {
+                    val r = size.minDimension * 0.5f
+                    val c = Offset(size.width * 0.5f, size.height * 0.5f)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            0.0f to Color(0xFF0A0A0B),
+                            0.70f to Color(0xFF171719),
+                            0.88f to Color(0xFF2B2B2E),
+                            1.0f to Color(0xFF0C0C0E),
+                            center = c,
+                            radius = r,
+                        ),
+                        radius = r,
+                        center = c,
+                    )
+                    for (g in 1..7) {
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.08f),
+                            radius = r * (0.42f + g * 0.072f),
+                            center = c,
+                            style = Stroke(width = 0.85f),
+                        )
                     }
-                } else {
+                    drawCircle(color = sleeveTop, radius = r * 0.28f, center = c)
+                    drawCircle(color = Color(0xFF0E0E10), radius = r * 0.08f, center = c)
+                }
+
+                // Matte Cinnabar Record Sleeve Card overlapping the left 84%
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(0.84f)
+                        .fillMaxHeight()
+                        .shadow(10.dp, cardShape, ambientColor = Color.Black.copy(alpha = 0.22f))
+                        .clip(cardShape)
+                        .background(Brush.verticalGradient(listOf(sleeveTop, sleeveBottom)))
+                        .border(0.75.dp, ivory.copy(alpha = 0.18f), cardShape)
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.onBackground),
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(ivory.copy(alpha = 0.14f))
+                            .border(0.75.dp, ivory.copy(alpha = 0.24f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Favorite,
                             contentDescription = null,
-                            tint = accentColor,
-                            modifier = Modifier.size(24.dp),
+                            tint = ivory,
+                            modifier = Modifier.size(26.dp),
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "我喜欢的音乐",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                    )
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = favSubtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                if (favoriteSongs.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onBackground)
-                            .clickable(onClick = onPlayFavorites),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.PlayArrow,
-                            contentDescription = "播放我喜欢的音乐",
-                            tint = MaterialTheme.colorScheme.background,
-                            modifier = Modifier.size(22.dp),
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "我喜欢的音乐",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = ivory,
+                            maxLines = 1,
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = favSubtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ivory.copy(alpha = 0.80f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    if (favoriteSongs.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(ivory)
+                                .clickable(onClick = onPlayFavorites),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.PlayArrow,
+                                contentDescription = "播放我喜欢的音乐",
+                                tint = sleeveTop,
+                                modifier = Modifier.size(21.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -2023,35 +2038,35 @@ private fun PlaylistsTabContent(
                     )
 
                     if (recentThumbs.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            contentAlignment = Alignment.CenterStart,
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            recentThumbs.forEachIndexed { idx, s ->
-                                val isCenter = idx == 0
-                                val sz = if (isCenter) 46.dp else 38.dp
-                                val xOff = when (idx) {
-                                    0 -> 0.dp
-                                    1 -> 34.dp
-                                    else -> 64.dp
-                                }
+                            for (i in 0 until 3) {
+                                val s = recentThumbs.getOrNull(i)
                                 Box(
                                     modifier = Modifier
-                                        .offset(x = xOff)
-                                        .size(sz)
-                                        .shadow(if (isCenter) 5.dp else 2.dp, RoundedCornerShape(6.dp))
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .border(0.8.dp, surfaceColor, RoundedCornerShape(6.dp)),
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(0.6.dp, outlineColor.copy(alpha = 0.7f), RoundedCornerShape(8.dp)),
                                 ) {
-                                    AlbumArtwork(
-                                        uri = s.albumArtUri,
-                                        contentDescription = s.title,
-                                        modifier = Modifier.fillMaxSize(),
-                                        cornerRadius = 6.dp,
-                                        iconSize = 18.dp,
-                                    )
+                                    if (s != null) {
+                                        AlbumArtwork(
+                                            uri = s.albumArtUri,
+                                            contentDescription = s.title,
+                                            modifier = Modifier.fillMaxSize(),
+                                            cornerRadius = 8.dp,
+                                            iconSize = 16.dp,
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2119,34 +2134,23 @@ private fun PlaylistsTabContent(
                             )
                         }
 
-                        // Minimalist 12-bar sparkline (2-hour buckets) highlighting peak listening period
-                        val inkBar = MaterialTheme.colorScheme.onBackground
+                        // Iconic 5-bar cinnabar sonic micro-capsules echoing Icon #1 & Splash Screen
                         Canvas(
                             modifier = Modifier
-                                .width(52.dp)
-                                .height(42.dp),
+                                .width(44.dp)
+                                .height(38.dp),
                         ) {
-                            val buckets = FloatArray(10) { b ->
-                                val h1 = b * 2 + 2
-                                val h2 = h1 + 1
-                                ((hourlyPlays[h1 % 24] ?: 0) + (hourlyPlays[h2 % 24] ?: 0)).toFloat()
-                            }
-                            val maxV = buckets.maxOrNull() ?: 0f
-                            val peakIdx = if (maxV > 0f) buckets.indices.maxByOrNull { buckets[it] } ?: -1 else -1
-                            val step = size.width / buckets.size
-                            val barW = (step * 0.46f).coerceAtLeast(2f)
-                            buckets.forEachIndexed { idx, v ->
-                                val ratio = if (maxV > 0f) (v / maxV).coerceIn(0.14f, 1f) else (0.18f + (idx % 3) * 0.08f)
-                                val h = size.height * ratio
-                                val x = idx * step + (step - barW) * 0.5f
-                                val col = when {
-                                    maxV <= 0f -> inkBar.copy(alpha = 0.16f)
-                                    idx == peakIdx -> accentColor
-                                    else -> inkBar.copy(alpha = 0.52f)
-                                }
+                            val heights = floatArrayOf(0.36f, 0.68f, 1.00f, 0.68f, 0.36f)
+                            val barW = size.width * 0.115f
+                            val gap = (size.width - heights.size * barW) / (heights.size - 1)
+                            val cy = size.height * 0.5f
+                            heights.forEachIndexed { idx, hFrac ->
+                                val h = size.height * hFrac
+                                val x = idx * (barW + gap)
+                                val col = if (totalPlays > 0) accentColor.copy(alpha = if (idx == 2) 1f else 0.78f) else accentColor.copy(alpha = 0.28f)
                                 drawRoundRect(
                                     color = col,
-                                    topLeft = Offset(x, size.height - h),
+                                    topLeft = Offset(x, cy - h * 0.5f),
                                     size = Size(barW, h),
                                     cornerRadius = CornerRadius(barW * 0.5f, barW * 0.5f),
                                 )

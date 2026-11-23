@@ -1336,7 +1336,7 @@ fun SettingsScreen(
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "v1.01",
+                            text = "v1.03",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold,
@@ -1356,7 +1356,7 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "PURE MUSIC  ·  本地离线  ·  零广告  ·  原生引擎",
+                    text = "PURE MUSIC · 本地离线 · 零广告 · 开源组件遵循 Apache-2.0（详见随包 THIRD_PARTY_LICENSES.txt）",
                     style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.6.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                 )

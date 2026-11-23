@@ -34,7 +34,7 @@ import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.MiniPlayerStyle
 import kotlin.math.tan
 
-val CinnabarRed = Color(0xFFA63429)
+val CinnabarRed = Color(0xFFA9321E)
 val ForestGreen = Color(0xFF2F5D50)
 
 private data class PaperPalette(
@@ -68,13 +68,13 @@ private fun lightPaperFor(accent: AppAccentColor): PaperPalette = when (accent) 
         outline = Color(0xFFC2D6CD),
     )
     AppAccentColor.CINNABAR_RED -> PaperPalette(
-        bg = Color(0xFFF2E7E0),
-        card = Color(0xFFFAF5F2),
-        variant = Color(0xFFE7D7CE),
-        high = Color(0xFFDEC9BD),
-        ink = Color(0xFF211816),
-        muted = Color(0xFF6B5B55),
-        outline = Color(0xFFD9C5BB),
+        bg = Color(0xFFF5F0E6),
+        card = Color(0xFFFBF8F2),
+        variant = Color(0xFFECE5D8),
+        high = Color(0xFFE3DACB),
+        ink = Color(0xFF1F1C18),
+        muted = Color(0xFF7A7267),
+        outline = Color(0xFFDFD7C8),
     )
     AppAccentColor.WALNUT_SEPIA -> PaperPalette(
         bg = Color(0xFFEFE7DA),
