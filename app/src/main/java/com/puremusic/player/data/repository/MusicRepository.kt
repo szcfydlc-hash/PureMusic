@@ -89,6 +89,9 @@ class MusicRepository(private val context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 add(MediaStore.Audio.Media.RELATIVE_PATH)
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                add(MediaStore.Audio.Media.GENRE)
+            }
         }.toTypedArray()
 
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 0"
@@ -112,6 +115,11 @@ class MusicRepository(private val context: Context) {
             val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
             val relPathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+            } else {
+                -1
+            }
+            val genreCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                cursor.getColumnIndex(MediaStore.Audio.Media.GENRE)
             } else {
                 -1
             }
@@ -155,6 +163,7 @@ class MusicRepository(private val context: Context) {
                         folderPath = folderPath,
                         filePath = filePath,
                         dateAddedSec = dateAddedSec,
+                        genre = normalizeGenre(if (genreCol >= 0) cursor.getString(genreCol) else null),
                     ),
                 )
             }
@@ -272,5 +281,36 @@ class MusicRepository(private val context: Context) {
             bitrateKbps = bitrateKbps,
             isHiRes = hiRes,
         )
+    }
+
+    private fun normalizeGenre(raw: String?): String {
+        val cleaned = raw
+            ?.replace(Regex("""^\(\d+\)\s*"""), "")
+            ?.trim()
+            .orEmpty()
+        if (cleaned.isBlank() || cleaned.equals("<unknown>", ignoreCase = true) || cleaned.equals("unknown", ignoreCase = true)) {
+            return ""
+        }
+        val firstToken = cleaned.split("/", ";", ",", "、").firstOrNull()?.trim().orEmpty()
+        if (firstToken.isBlank()) return ""
+        val lower = firstToken.lowercase()
+        return when {
+            lower.contains("pop") || lower.contains("流行") -> "流行"
+            lower.contains("jazz") || lower.contains("爵士") -> "爵士"
+            lower.contains("rock") || lower.contains("摇滚") -> "摇滚"
+            lower.contains("folk") || lower.contains("acoustic") || lower.contains("民谣") -> "民谣"
+            lower.contains("electronic") || lower.contains("edm") || lower.contains("trip-hop") ||
+                lower.contains("trip hop") || lower.contains("ambient") || lower.contains("house") ||
+                lower.contains("techno") || lower.contains("电子") -> "电子"
+            lower.contains("classical") || lower.contains("orchestra") || lower.contains("古典") -> "古典"
+            lower.contains("hip-hop") || lower.contains("hip hop") || lower.contains("rap") || lower.contains("说唱") -> "说唱"
+            lower.contains("r&b") || lower.contains("rnb") || lower.contains("soul") || lower.contains("节奏布鲁斯") -> "R&B"
+            lower.contains("soundtrack") || lower.contains("ost") || lower.contains("score") || lower.contains("原声") -> "原声"
+            lower.contains("metal") || lower.contains("金属") -> "金属"
+            lower.contains("blues") || lower.contains("蓝调") -> "蓝调"
+            lower.contains("country") || lower.contains("乡村") -> "乡村"
+            lower.contains("indie") || lower.contains("alternative") || lower.contains("独立") -> "独立"
+            else -> firstToken.take(10)
+        }
     }
 }

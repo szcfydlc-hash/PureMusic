@@ -15,6 +15,7 @@ data class Song(
     val folderPath: String,
     val filePath: String = "",
     val dateAddedSec: Long,
+    val genre: String = "",
 )
 
 data class Album(

@@ -150,6 +150,7 @@ fun ImmersiveLyricsHost(
     lyricFamily: FontFamily,
     lyricStyleItalic: FontStyle,
     dynamicAccent: Color,
+    dynamicGlow: Color = dynamicAccent,
     isDarkTheme: Boolean,
     isTranslatingLyrics: Boolean,
     lyricOffsetMs: Long,
@@ -221,6 +222,8 @@ fun ImmersiveLyricsHost(
                     vinylRotationProvider = vinylRotationProvider,
                     lyricFamily = lyricFamily,
                     lyricStyleItalic = lyricStyleItalic,
+                    dynamicAccent = dynamicAccent,
+                    dynamicGlow = dynamicGlow,
                     isDarkTheme = isDarkTheme,
                     currentStyle = targetStyle,
                     isTranslatingLyrics = isTranslatingLyrics,
@@ -335,6 +338,8 @@ private fun VinylStudyImmersiveView(
     vinylRotationProvider: () -> Float,
     lyricFamily: FontFamily,
     lyricStyleItalic: FontStyle,
+    dynamicAccent: Color = Color(0xFF7B8E9B),
+    dynamicGlow: Color = Color(0xFF93A6B2),
     isDarkTheme: Boolean,
     currentStyle: ImmersionLyricStyle,
     isTranslatingLyrics: Boolean,
@@ -356,11 +361,25 @@ private fun VinylStudyImmersiveView(
     onAdjustLyricOffset: (Long) -> Unit,
     onResetLyricOffset: () -> Unit,
 ) {
-    val bgColor = if (isDarkTheme) Color(0xFF151413) else Color(0xFFF5F0E6)
-    val inkPrimary = if (isDarkTheme) Color(0xFFF2ECE1) else Color(0xFF1E1B18)
-    val inkSecondary = if (isDarkTheme) Color(0xFFA69E93) else Color(0xFF6B655D)
-    val inkMuted = if (isDarkTheme) Color(0xFF666059) else Color(0xFFB5ADA1)
-    val cinnabar = Color(0xFFC83E2B)
+    val studyBgTop by animateColorAsState(
+        targetValue = lerp(Color(0xFF1B2328), dynamicAccent, 0.44f),
+        animationSpec = tween(durationMillis = 550),
+        label = "studyBgTop",
+    )
+    val studyBgMid by animateColorAsState(
+        targetValue = lerp(Color(0xFF12181C), dynamicAccent, 0.28f),
+        animationSpec = tween(durationMillis = 550),
+        label = "studyBgMid",
+    )
+    val studyBgBottom by animateColorAsState(
+        targetValue = lerp(Color(0xFF0A0F12), dynamicAccent, 0.14f),
+        animationSpec = tween(durationMillis = 550),
+        label = "studyBgBottom",
+    )
+    val inkPrimary = if (isDarkTheme) Color(0xFFF4F7F9) else Color(0xFF1E1B18)
+    val inkSecondary = if (isDarkTheme) lerp(Color(0xFFA3AEB5), dynamicGlow, 0.22f) else Color(0xFF6B655D)
+    val inkMuted = if (isDarkTheme) lerp(Color(0xFF646F77), dynamicGlow, 0.18f) else Color(0xFFB5ADA1)
+    val cinnabar = if (isDarkTheme) lerp(Color(0xFFAECAD8), dynamicGlow, 0.55f) else Color(0xFFC83E2B)
 
     val haptic = LocalHapticFeedback.current
     val hapticEnabled = LocalHapticEnabled.current
@@ -371,10 +390,35 @@ private fun VinylStudyImmersiveView(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgColor)
+            .then(
+                if (isDarkTheme) {
+                    Modifier.background(
+                        Brush.verticalGradient(
+                            0.0f to studyBgTop,
+                            0.48f to studyBgMid,
+                            1.0f to studyBgBottom,
+                        ),
+                    )
+                } else {
+                    Modifier.background(Color(0xFFF5F0E6))
+                },
+            )
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
+        if (isDarkTheme) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        0.0f to dynamicGlow.copy(alpha = 0.26f),
+                        0.46f to dynamicGlow.copy(alpha = 0.10f),
+                        1.0f to Color.Transparent,
+                        center = Offset(size.width * 0.54f, size.height * 0.26f),
+                        radius = size.minDimension * 0.64f,
+                    ),
+                )
+            }
+        }
         val stageW = maxWidth
         val stageH = maxHeight
         val isCompactH = stageH < 520.dp
@@ -555,7 +599,7 @@ private fun VinylStudyImmersiveView(
                 isPlaying = isPlaying,
                 spectrumBands = spectrumBands,
                 spectrumStyle = spectrumStyle,
-                playedColor = inkPrimary,
+                playedColor = if (isDarkTheme) lerp(inkPrimary, dynamicGlow, 0.30f) else inkPrimary,
                 unplayedColor = inkMuted.copy(alpha = 0.45f),
                 needleColor = cinnabar,
                 timestampColor = inkSecondary,

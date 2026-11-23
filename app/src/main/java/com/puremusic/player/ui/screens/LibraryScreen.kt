@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -62,12 +63,14 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Whatshot
 import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MusicOff
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Pause
@@ -238,6 +241,22 @@ fun LibraryScreen(
     bottomContentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     var selectedSubTab by remember { mutableStateOf(LibrarySubTab.SONGS) }
+    var selectedGenre by remember { mutableStateOf<String?>(null) }
+    val availableGenres = remember(songs) {
+        songs
+            .asSequence()
+            .map { it.genre.trim() }
+            .filter { it.isNotEmpty() }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .map { it.key }
+    }
+    val effectiveSelectedGenre = selectedGenre?.takeIf { it in availableGenres }
+    val displayedSongs = remember(songs, effectiveSelectedGenre) {
+        if (effectiveSelectedGenre == null) songs else songs.filter { it.genre == effectiveSelectedGenre }
+    }
     var activeDetail by remember { mutableStateOf<CollectionDetail?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var isSelectionMode by remember { mutableStateOf(false) }
@@ -548,49 +567,151 @@ fun LibraryScreen(
                     }
                 }
 
-                // 3. Book-Index Underline Sub-Tabs on Library tab (歌曲 / 歌手 / 文件夹)
+                // 3. High-Clarity Segmented Capsule Sub-Tabs (歌曲 / 歌手 / 文件夹) + Scrollable Genre Pills
                 if (activeMainTab == MainTab.LIBRARY) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 4.dp),
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        val trackShape = RoundedCornerShape(22.dp)
+                        val pillShape = RoundedCornerShape(19.dp)
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp, vertical = 6.dp)
+                                .height(44.dp)
+                                .clip(trackShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+                                .border(0.75.dp, outlineColor, trackShape)
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             LibrarySubTab.entries.forEach { subTab ->
                                 val selected = subTab == selectedSubTab
-                                Column(
+                                val tabIcon = when (subTab) {
+                                    LibrarySubTab.SONGS -> Icons.Rounded.MusicNote
+                                    LibrarySubTab.ARTISTS -> Icons.Rounded.Person
+                                    LibrarySubTab.FOLDERS -> Icons.Rounded.FolderOpen
+                                }
+                                Row(
                                     modifier = Modifier
-                                        .clickable { selectedSubTab = subTab }
-                                        .padding(top = 6.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .then(
+                                            if (selected) {
+                                                Modifier
+                                                    .shadow(2.dp, pillShape, ambientColor = Color.Black.copy(alpha = 0.12f))
+                                                    .clip(pillShape)
+                                                    .background(MaterialTheme.colorScheme.surface)
+                                                    .border(0.5.dp, outlineColor.copy(alpha = 0.75f), pillShape)
+                                            } else {
+                                                Modifier.clip(pillShape)
+                                            },
+                                        )
+                                        .clickable { selectedSubTab = subTab },
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
+                                    Icon(
+                                        imageVector = tabIcon,
+                                        contentDescription = null,
+                                        tint = if (selected) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
                                     Text(
                                         text = subTab.label,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                                         color = if (selected) {
                                             MaterialTheme.colorScheme.primary
                                         } else {
                                             MaterialTheme.colorScheme.onSurfaceVariant
                                         },
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .width(34.dp)
-                                            .height(2.dp)
-                                            .background(
-                                                if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                            ),
+                                        maxLines = 1,
                                     )
                                 }
                             }
                         }
-                        HorizontalDivider(thickness = 0.75.dp, color = outlineColor)
+
+                        // Scrollable Genre Filter Pills (流派标签) on Songs sub-tab when genres exist
+                        if (selectedSubTab == LibrarySubTab.SONGS && !isLoading && availableGenres.isNotEmpty()) {
+                            LazyRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp, bottom = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 18.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                item(key = "genre_all") {
+                                    val isAllSelected = effectiveSelectedGenre == null
+                                    val chipShape = RoundedCornerShape(15.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .height(30.dp)
+                                            .clip(chipShape)
+                                            .background(
+                                                if (isAllSelected) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.surface,
+                                            )
+                                            .then(
+                                                if (isAllSelected) Modifier
+                                                else Modifier.border(0.75.dp, outlineColor, chipShape),
+                                            )
+                                            .clickable { selectedGenre = null }
+                                            .padding(horizontal = 14.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = "全部",
+                                            fontSize = 12.5.sp,
+                                            fontWeight = if (isAllSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = if (isAllSelected) {
+                                                MaterialTheme.colorScheme.onPrimary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.84f)
+                                            },
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
+                                items(availableGenres, key = { "genre_$it" }) { genre ->
+                                    val isGenreSelected = effectiveSelectedGenre == genre
+                                    val chipShape = RoundedCornerShape(15.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .height(30.dp)
+                                            .clip(chipShape)
+                                            .background(
+                                                if (isGenreSelected) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.surface,
+                                            )
+                                            .then(
+                                                if (isGenreSelected) Modifier
+                                                else Modifier.border(0.75.dp, outlineColor, chipShape),
+                                            )
+                                            .clickable { selectedGenre = if (isGenreSelected) null else genre }
+                                            .padding(horizontal = 13.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = genre,
+                                            fontSize = 12.5.sp,
+                                            fontWeight = if (isGenreSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = if (isGenreSelected) {
+                                                MaterialTheme.colorScheme.onPrimary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.84f)
+                                            },
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else {
                     HorizontalDivider(
@@ -601,7 +722,7 @@ fun LibraryScreen(
                 }
 
                 // 4. Ultra-Clean Compact Single-Line Toolbar (or Batch Multi-Select Header)
-                if (activeMainTab == MainTab.LIBRARY && selectedSubTab == LibrarySubTab.SONGS && !isLoading && songs.isNotEmpty()) {
+                if (activeMainTab == MainTab.LIBRARY && selectedSubTab == LibrarySubTab.SONGS && !isLoading && displayedSongs.isNotEmpty()) {
                     if (isSelectionMode) {
                         Row(
                             modifier = Modifier
@@ -636,17 +757,17 @@ fun LibraryScreen(
                                 )
                             }
                             Text(
-                                text = if (selectedSongIds.size == songs.size) "取消全选" else "全选",
+                                text = if (selectedSongIds.size == displayedSongs.size) "取消全选" else "全选",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
                                     .clickable {
-                                        selectedSongIds = if (selectedSongIds.size == songs.size) {
+                                        selectedSongIds = if (selectedSongIds.size == displayedSongs.size) {
                                             emptySet()
                                         } else {
-                                            songs.map { it.id }.toSet()
+                                            displayedSongs.map { it.id }.toSet()
                                         }
                                     }
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -663,7 +784,7 @@ fun LibraryScreen(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { onPlaySongs(songs, 0, true) }
+                                .clickable { onPlaySongs(displayedSongs, 0, true) }
                                 .padding(horizontal = 4.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(LocalLayoutDensity.current.gridSpacingDp.dp),
@@ -675,7 +796,7 @@ fun LibraryScreen(
                                 modifier = Modifier.size(19.dp),
                             )
                             Text(
-                                text = "${songs.size}",
+                                text = "${displayedSongs.size}",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onBackground,
@@ -776,7 +897,7 @@ fun LibraryScreen(
                         when (mainTab) {
                             MainTab.LIBRARY -> when (subTab) {
                                 LibrarySubTab.SONGS -> SongsTabContent(
-                                    songs = songs,
+                                    songs = displayedSongs,
                                     playerTheme = playerTheme,
                                     usePosterGrid = usePosterGrid,
                                     gridColumns = songGridColumns,
@@ -1895,301 +2016,257 @@ private fun PlaylistsTabContent(
         ),
         verticalArrangement = Arrangement.spacedBy(density.gridSpacingDp.dp),
     ) {
-        // 1. Hero Card: 我喜欢的音乐 (Icon-Cohesive Cinnabar Vinyl Sleeve + Peeking 180g LP)
+        // 1. Style 2 Hero Card: Light Washi Vinyl Shelf for 我喜欢的音乐 (Cinnabar mini sleeve + peeking black LP on ivory paper!)
         item(key = "favorites_hero") {
-            val sleeveTop = accentColor
-            val sleeveBottom = lerp(accentColor, Color(0xFF1A0805), 0.24f)
-            val ivory = Color(0xFFF6EFE2)
-            Box(
+            val cinnabarSleeve = Color(0xFFA9321E)
+            val cinnabarDeep = Color(0xFF8B2514)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(114.dp)
-                    .clickable(onClick = onOpenFavorites),
-                contentAlignment = Alignment.CenterStart,
+                    .shadow(4.dp, cardShape, ambientColor = Color.Black.copy(alpha = 0.08f))
+                    .clip(cardShape)
+                    .background(surfaceColor)
+                    .border(0.75.dp, outlineColor, cardShape)
+                    .clickable(onClick = onOpenFavorites)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Peeking grooved 180g black vinyl LP emerging cleanly on the right (echoing Icon #1!)
-                Canvas(
+                // Physical mini cinnabar vinyl sleeve + grooved 180g LP peeking cleanly out the right
+                Box(
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 6.dp)
-                        .size(102.dp),
+                        .width(106.dp)
+                        .height(78.dp),
+                    contentAlignment = Alignment.CenterStart,
                 ) {
-                    val r = size.minDimension * 0.5f
-                    val c = Offset(size.width * 0.5f, size.height * 0.5f)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            0.0f to Color(0xFF0A0A0B),
-                            0.70f to Color(0xFF171719),
-                            0.88f to Color(0xFF2B2B2E),
-                            1.0f to Color(0xFF0C0C0E),
-                            center = c,
-                            radius = r,
-                        ),
-                        radius = r,
-                        center = c,
-                    )
-                    for (g in 1..7) {
+                    Canvas(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(72.dp),
+                    ) {
+                        val r = size.minDimension * 0.5f
+                        val c = Offset(size.width * 0.5f, size.height * 0.5f)
                         drawCircle(
-                            color = Color.White.copy(alpha = 0.08f),
-                            radius = r * (0.42f + g * 0.072f),
+                            brush = Brush.radialGradient(
+                                0.0f to Color(0xFF0A0A0B),
+                                0.72f to Color(0xFF1A1A1C),
+                                0.90f to Color(0xFF2E2E32),
+                                1.0f to Color(0xFF0E0E10),
+                                center = c,
+                                radius = r,
+                            ),
+                            radius = r,
                             center = c,
-                            style = Stroke(width = 0.85f),
                         )
+                        for (g in 1..6) {
+                            drawCircle(
+                                color = Color.White.copy(alpha = 0.08f),
+                                radius = r * (0.44f + g * 0.08f),
+                                center = c,
+                                style = Stroke(width = 0.75f),
+                            )
+                        }
+                        drawCircle(color = cinnabarSleeve, radius = r * 0.28f, center = c)
+                        drawCircle(color = Color(0xFF101012), radius = r * 0.08f, center = c)
                     }
-                    drawCircle(color = sleeveTop, radius = r * 0.28f, center = c)
-                    drawCircle(color = Color(0xFF0E0E10), radius = r * 0.08f, center = c)
-                }
 
-                // Matte Cinnabar Record Sleeve Card overlapping the left 84%
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(0.84f)
-                        .fillMaxHeight()
-                        .shadow(10.dp, cardShape, ambientColor = Color.Black.copy(alpha = 0.22f))
-                        .clip(cardShape)
-                        .background(Brush.verticalGradient(listOf(sleeveTop, sleeveBottom)))
-                        .border(0.75.dp, ivory.copy(alpha = 0.18f), cardShape)
-                        .padding(horizontal = 18.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
                     Box(
                         modifier = Modifier
-                            .size(50.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(ivory.copy(alpha = 0.14f))
-                            .border(0.75.dp, ivory.copy(alpha = 0.24f), RoundedCornerShape(12.dp)),
+                            .size(76.dp)
+                            .shadow(6.dp, RoundedCornerShape(8.dp), ambientColor = Color.Black.copy(alpha = 0.25f))
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Brush.verticalGradient(listOf(cinnabarSleeve, cinnabarDeep)))
+                            .border(0.6.dp, Color(0xFFF6EFE2).copy(alpha = 0.22f), RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Favorite,
                             contentDescription = null,
-                            tint = ivory,
-                            modifier = Modifier.size(26.dp),
+                            tint = Color(0xFFF6EFE2).copy(alpha = 0.92f),
+                            modifier = Modifier.size(28.dp),
                         )
-                    }
-
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "我喜欢的音乐",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = ivory,
-                            maxLines = 1,
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = favSubtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ivory.copy(alpha = 0.80f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-
-                    if (favoriteSongs.isNotEmpty()) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(ivory)
-                                .clickable(onClick = onPlayFavorites),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.PlayArrow,
-                                contentDescription = "播放我喜欢的音乐",
-                                tint = sleeveTop,
-                                modifier = Modifier.size(21.dp),
-                            )
-                        }
                     }
                 }
-            }
-        }
 
-        // 2. Editorial Bento Row: 最近播放 (left) + 听歌报告 (right)
-        item(key = "smart_bento_row") {
-            val recentThumbs = remember(recentSongs) { recentSongs.take(3) }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                // Left Card: 最近播放 with overlapping 3-cover preview
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(132.dp)
-                        .clip(cardShape)
-                        .background(surfaceColor)
-                        .border(0.75.dp, outlineColor, cardShape)
-                        .clickable(onClick = onOpenRecent)
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "最近播放",
-                        style = MaterialTheme.typography.titleSmall,
+                        text = "我喜欢的音乐",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
                         maxLines = 1,
                     )
-
-                    if (recentThumbs.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            for (i in 0 until 3) {
-                                val s = recentThumbs.getOrNull(i)
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .border(0.6.dp, outlineColor.copy(alpha = 0.7f), RoundedCornerShape(8.dp)),
-                                ) {
-                                    if (s != null) {
-                                        AlbumArtwork(
-                                            uri = s.albumArtUri,
-                                            contentDescription = s.title,
-                                            modifier = Modifier.fillMaxSize(),
-                                            cornerRadius = 8.dp,
-                                            iconSize = 16.dp,
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.History,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (recentSongs.isNotEmpty()) {
-                            "${recentSongs.size} 首 · ${recentSongs.first().title}"
-                        } else {
-                            "暂无播放记录"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
+                        text = favSubtitle,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
 
-                // Right Card: 听歌报告 (live hours, play count, and 24h mini rhythm sparkline)
-                Column(
+                if (favoriteSongs.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .border(1.1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f), CircleShape)
+                            .clickable(onClick = onPlayFavorites),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PlayArrow,
+                            contentDescription = "播放我喜欢的音乐",
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. Style 2 Slim Dual-Pill Shortcut Bar: 最近播放 + 听歌报告 (Zero empty placeholder boxes!)
+        item(key = "smart_bento_row") {
+            val latestRecent = recentSongs.firstOrNull()
+            val pillShape = RoundedCornerShape(24.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // Left Pill: 最近播放
+                Row(
                     modifier = Modifier
                         .weight(1f)
-                        .height(132.dp)
-                        .clip(cardShape)
+                        .height(50.dp)
+                        .clip(pillShape)
                         .background(surfaceColor)
-                        .border(0.75.dp, outlineColor, cardShape)
-                        .clickable(onClick = onOpenListeningReport)
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
+                        .border(0.75.dp, outlineColor, pillShape)
+                        .clickable(onClick = onOpenRecent)
+                        .padding(start = 14.dp, end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        text = "听歌报告",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                    )
-
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = estimatedHoursText,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                maxLines = 1,
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "$totalPlays 次播放",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                            )
-                        }
-
-                        // Iconic 5-bar cinnabar sonic micro-capsules echoing Icon #1 & Splash Screen
-                        Canvas(
+                        Text(
+                            text = "最近播放",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = " · ${recentSongs.size} 首",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (latestRecent != null) {
+                        AlbumArtwork(
+                            uri = latestRecent.albumArtUri,
+                            contentDescription = latestRecent.title,
                             modifier = Modifier
-                                .width(44.dp)
-                                .height(38.dp),
-                        ) {
-                            val heights = floatArrayOf(0.36f, 0.68f, 1.00f, 0.68f, 0.36f)
-                            val barW = size.width * 0.115f
-                            val gap = (size.width - heights.size * barW) / (heights.size - 1)
-                            val cy = size.height * 0.5f
-                            heights.forEachIndexed { idx, hFrac ->
-                                val h = size.height * hFrac
-                                val x = idx * (barW + gap)
-                                val col = if (totalPlays > 0) accentColor.copy(alpha = if (idx == 2) 1f else 0.78f) else accentColor.copy(alpha = 0.28f)
-                                drawRoundRect(
-                                    color = col,
-                                    topLeft = Offset(x, cy - h * 0.5f),
-                                    size = Size(barW, h),
-                                    cornerRadius = CornerRadius(barW * 0.5f, barW * 0.5f),
-                                )
-                            }
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .border(0.6.dp, outlineColor, CircleShape),
+                            cornerRadius = 17.dp,
+                            iconSize = 15.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+
+                // Right Pill: 听歌报告
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp)
+                        .clip(pillShape)
+                        .background(surfaceColor)
+                        .border(0.75.dp, outlineColor, pillShape)
+                        .clickable(onClick = onOpenListeningReport)
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "听歌报告",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = " · $estimatedHoursText",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Canvas(modifier = Modifier.width(22.dp).height(18.dp)) {
+                        val heights = floatArrayOf(0.42f, 0.78f, 1.00f, 0.72f, 0.42f)
+                        val barW = size.width * 0.13f
+                        val gap = (size.width - heights.size * barW) / (heights.size - 1)
+                        val cy = size.height * 0.5f
+                        heights.forEachIndexed { idx, hFrac ->
+                            val h = size.height * hFrac
+                            val x = idx * (barW + gap)
+                            drawRoundRect(
+                                color = accentColor,
+                                topLeft = Offset(x, cy - h * 0.5f),
+                                size = Size(barW, h),
+                                cornerRadius = CornerRadius(barW * 0.5f, barW * 0.5f),
+                            )
                         }
                     }
-
-                    Text(
-                        text = if (totalPlays > 0) "查看聆听档案" else "听歌后自动生成",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = accentColor,
-                        maxLines = 1,
-                    )
                 }
             }
         }
 
         // 3. Section Header: 自建歌单
         item(key = "user_playlists_header") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp, start = 2.dp, end = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = "自建歌单",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                if (playlists.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
                     Text(
-                        text = "${playlists.size} 个",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = "自建歌单",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
                     )
+                    if (playlists.isNotEmpty()) {
+                        Text(
+                            text = "${playlists.size} 个",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor.copy(alpha = 0.85f))
             }
         }
 
@@ -2222,34 +2299,50 @@ private fun PlaylistsTabContent(
                 }
             }
         } else {
-            // Clean 2-column cover card grid for user playlists
-            val rows = playlists.chunked(2)
-            items(rows, key = { pair -> pair.joinToString("_") { it.id } }) { rowPlaylists ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    rowPlaylists.forEach { playlist ->
-                        val customCoverUri = playlistCovers[playlist.id]
-                        val autoCoverUri = remember(playlist.songIds) {
-                            resolveSongsByIds(playlist.songIds).firstOrNull()?.albumArtUri
-                        }
-                        val finalCoverUri = customCoverUri ?: autoCoverUri
-                        var plMenuExpanded by remember { mutableStateOf(false) }
+            // Style 3 Compact Editorial Monograph Rows (64dp cover with subtle vinyl peek + hairline dividers)
+            items(playlists, key = { it.id }) { playlist ->
+                val customCoverUri = playlistCovers[playlist.id]
+                val autoCoverUri = remember(playlist.songIds) {
+                    resolveSongsByIds(playlist.songIds).firstOrNull()?.albumArtUri
+                }
+                val finalCoverUri = customCoverUri ?: autoCoverUri
+                var plMenuExpanded by remember { mutableStateOf(false) }
 
-                        Column(
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onOpenPlaylist(playlist) }
+                            .padding(vertical = 8.dp, horizontal = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Compact 64dp cover with refined peeking vinyl accent
+                        Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .clip(cardShape)
-                                .background(surfaceColor)
-                                .border(0.75.dp, outlineColor, cardShape)
-                                .clickable { onOpenPlaylist(playlist) }
-                                .padding(10.dp),
+                                .width(76.dp)
+                                .height(64.dp),
+                            contentAlignment = Alignment.CenterStart,
                         ) {
+                            Canvas(
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .size(56.dp),
+                            ) {
+                                val r = size.minDimension * 0.5f
+                                val c = Offset(size.width * 0.5f, size.height * 0.5f)
+                                drawCircle(color = Color(0xFF151517), radius = r, center = c)
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.08f),
+                                    radius = r * 0.78f,
+                                    center = c,
+                                    style = Stroke(width = 0.7f),
+                                )
+                            }
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
+                                    .size(64.dp)
+                                    .shadow(4.dp, RoundedCornerShape(8.dp), ambientColor = Color.Black.copy(alpha = 0.16f))
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant),
                                 contentAlignment = Alignment.Center,
@@ -2260,103 +2353,103 @@ private fun PlaylistsTabContent(
                                         contentDescription = playlist.name,
                                         modifier = Modifier.fillMaxSize(),
                                         cornerRadius = 8.dp,
-                                        iconSize = 36.dp,
+                                        iconSize = 24.dp,
                                     )
                                 } else {
                                     Icon(
                                         imageVector = Icons.Rounded.QueueMusic,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                                        modifier = Modifier.size(34.dp),
+                                        modifier = Modifier.size(26.dp),
                                     )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = playlist.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onBackground,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = "${playlist.songIds.size} 首",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                Box {
-                                    IconButton(
-                                        onClick = { plMenuExpanded = true },
-                                        modifier = Modifier.size(30.dp),
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.MoreVert,
-                                            contentDescription = "歌单操作",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = plMenuExpanded,
-                                        onDismissRequest = { plMenuExpanded = false },
-                                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-                                        tonalElevation = 0.dp,
-                                        shadowElevation = 10.dp,
-                                        shape = RoundedCornerShape(14.dp),
-                                        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("添加 / 管理歌曲") },
-                                            onClick = {
-                                                plMenuExpanded = false
-                                                onRequestManagePlaylistSongs(playlist)
-                                            },
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("更换歌单封面") },
-                                            onClick = {
-                                                plMenuExpanded = false
-                                                onRequestReplacePlaylistCover(playlist)
-                                            },
-                                        )
-                                        if (customCoverUri != null) {
-                                            DropdownMenuItem(
-                                                text = { Text("恢复自动封面") },
-                                                onClick = {
-                                                    plMenuExpanded = false
-                                                    onClearPlaylistCover(playlist)
-                                                },
-                                            )
-                                        }
-                                        DropdownMenuItem(
-                                            text = { Text("重命名歌单") },
-                                            onClick = {
-                                                plMenuExpanded = false
-                                                onRequestRenamePlaylist(playlist)
-                                            },
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("删除歌单", color = MaterialTheme.colorScheme.primary) },
-                                            onClick = {
-                                                plMenuExpanded = false
-                                                onRequestDeletePlaylist(playlist)
-                                            },
-                                        )
-                                    }
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = playlist.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "${playlist.songIds.size} 首",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        Box {
+                            IconButton(
+                                onClick = { plMenuExpanded = true },
+                                modifier = Modifier.size(34.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.MoreVert,
+                                    contentDescription = "歌单操作",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(19.dp),
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = plMenuExpanded,
+                                onDismissRequest = { plMenuExpanded = false },
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+                                tonalElevation = 0.dp,
+                                shadowElevation = 10.dp,
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("添加 / 管理歌曲") },
+                                    onClick = {
+                                        plMenuExpanded = false
+                                        onRequestManagePlaylistSongs(playlist)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("更换歌单封面") },
+                                    onClick = {
+                                        plMenuExpanded = false
+                                        onRequestReplacePlaylistCover(playlist)
+                                    },
+                                )
+                                if (customCoverUri != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("恢复自动封面") },
+                                        onClick = {
+                                            plMenuExpanded = false
+                                            onClearPlaylistCover(playlist)
+                                        },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text("重命名歌单") },
+                                    onClick = {
+                                        plMenuExpanded = false
+                                        onRequestRenamePlaylist(playlist)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("删除歌单", color = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        plMenuExpanded = false
+                                        onRequestDeletePlaylist(playlist)
+                                    },
+                                )
+                            }
+                        }
                     }
-                    if (rowPlaylists.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = outlineColor.copy(alpha = 0.65f),
+                    )
                 }
             }
         }

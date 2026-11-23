@@ -265,24 +265,30 @@ fun NowPlayingScreen(
     }
     val lyricStyleItalic = if (lyricFontStyle == LyricFontStyle.SERIF_ITALIC) FontStyle.Italic else FontStyle.Normal
 
-    val rawAccentColor = if (liquidGlassEnabled) animatedAccent else MaterialTheme.colorScheme.primary
+    val rawAccentColor = if (isDarkTheme) {
+        animatedGlow
+    } else if (liquidGlassEnabled) {
+        animatedAccent
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
     val activeAccentColor = if (isDarkTheme && rawAccentColor.luminance() < 0.28f) {
-        Color(0xFFE6C896)
+        Color(0xFFD6E2EA)
     } else {
         rawAccentColor
     }
     val darkBgTop by animateColorAsState(
-        targetValue = lerp(Color(0xFF231F20), extractedPalette.accent, 0.56f),
+        targetValue = lerp(Color(0xFF282E33), extractedPalette.accent, 0.44f),
         animationSpec = tween(durationMillis = 550),
         label = "darkAmbientTop",
     )
     val darkBgMid by animateColorAsState(
-        targetValue = lerp(Color(0xFF1A1718), extractedPalette.accent, 0.38f),
+        targetValue = lerp(Color(0xFF1D2226), extractedPalette.accent, 0.30f),
         animationSpec = tween(durationMillis = 550),
         label = "darkAmbientMid",
     )
     val darkBgBottom by animateColorAsState(
-        targetValue = lerp(Color(0xFF121011), extractedPalette.accent, 0.22f),
+        targetValue = lerp(Color(0xFF14181B), extractedPalette.accent, 0.18f),
         animationSpec = tween(durationMillis = 550),
         label = "darkAmbientBottom",
     )
@@ -309,11 +315,11 @@ fun NowPlayingScreen(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawRect(
                     brush = Brush.radialGradient(
-                        0.0f to animatedAccent.copy(alpha = 0.36f),
-                        0.45f to animatedAccent.copy(alpha = 0.16f),
+                        0.0f to animatedGlow.copy(alpha = 0.20f),
+                        0.48f to animatedGlow.copy(alpha = 0.08f),
                         1.0f to Color.Transparent,
-                        center = Offset(size.width * 0.88f, size.height * 0.14f),
-                        radius = size.maxDimension * 0.62f,
+                        center = Offset(size.width * 0.50f, size.height * 0.32f),
+                        radius = size.maxDimension * 0.58f,
                     ),
                 )
             }
@@ -367,7 +373,8 @@ fun NowPlayingScreen(
                     vinylRotationProvider = { vinylAngle.value },
                     lyricFamily = lyricFamily,
                     lyricStyleItalic = lyricStyleItalic,
-                    dynamicAccent = extractedPalette.accent,
+                    dynamicAccent = animatedAccent,
+                    dynamicGlow = animatedGlow,
                     isDarkTheme = isDarkTheme,
                     isTranslatingLyrics = isTranslatingLyrics,
                     lyricOffsetMs = lyricOffsetMs,
@@ -479,6 +486,9 @@ fun NowPlayingScreen(
                         onClose = onClose,
                         onSelectSong = onSelectSongFromWall,
                         onOpenSleepTimer = onOpenSleepTimer,
+                        isDarkTheme = isDarkTheme,
+                        edgeFadeColor = darkBgTop,
+                        vinylHaloColor = animatedGlow,
                         onLongPressVinyl = { onOpenCoverSearch(song) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1308,6 +1318,9 @@ private fun InteractivePosterWallHeader(
     onClose: () -> Unit,
     onSelectSong: (Song) -> Unit,
     onOpenSleepTimer: () -> Unit,
+    isDarkTheme: Boolean = false,
+    edgeFadeColor: Color = Color.Transparent,
+    vinylHaloColor: Color = Color.Transparent,
     onLongPressVinyl: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -1407,12 +1420,44 @@ private fun InteractivePosterWallHeader(
                 }
             }
 
-            // Giant glossy LP straddling row 4 with smooth song-switch transition
+            // Smooth atmospheric feather along the bottom edge of the poster wall in dark mode
+            if (isDarkTheme) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = (gridHeight - 48.dp).coerceAtLeast(0.dp))
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                0.0f to Color.Transparent,
+                                0.62f to edgeFadeColor.copy(alpha = 0.72f),
+                                1.0f to edgeFadeColor,
+                            ),
+                        ),
+                )
+            }
+
+            // Giant glossy LP straddling row 4 with subtle ambient separation halo in dark mode
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset(y = gridHeight - discSize * 0.58f),
+                contentAlignment = Alignment.Center,
             ) {
+                if (isDarkTheme) {
+                    Canvas(modifier = Modifier.size(discSize * 1.16f)) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0.52f to vinylHaloColor.copy(alpha = 0.24f),
+                                0.80f to vinylHaloColor.copy(alpha = 0.08f),
+                                1.0f to Color.Transparent,
+                                center = center,
+                                radius = size.minDimension / 2f,
+                            ),
+                        )
+                    }
+                }
                 SpinningVinylDisc(
                     albumArtUri = currentSong.albumArtUri,
                     rotationProvider = vinylRotationProvider,
