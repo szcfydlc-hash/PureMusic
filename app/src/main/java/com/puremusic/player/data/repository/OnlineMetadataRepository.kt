@@ -469,7 +469,7 @@ class OnlineMetadataRepository(private val context: Context) {
             }
             val joined = batch.joinToString(sep)
             val url = "https://api.mymemory.translated.net/get?q=${URLEncoder.encode(joined, "UTF-8")}&langpair=${URLEncoder.encode(langPair, "UTF-8")}"
-            val body = httpGet(url) ?: continue
+            val body = runCatching { httpGetText(url) }.getOrNull() ?: continue
             val root = JSONObject(body)
             val translatedText = root.optJSONObject("responseData")?.optString("translatedText").orEmpty()
             if (translatedText.isNotBlank()) {
@@ -483,7 +483,7 @@ class OnlineMetadataRepository(private val context: Context) {
                     // Fallback line-by-line if batch delimiter was altered
                     for (line in batch) {
                         val singleUrl = "https://api.mymemory.translated.net/get?q=${URLEncoder.encode(line, "UTF-8")}&langpair=${URLEncoder.encode(langPair, "UTF-8")}"
-                        val sBody = httpGet(singleUrl) ?: continue
+                        val sBody = runCatching { httpGetText(singleUrl) }.getOrNull() ?: continue
                         val sTrans = JSONObject(sBody).optJSONObject("responseData")?.optString("translatedText").orEmpty().trim()
                         if (sTrans.isNotBlank()) out[line] = sTrans
                     }

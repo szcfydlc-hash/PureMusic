@@ -467,6 +467,22 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { it[Keys.KARAOKE_LYRIC_MODE] = mode.name }
     }
 
+    suspend fun setVolumeNormalization(enabled: Boolean) {
+        context.pureMusicDataStore.edit { prefs ->
+            prefs[Keys.VOLUME_NORMALIZATION] = enabled
+        }
+    }
+
+    suspend fun updateTranslationSettings(settings: TranslationSettings) {
+        context.pureMusicDataStore.edit { prefs ->
+            prefs[Keys.TRANSLATION_ENGINE] = settings.engine.name
+            prefs[Keys.TRANSLATE_BASE_URL] = settings.customBaseUrl.trim()
+            prefs[Keys.TRANSLATE_API_KEY] = settings.customApiKey.trim()
+            prefs[Keys.TRANSLATE_MODEL] = settings.customModel.trim().ifBlank { "gpt-4o-mini" }
+        }
+    }
+
+
     suspend fun recordSongPlayed(songId: Long) {
         context.pureMusicDataStore.edit { prefs ->
             val currentRecent = prefs[Keys.RECENT_SONG_IDS]
