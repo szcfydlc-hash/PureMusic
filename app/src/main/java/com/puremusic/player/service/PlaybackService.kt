@@ -3,25 +3,38 @@ package com.puremusic.player.service
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.BitmapLoader
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.session.CacheBitmapLoader
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import com.puremusic.player.MainActivity
+import com.puremusic.player.ui.components.AudioArtFetcher
 import com.puremusic.player.widget.PureMusicWidgetProvider
+import java.io.IOException
+import java.net.URL
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private var artworkExecutor: ExecutorService? = null
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -95,8 +108,12 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val executor = Executors.newFixedThreadPool(2)
+        artworkExecutor = executor
+
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivityPendingIntent)
+            .setBitmapLoader(CacheBitmapLoader(AudioNotificationBitmapLoader(applicationContext, executor)))
             .build()
     }
 
@@ -143,11 +160,71 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         AudioSpectrumBus.resetToIdle()
         AudioEqualizerManager.release()
+        artworkExecutor?.shutdownNow()
+        artworkExecutor = null
         mediaSession?.run {
             player.release()
             release()
             mediaSession = null
         }
         super.onDestroy()
+    }
+}
+
+@UnstableApi
+private class AudioNotificationBitmapLoader(
+    private val context: Context,
+    private val executor: ExecutorService,
+) : BitmapLoader {
+
+    override fun supportsMimeType(mimeType: String): Boolean {
+        return mimeType.startsWith("image/")
+    }
+
+    override fun decodeBitmap(data: ByteArray): ListenableFuture<Bitmap> {
+        val future = SettableFuture.create<Bitmap>()
+        executor.execute {
+            try {
+                val bmp = BitmapFactory.decodeByteArray(data, 0, data.size)
+                if (bmp != null) {
+                    future.set(bmp)
+                } else {
+                    future.setException(IOException("Unable to decode artwork bytes"))
+                }
+            } catch (t: Throwable) {
+                future.setException(t)
+            }
+        }
+        return future
+    }
+
+    override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> {
+        val future = SettableFuture.create<Bitmap>()
+        executor.execute {
+            try {
+                val uriStr = uri.toString()
+                val bmp: Bitmap? = when {
+                    uriStr.contains("/audio/media/") -> {
+                        AudioArtFetcher.loadPerSongBitmap(context, uri, 512)
+                    }
+                    uri.scheme == "http" || uri.scheme == "https" -> {
+                        URL(uriStr).openStream().use { BitmapFactory.decodeStream(it) }
+                    }
+                    else -> {
+                        context.contentResolver.openInputStream(uri)?.use {
+                            BitmapFactory.decodeStream(it)
+                        }
+                    }
+                }
+                if (bmp != null) {
+                    future.set(bmp)
+                } else {
+                    future.setException(IOException("No artwork found for $uri"))
+                }
+            } catch (t: Throwable) {
+                future.setException(t)
+            }
+        }
+        return future
     }
 }

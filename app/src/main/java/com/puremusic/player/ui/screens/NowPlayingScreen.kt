@@ -106,6 +106,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -150,6 +151,7 @@ import com.puremusic.player.ui.components.AlbumArtwork
 import com.puremusic.player.ui.components.formatCountdown
 import com.puremusic.player.ui.components.formatDuration
 import com.puremusic.player.ui.theme.DynamicColorExtractor
+import com.puremusic.player.service.AudioSpectrumBus
 import com.puremusic.player.ui.theme.DynamicSongPalette
 import kotlinx.coroutines.isActive
 
@@ -1833,6 +1835,9 @@ private fun EditorialFullScreenLyricsView(
     val activeLineColor = if (isDarkTheme) primaryTextColor else accentColor
     val textMeasurer = rememberTextMeasurer()
     val isPhoneLandscapeLyrics = LocalConfiguration.current.screenHeightDp < 480
+    val spectrumBands by AudioSpectrumBus.bands.collectAsState()
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
 
     val gridCells = remember(lyrics, activeIdx) {
         if (lyrics.isEmpty() || activeIdx < 0) {
@@ -2038,11 +2043,32 @@ private fun EditorialFullScreenLyricsView(
             }
 
             }
-            // 4. Fixed-Stage Auto-Sized Editorial Kinetic Typography Lyrics
+            // 4. Fixed-Stage Auto-Sized Editorial Kinetic Typography Lyrics (tap play/pause, swipe skip)
             BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .pointerInput(song.id) {
+                        detectTapGestures(
+                            onTap = {
+                                if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onTogglePlayPause()
+                            },
+                        )
+                    }
+                    .pointerInput(song.id) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (kotlin.math.abs(totalDrag) > 72f) {
+                                    if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (totalDrag < 0f) onSkipNext() else onSkipPrevious()
+                                }
+                            },
+                        )
+                    }
                     .padding(horizontal = 24.dp, vertical = 8.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -2267,73 +2293,25 @@ private fun EditorialFullScreenLyricsView(
                 }
             }
 
-            // 5. Thin Progress Bar & 3-Button Minimal Playback Controls
-            Column(
+            // 5. Live Silk-Ribbon / Dot-Matrix Spectrum Waveform SeekBar (unified with Vinyl Study)
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 10.dp),
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
             ) {
-                ThinSeekBar(
+                LiveSpectrumWaveformSeekBar(
+                    songId = song.id,
                     positionMs = positionMs,
                     durationMs = durationMs.coerceAtLeast(1L),
-                    activeLineColor = accentColor,
-                    accentColor = accentColor,
-                    trackColor = secondaryTextColor.copy(alpha = 0.25f),
+                    isPlaying = isPlaying,
+                    spectrumBands = spectrumBands,
+                    spectrumStyle = currentSpectrumStyle,
+                    playedColor = if (isDarkTheme) lerp(primaryTextColor, accentColor, 0.30f) else primaryTextColor,
+                    unplayedColor = secondaryTextColor.copy(alpha = 0.28f),
+                    needleColor = accentColor,
+                    timestampColor = secondaryTextColor,
                     onSeekTo = onSeekTo,
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = formatDuration(positionMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = secondaryTextColor,
-                    )
-                    Text(
-                        text = formatDuration(durationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = secondaryTextColor,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onSkipPrevious) {
-                        Icon(
-                            imageVector = Icons.Rounded.SkipPrevious,
-                            contentDescription = "上一首",
-                            tint = primaryTextColor,
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-                    IconButton(
-                        onClick = onTogglePlayPause,
-                        modifier = Modifier.size(52.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (isPlaying) "暂停" else "播放",
-                            tint = activeLineColor,
-                            modifier = Modifier.size(36.dp),
-                        )
-                    }
-                    IconButton(onClick = onSkipNext) {
-                        Icon(
-                            imageVector = Icons.Rounded.SkipNext,
-                            contentDescription = "下一首",
-                            tint = primaryTextColor,
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-                }
             }
         }
     }
