@@ -23,7 +23,12 @@ import com.puremusic.player.data.model.LayoutDensity
 import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.ImmersionLyricStyle
+import android.widget.Toast
 import com.puremusic.player.data.model.KaraokeLyricMode
+import com.puremusic.player.data.model.LyricTranslationEngine
+import com.puremusic.player.data.model.TranslationSettings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.puremusic.player.data.model.SpectrumStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.LyricLine
@@ -262,6 +267,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = true,
     )
 
+    val volumeNormalizationEnabled: StateFlow<Boolean> = playlistRepository.volumeNormalizationFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false,
+    )
+
     val carModeEnabled: StateFlow<Boolean> = playlistRepository.carModeEnabledFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -285,6 +296,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = KaraokeLyricMode.SMART,
     )
+
+    val translationSettings: StateFlow<TranslationSettings> = playlistRepository.translationSettingsFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = TranslationSettings(),
+    )
+
+    private val _isDownloadingOfflineModels = MutableStateFlow(false)
+    val isDownloadingOfflineModels: StateFlow<Boolean> = _isDownloadingOfflineModels.asStateFlow()
+
+    private val _offlineModelsReady = MutableStateFlow(false)
+    val offlineModelsReady: StateFlow<Boolean> = _offlineModelsReady.asStateFlow()
 
     val lyricOffsets: StateFlow<Map<Long, Long>> = playlistRepository.lyricOffsetsFlow.stateIn(
         scope = viewModelScope,
@@ -322,6 +345,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 title = meta.title.ifBlank { s.title },
                 artist = meta.artist.ifBlank { s.artist },
                 album = meta.album.ifBlank { s.album },
+                genre = meta.genre.ifBlank { s.genre },
             )
         }
         return s
@@ -898,6 +922,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.setHapticEnabled(enabled) }
     }
 
+    fun setVolumeNormalization(enabled: Boolean) {
+        AudioEqualizerManager.setVolumeNormalizationEnabled(enabled)
+        viewModelScope.launch { playlistRepository.setVolumeNormalization(enabled) }
+    }
+
     fun setCarModeEnabled(enabled: Boolean) {
         viewModelScope.launch { playlistRepository.setCarModeEnabled(enabled) }
     }
@@ -912,6 +941,37 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setKaraokeLyricMode(mode: KaraokeLyricMode) {
         viewModelScope.launch { playlistRepository.setKaraokeLyricMode(mode) }
+    }
+
+    fun updateTranslationSettings(settings: TranslationSettings) {
+        viewModelScope.launch { playlistRepository.updateTranslationSettings(settings) }
+    }
+
+    fun refreshOfflineModelStatus() {
+        viewModelScope.launch {
+            val downloaded = onlineMetadataRepository.checkOfflineModelsDownloaded()
+            _offlineModelsReady.value = downloaded.contains("en") && downloaded.contains("zh")
+        }
+    }
+
+    fun predownloadOfflineTranslationModels() {
+        if (_isDownloadingOfflineModels.value) return
+        viewModelScope.launch {
+            _isDownloadingOfflineModels.value = true
+            showToast("正在下载英/日/韩离线翻译包（约 30MB）...")
+            val res = onlineMetadataRepository.predownloadOfflineModels()
+            res.onSuccess { msg ->
+                _offlineModelsReady.value = true
+                showToast(msg)
+            }.onFailure { err ->
+                showToast(err.message ?: "离线语言包下载失败，请检查网络")
+            }
+            _isDownloadingOfflineModels.value = false
+        }
+    }
+
+    private suspend fun showToast(msg: String) = withContext(Dispatchers.Main) {
+        Toast.makeText(getApplication(), msg, Toast.LENGTH_SHORT).show()
     }
 
     fun adjustCurrentLyricOffset(deltaMs: Long) {
@@ -1023,15 +1083,27 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val song = _playerState.value.currentSong ?: return
         val lines = _currentLyrics.value
         if (lines.isEmpty()) return
+        val currentSettings = translationSettings.value
         viewModelScope.launch {
             _isTranslatingLyrics.value = true
-            val res = onlineMetadataRepository.translateLyricsToBilingualLrc(lines)
+            val engineTip = if (currentSettings.engine == LyricTranslationEngine.OFFLINE_MLKIT) {
+                "正在使用离线模型翻译歌词..."
+            } else if (currentSettings.customApiKey.isNotBlank()) {
+                "正在使用自定义接口翻译歌词..."
+            } else {
+                "正在使用公开免费接口翻译歌词..."
+            }
+            showToast(engineTip)
+            val res = onlineMetadataRepository.translateLyricsToBilingualLrc(lines, currentSettings)
             res.onSuccess { bilingualLrc ->
                 val saved = onlineMetadataRepository.saveCustomLyricsText(song.id, bilingualLrc)
                 if (saved) {
                     lastLoadedLyricsSongId = null
                     refreshLyricsIfNeeded(song)
+                    showToast("歌词翻译完成，已缓存双语字幕")
                 }
+            }.onFailure { err ->
+                showToast(err.message ?: "歌词翻译失败，请检查网络或在设置中切换引擎")
             }
             _isTranslatingLyrics.value = false
         }
@@ -1068,7 +1140,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun saveSongMetadata(songId: Long, title: String, artist: String, album: String) {
+    fun saveSongMetadata(songId: Long, title: String, artist: String, album: String, genre: String = "") {
         val cleanTitle = title.trim()
         val cleanArtist = artist.trim()
         val cleanAlbum = album.trim()
@@ -1077,6 +1149,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             title = cleanTitle,
             artist = cleanArtist.ifBlank { "未知歌手" },
             album = cleanAlbum.ifBlank { cleanTitle },
+            genre = genre.trim(),
         )
         viewModelScope.launch {
             onlineMetadataRepository.saveMetaOverride(songId, override)

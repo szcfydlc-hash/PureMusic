@@ -7,7 +7,19 @@ import android.net.Uri
 import com.puremusic.player.data.model.LyricLine
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import com.google.android.gms.tasks.Task
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.common.model.RemoteModelManager
+import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.TranslateRemoteModel
+import com.google.mlkit.nl.translate.Translation
+import com.google.mlkit.nl.translate.TranslatorOptions
+import com.puremusic.player.data.model.LyricTranslationEngine
+import com.puremusic.player.data.model.TranslationSettings
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -41,6 +53,7 @@ data class SongMetaOverride(
     val title: String,
     val artist: String,
     val album: String,
+    val genre: String = "",
 )
 
 data class OnlineCoverCandidate(
@@ -275,6 +288,7 @@ class OnlineMetadataRepository(private val context: Context) {
                     title = obj.optString("title"),
                     artist = obj.optString("artist"),
                     album = obj.optString("album"),
+                    genre = obj.optString("genre"),
                 )
             }
             map
@@ -292,6 +306,7 @@ class OnlineMetadataRepository(private val context: Context) {
                 put("title", override.title.trim())
                 put("artist", override.artist.trim())
                 put("album", override.album.trim())
+                put("genre", override.genre.trim())
             }
             root.put(songId.toString(), obj)
             metaFile.writeText(root.toString(), Charsets.UTF_8)
@@ -312,25 +327,240 @@ class OnlineMetadataRepository(private val context: Context) {
         if (target.exists()) runCatching { target.delete() }
     }
 
-    suspend fun translateLyricsToBilingualLrc(lines: List<LyricLine>): Result<String> = withContext(Dispatchers.IO) {
-        if (lines.isEmpty()) return@withContext Result.failure(IllegalArgumentException("暂无可处理歌词"))
-        val hasBilingual = lines.any { !it.secondaryText.isNullOrBlank() }
-        if (!hasBilingual) {
-            return@withContext Result.failure(
-                IllegalStateException("为确保合规，已移除非官方在线翻译接口；请导入本地双语 .lrc 歌词文件"),
-            )
-        }
+    suspend fun checkOfflineModelsDownloaded(): Set<String> = withContext(Dispatchers.IO) {
         runCatching {
+            val models = RemoteModelManager.getInstance()
+                .getDownloadedModels(TranslateRemoteModel::class.java)
+                .awaitTask()
+            models.map { it.language }.toSet()
+        }.getOrDefault(emptySet())
+    }
+
+    suspend fun predownloadOfflineModels(): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val conditions = DownloadConditions.Builder().build()
+            val langs = listOf(TranslateLanguage.ENGLISH, TranslateLanguage.JAPANESE, TranslateLanguage.KOREAN)
+            for (src in langs) {
+                val options = TranslatorOptions.Builder()
+                    .setSourceLanguage(src)
+                    .setTargetLanguage(TranslateLanguage.CHINESE)
+                    .build()
+                val client = Translation.getClient(options)
+                try {
+                    client.downloadModelIfNeeded(conditions).awaitTask()
+                } finally {
+                    client.close()
+                }
+            }
+            "英 / 日 / 韩离线翻译包已下载就绪"
+        }
+    }
+
+    suspend fun translateLyricsToBilingualLrc(
+        lines: List<LyricLine>,
+        settings: TranslationSettings = TranslationSettings(),
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (lines.isEmpty()) return@withContext Result.failure(IllegalArgumentException("暂无可翻译歌词"))
+        val srcLang = detectSourceLanguage(lines)
+            ?: return@withContext Result.failure(IllegalStateException("当前歌词已是中文，无需翻译"))
+
+        val uniqueTexts = lines.map { it.primaryText.trim() }.filter { it.isNotBlank() }.distinct()
+        if (uniqueTexts.isEmpty()) return@withContext Result.failure(IllegalArgumentException("暂无有效歌词文本"))
+
+        val translatedMapResult: Result<Map<String, String>> = when (settings.engine) {
+            LyricTranslationEngine.OFFLINE_MLKIT -> translateWithMlKit(uniqueTexts, srcLang)
+            LyricTranslationEngine.ONLINE_API -> {
+                if (settings.customApiKey.isNotBlank()) {
+                    translateWithCustomOpenAiApi(uniqueTexts, settings)
+                } else {
+                    translateWithMyMemoryApi(uniqueTexts, srcLang)
+                }
+            }
+        }
+
+        translatedMapResult.mapCatching { map ->
             buildString {
                 lines.forEach { line ->
                     val tag = formatLrcTimestamp(line.timeMs)
-                    append(tag).append(line.primaryText.trim()).append('\n')
-                    val secondary = line.secondaryText?.takeIf { it.isNotBlank() }
-                    if (!secondary.isNullOrBlank()) {
-                        append(tag).append(secondary.trim()).append('\n')
+                    val primary = line.primaryText.trim()
+                    append(tag).append(primary).append('\n')
+                    val translated = map[primary]?.trim()?.takeIf { it.isNotBlank() && !it.equals(primary, ignoreCase = true) }
+                        ?: line.secondaryText?.trim()?.takeIf { it.isNotBlank() }
+                    if (!translated.isNullOrBlank()) {
+                        append(tag).append(translated).append('\n')
                     }
                 }
             }
+        }
+    }
+
+    private fun detectSourceLanguage(lines: List<LyricLine>): String? {
+        val sample = lines.joinToString(" ") { it.primaryText }
+        var cjk = 0
+        var jpKana = 0
+        var koHangul = 0
+        var cyrillic = 0
+        var latin = 0
+        for (ch in sample) {
+            when (ch.code) {
+                in 0x3040..0x30FF -> jpKana++
+                in 0xAC00..0xD7AF -> koHangul++
+                in 0x0400..0x04FF -> cyrillic++
+                in 0x4E00..0x9FFF -> cjk++
+                in 0x0041..0x007A -> latin++
+            }
+        }
+        return when {
+            jpKana >= 4 -> TranslateLanguage.JAPANESE
+            koHangul >= 4 -> TranslateLanguage.KOREAN
+            cyrillic >= 6 -> TranslateLanguage.RUSSIAN
+            cjk > latin && jpKana == 0 && koHangul == 0 -> null
+            else -> TranslateLanguage.ENGLISH
+        }
+    }
+
+    private suspend fun translateWithMlKit(
+        texts: List<String>,
+        srcLang: String,
+    ): Result<Map<String, String>> = runCatching {
+        val options = TranslatorOptions.Builder()
+            .setSourceLanguage(srcLang)
+            .setTargetLanguage(TranslateLanguage.CHINESE)
+            .build()
+        val translator = Translation.getClient(options)
+        try {
+            translator.downloadModelIfNeeded(DownloadConditions.Builder().build()).awaitTask()
+            val out = LinkedHashMap<String, String>(texts.size)
+            for (t in texts) {
+                val res = runCatching { translator.translate(t).awaitTask() }.getOrNull()
+                if (!res.isNullOrBlank()) {
+                    out[t] = res.trim()
+                }
+            }
+            if (out.isEmpty()) error("离线翻译返回为空，请重试")
+            out
+        } finally {
+            translator.close()
+        }
+    }
+
+    private fun translateWithMyMemoryApi(
+        texts: List<String>,
+        srcLang: String,
+    ): Result<Map<String, String>> = runCatching {
+        val langPair = when (srcLang) {
+            TranslateLanguage.JAPANESE -> "ja|zh-CN"
+            TranslateLanguage.KOREAN -> "ko|zh-CN"
+            TranslateLanguage.RUSSIAN -> "ru|zh-CN"
+            else -> "en|zh-CN"
+        }
+        val out = LinkedHashMap<String, String>(texts.size)
+        val sep = " ||| "
+        var i = 0
+        while (i < texts.size) {
+            val batch = mutableListOf<String>()
+            var charLen = 0
+            while (i < texts.size && batch.size < 8) {
+                val nextLen = texts[i].length + sep.length
+                if (batch.isNotEmpty() && charLen + nextLen > 420) break
+                batch.add(texts[i])
+                charLen += nextLen
+                i++
+            }
+            val joined = batch.joinToString(sep)
+            val url = "https://api.mymemory.translated.net/get?q=${URLEncoder.encode(joined, "UTF-8")}&langpair=${URLEncoder.encode(langPair, "UTF-8")}"
+            val body = httpGet(url) ?: continue
+            val root = JSONObject(body)
+            val translatedText = root.optJSONObject("responseData")?.optString("translatedText").orEmpty()
+            if (translatedText.isNotBlank()) {
+                val parts = translatedText.split(Regex("""\s*\|\|\|\s*"""))
+                if (parts.size == batch.size) {
+                    batch.indices.forEach { idx ->
+                        val cleaned = parts[idx].trim()
+                        if (cleaned.isNotBlank()) out[batch[idx]] = cleaned
+                    }
+                } else {
+                    // Fallback line-by-line if batch delimiter was altered
+                    for (line in batch) {
+                        val singleUrl = "https://api.mymemory.translated.net/get?q=${URLEncoder.encode(line, "UTF-8")}&langpair=${URLEncoder.encode(langPair, "UTF-8")}"
+                        val sBody = httpGet(singleUrl) ?: continue
+                        val sTrans = JSONObject(sBody).optJSONObject("responseData")?.optString("translatedText").orEmpty().trim()
+                        if (sTrans.isNotBlank()) out[line] = sTrans
+                    }
+                }
+            }
+        }
+        if (out.isEmpty()) error("公开翻译接口暂不可用，请检查网络或切换离线模型")
+        out
+    }
+
+    private fun translateWithCustomOpenAiApi(
+        texts: List<String>,
+        settings: TranslationSettings,
+    ): Result<Map<String, String>> = runCatching {
+        val base = settings.customBaseUrl.trim().ifBlank { "https://api.openai.com/v1" }.trimEnd('/')
+        val endpoint = if (base.endsWith("/chat/completions")) base else "$base/chat/completions"
+        val model = settings.customModel.trim().ifBlank { "gpt-4o-mini" }
+        val out = LinkedHashMap<String, String>(texts.size)
+
+        texts.chunked(30).forEach { chunk ->
+            val numbered = chunk.mapIndexed { idx, s -> "${idx + 1}. $s" }.joinToString("\n")
+            val messages = JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", "You are a poetic song lyric translator. Translate each numbered line into natural Simplified Chinese. Keep the exact numbering (1. 2. ...) and line count. Output only the translated lines.")
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", numbered)
+                })
+            }
+            val payload = JSONObject().apply {
+                put("model", model)
+                put("temperature", 0.2)
+                put("messages", messages)
+            }
+            val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 15_000
+                readTimeout = 30_000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                setRequestProperty("Authorization", "Bearer ${settings.customApiKey.trim()}")
+            }
+            try {
+                conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                val code = conn.responseCode
+                val respText = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                    ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                if (code !in 200..299) error("自定义接口返回 HTTP $code")
+                val content = JSONObject(respText)
+                    .optJSONArray("choices")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("message")
+                    ?.optString("content")
+                    .orEmpty()
+                val respLines = content.lines().map { it.trim() }.filter { it.isNotBlank() }
+                respLines.forEachIndexed { idx, rawLine ->
+                    val stripped = rawLine.replace(Regex("""^\d+[\.\)、:]\s*"""), "").trim()
+                    if (idx < chunk.size && stripped.isNotBlank()) {
+                        out[chunk[idx]] = stripped
+                    }
+                }
+            } finally {
+                conn.disconnect()
+            }
+        }
+        if (out.isEmpty()) error("自定义接口未返回有效译文，请检查配置")
+        out
+    }
+
+    private suspend fun <T> Task<T>.awaitTask(): T = suspendCancellableCoroutine { cont ->
+        addOnSuccessListener { result ->
+            if (cont.isActive) cont.resume(result)
+        }
+        addOnFailureListener { exc ->
+            if (cont.isActive) cont.resumeWithException(exc)
         }
     }
 

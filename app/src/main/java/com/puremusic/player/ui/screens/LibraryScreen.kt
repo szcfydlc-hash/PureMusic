@@ -243,6 +243,7 @@ fun LibraryScreen(
     var selectedSubTab by remember { mutableStateOf(LibrarySubTab.SONGS) }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     val availableGenres = remember(songs) {
+        val minCount = if (songs.size >= 20) 2 else 1
         songs
             .asSequence()
             .map { it.genre.trim() }
@@ -250,6 +251,7 @@ fun LibraryScreen(
             .groupingBy { it }
             .eachCount()
             .entries
+            .filter { it.value >= minCount }
             .sortedByDescending { it.value }
             .map { it.key }
     }
@@ -322,6 +324,8 @@ fun LibraryScreen(
             title = liveTitle,
             subtitle = liveSubtitle,
             songs = detailSongs,
+            isAlbumDetail = detail is CollectionDetail.AlbumDetail,
+            isArtistDetail = detail is CollectionDetail.ArtistDetail,
             favoriteSongIds = favoriteSongIds,
             playerState = playerState,
             liquidGlassEnabled = liquidGlassEnabled,
@@ -2836,6 +2840,8 @@ private fun CollectionDetailView(
     title: String,
     subtitle: String,
     songs: List<Song>,
+    isAlbumDetail: Boolean = false,
+    isArtistDetail: Boolean = false,
     favoriteSongIds: Set<Long>,
     playerState: PlayerUiState,
     liquidGlassEnabled: Boolean,
@@ -2941,24 +2947,156 @@ private fun CollectionDetailView(
                 contentPadding = bottomContentPadding,
             ) {
                 item {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 18.dp),
-                        thickness = 0.75.dp,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
+                    val pillCorner = 21.dp
+                    val totalMin = (songs.sumOf { it.durationMs } / 60_000L).coerceAtLeast(1L)
+                    if (isAlbumDetail || isArtistDetail) {
+                        val heroCover = songs.firstOrNull()?.albumArtUri
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            if (isAlbumDetail) {
+                                // Collector Square Album Sleeve + Peeking 180g Grooved Vinyl + Razor-Thin Contact Shadow
+                                val sleeveSz = 182.dp
+                                val discSz = 162.dp
+                                Box(
+                                    modifier = Modifier
+                                        .width(sleeveSz + discSz * 0.44f)
+                                        .height(sleeveSz + 10.dp),
+                                    contentAlignment = Alignment.TopStart,
+                                ) {
+                                    // Peeking 180g grooved black LP
+                                    Canvas(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .offset(x = sleeveSz * 0.48f, y = (sleeveSz - discSz) / 2f)
+                                            .size(discSz),
+                                    ) {
+                                        val r = size.minDimension / 2f
+                                        val c = Offset(r, r)
+                                        drawCircle(
+                                            brush = Brush.radialGradient(
+                                                0.0f to Color(0xFF0A0A0B),
+                                                0.62f to Color(0xFF151517),
+                                                0.84f to Color(0xFF232327),
+                                                1.0f to Color(0xFF0B0B0D),
+                                                center = c,
+                                                radius = r,
+                                            ),
+                                            radius = r,
+                                            center = c,
+                                        )
+                                        for (g in 1..10) {
+                                            drawCircle(
+                                                color = Color.White.copy(alpha = if (g % 3 == 0) 0.11f else 0.05f),
+                                                radius = r * (0.48f + g * 0.048f),
+                                                center = c,
+                                                style = Stroke(width = 0.7f),
+                                            )
+                                        }
+                                        drawCircle(
+                                            color = Color.White.copy(alpha = 0.14f),
+                                            radius = r - 0.8f,
+                                            center = c,
+                                            style = Stroke(width = 0.9f),
+                                        )
+                                    }
+                                    // Razor-thin contact shadow directly beneath the square sleeve
+                                    Canvas(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .offset(y = sleeveSz - 1.dp)
+                                            .width(sleeveSz)
+                                            .height(8.dp),
+                                    ) {
+                                        drawRect(
+                                            brush = Brush.verticalGradient(
+                                                0.0f to Color.Black.copy(alpha = 0.34f),
+                                                0.5f to Color.Black.copy(alpha = 0.12f),
+                                                1.0f to Color.Transparent,
+                                            ),
+                                        )
+                                    }
+                                    // Square album cover jacket
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .size(sleeveSz)
+                                            .shadow(10.dp, RoundedCornerShape(4.dp), ambientColor = Color.Black.copy(alpha = 0.22f))
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .border(0.6.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.65f), RoundedCornerShape(4.dp)),
+                                    ) {
+                                        AlbumArtwork(
+                                            uri = heroCover,
+                                            contentDescription = title,
+                                            modifier = Modifier.fillMaxSize(),
+                                            cornerRadius = 4.dp,
+                                            iconSize = 44.dp,
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Artist Detail Circular Collector Medallion
+                                Box(
+                                    modifier = Modifier
+                                        .size(134.dp)
+                                        .shadow(10.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.20f))
+                                        .clip(CircleShape)
+                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), CircleShape),
+                                ) {
+                                    AlbumArtwork(
+                                        uri = heroCover,
+                                        contentDescription = title,
+                                        modifier = Modifier.fillMaxSize(),
+                                        cornerRadius = 67.dp,
+                                        iconSize = 42.dp,
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "$subtitle · ${totalMin} 分钟",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    } else {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 18.dp),
+                            thickness = 0.75.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(actionCorner))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(actionCorner))
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(pillCorner))
+                                .background(MaterialTheme.colorScheme.primary)
                                 .clickable { onPlaySongs(songs, 0, false) },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
@@ -2966,24 +3104,24 @@ private fun CollectionDetailView(
                             Icon(
                                 imageVector = Icons.Rounded.PlayArrow,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(18.dp),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "播放全部",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.SemiBold,
                             )
                         }
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(actionCorner))
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(pillCorner))
                                 .background(MaterialTheme.colorScheme.surface)
-                                .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(actionCorner))
+                                .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(pillCorner))
                                 .clickable { onPlaySongs(songs, 0, true) },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
@@ -2991,7 +3129,7 @@ private fun CollectionDetailView(
                             Icon(
                                 imageVector = Icons.Rounded.Shuffle,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -3003,6 +3141,7 @@ private fun CollectionDetailView(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
                 itemsIndexed(songs, key = { idx, song -> "${song.id}_$idx" }) { index, song ->
                     SongRowItem(

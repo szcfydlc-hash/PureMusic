@@ -186,6 +186,9 @@ private fun PureMusicApp(
     val fontScale by viewModel.fontScale.collectAsStateWithLifecycle()
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val karaokeLyricMode by viewModel.karaokeLyricMode.collectAsStateWithLifecycle()
+    val translationSettings by viewModel.translationSettings.collectAsStateWithLifecycle()
+    val offlineModelsReady by viewModel.offlineModelsReady.collectAsStateWithLifecycle()
+    val isDownloadingOfflineModels by viewModel.isDownloadingOfflineModels.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
     val floatingControlsEnabled by viewModel.floatingControlsEnabled.collectAsStateWithLifecycle()
     val liquidGlassLevel by viewModel.liquidGlassLevel.collectAsStateWithLifecycle()
@@ -196,6 +199,7 @@ private fun PureMusicApp(
     val fontSlantDegrees by viewModel.fontSlantDegrees.collectAsStateWithLifecycle()
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val fadeInSeconds by viewModel.fadeInSeconds.collectAsStateWithLifecycle()
+    val volumeNormalizationEnabled by viewModel.volumeNormalizationEnabled.collectAsStateWithLifecycle()
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
     val carModeEnabled by viewModel.carModeEnabled.collectAsStateWithLifecycle()
 
@@ -521,6 +525,7 @@ private fun PureMusicApp(
                         fontSlantDegrees = fontSlantDegrees,
                         playbackSpeed = playbackSpeed,
                         fadeInSeconds = fadeInSeconds,
+                        volumeNormalizationEnabled = volumeNormalizationEnabled,
                         hapticEnabled = hapticEnabled,
                         carModeEnabled = carModeEnabled,
                         keepScreenOn = keepScreenOn,
@@ -544,8 +549,14 @@ private fun PureMusicApp(
                         onChangeFontSlantDegrees = viewModel::setFontSlantDegrees,
                         karaokeLyricMode = karaokeLyricMode,
                         onSelectKaraokeLyricMode = viewModel::setKaraokeLyricMode,
+                        translationSettings = translationSettings,
+                        offlineModelsReady = offlineModelsReady,
+                        isDownloadingOfflineModels = isDownloadingOfflineModels,
+                        onUpdateTranslationSettings = viewModel::updateTranslationSettings,
+                        onPredownloadOfflineModels = viewModel::predownloadOfflineTranslationModels,
                         onSelectPlaybackSpeed = viewModel::setPlaybackSpeed,
                         onSelectFadeInSeconds = viewModel::setFadeInSeconds,
+                        onToggleVolumeNormalization = viewModel::setVolumeNormalization,
                         onToggleHaptic = viewModel::setHapticEnabled,
                         onToggleCarMode = {
                             viewModel.setCarModeEnabled(it)
@@ -861,7 +872,7 @@ private fun PureMusicApp(
             SongInfoDialog(
                 song = song,
                 hasCustomMetadata = song.id in metaOverrides,
-                onSaveMetadata = { t, ar, al -> viewModel.saveSongMetadata(song.id, t, ar, al) },
+                onSaveMetadata = { t, ar, al, g -> viewModel.saveSongMetadata(song.id, t, ar, al, g) },
                 onRestoreMetadata = { viewModel.clearSongMetadata(song.id) },
                 onReplaceCover = { coverSearchSong = song },
                 onDismiss = { infoDialogSong = null },

@@ -12,8 +12,8 @@ android {
         applicationId = "com.puremusic.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 102
-        versionName = "1.07"
+        versionCode = 104
+        versionName = "1.09"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation("com.google.mlkit:translate:17.0.3")
 
     debugImplementation(libs.androidx.ui.tooling)
 }

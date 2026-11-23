@@ -22,6 +22,8 @@ import com.puremusic.player.data.model.LayoutMode
 import com.puremusic.player.data.model.LiquidGlassLevel
 import com.puremusic.player.data.model.ImmersionLyricStyle
 import com.puremusic.player.data.model.KaraokeLyricMode
+import com.puremusic.player.data.model.LyricTranslationEngine
+import com.puremusic.player.data.model.TranslationSettings
 import com.puremusic.player.data.model.SpectrumStyle
 import com.puremusic.player.data.model.LyricFontStyle
 import com.puremusic.player.data.model.MinDurationFilter
@@ -68,10 +70,15 @@ class PlaylistRepository(private val context: Context) {
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         val FADE_IN_SECONDS = intPreferencesKey("fade_in_seconds")
         val HAPTIC_ENABLED = booleanPreferencesKey("haptic_enabled")
+        val VOLUME_NORMALIZATION = booleanPreferencesKey("volume_normalization")
         val CAR_MODE_ENABLED = booleanPreferencesKey("car_mode_enabled")
         val IMMERSION_STYLE = stringPreferencesKey("immersion_style")
         val SPECTRUM_STYLE = stringPreferencesKey("spectrum_style")
         val KARAOKE_LYRIC_MODE = stringPreferencesKey("karaoke_lyric_mode")
+        val TRANSLATION_ENGINE = stringPreferencesKey("translation_engine")
+        val TRANSLATE_BASE_URL = stringPreferencesKey("translate_base_url")
+        val TRANSLATE_API_KEY = stringPreferencesKey("translate_api_key")
+        val TRANSLATE_MODEL = stringPreferencesKey("translate_model")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val RECENT_SONG_IDS = stringPreferencesKey("recent_song_ids")
         val PLAY_COUNTS_JSON = stringPreferencesKey("play_counts_json")
@@ -198,6 +205,10 @@ class PlaylistRepository(private val context: Context) {
         prefs[Keys.HAPTIC_ENABLED] ?: true
     }
 
+    val volumeNormalizationFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.VOLUME_NORMALIZATION] ?: false
+    }
+
     val carModeEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.CAR_MODE_ENABLED] ?: false
     }
@@ -215,6 +226,18 @@ class PlaylistRepository(private val context: Context) {
     val karaokeLyricModeFlow: Flow<KaraokeLyricMode> = context.pureMusicDataStore.data.map { prefs ->
         val raw = prefs[Keys.KARAOKE_LYRIC_MODE]
         KaraokeLyricMode.entries.firstOrNull { it.name == raw } ?: KaraokeLyricMode.SMART
+    }
+
+    val translationSettingsFlow: Flow<TranslationSettings> = context.pureMusicDataStore.data.map { prefs ->
+        val engRaw = prefs[Keys.TRANSLATION_ENGINE]
+        val engine = LyricTranslationEngine.entries.firstOrNull { it.name == engRaw }
+            ?: LyricTranslationEngine.OFFLINE_MLKIT
+        TranslationSettings(
+            engine = engine,
+            customBaseUrl = prefs[Keys.TRANSLATE_BASE_URL].orEmpty(),
+            customApiKey = prefs[Keys.TRANSLATE_API_KEY].orEmpty(),
+            customModel = prefs[Keys.TRANSLATE_MODEL]?.takeIf { it.isNotBlank() } ?: "gpt-4o-mini",
+        )
     }
 
     val recentSongIdsFlow: Flow<List<Long>> = context.pureMusicDataStore.data.map { prefs ->

@@ -1,6 +1,7 @@
 package com.puremusic.player.service
 
 import android.media.audiofx.Equalizer
+import android.media.audiofx.LoudnessEnhancer
 import com.puremusic.player.data.model.EqualizerBand
 import com.puremusic.player.data.model.EqualizerState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,7 +12,9 @@ import kotlin.math.pow
 object AudioEqualizerManager {
 
     private var equalizer: Equalizer? = null
+    private var loudnessEnhancer: LoudnessEnhancer? = null
     private var attachedSessionId: Int = -1
+    @Volatile private var volumeNormalizationEnabled: Boolean = false
     @Volatile var preampLinearGain: Float = 1.0f
         private set
 
@@ -30,6 +33,12 @@ object AudioEqualizerManager {
             publishSnapshot(eq)
         }.onFailure {
             _state.value = EqualizerState(available = false)
+        }
+        runCatching {
+            val le = LoudnessEnhancer(audioSessionId)
+            le.setTargetGain(if (volumeNormalizationEnabled) 240 else 0)
+            le.enabled = volumeNormalizationEnabled
+            loudnessEnhancer = le
         }
     }
 
@@ -65,6 +74,15 @@ object AudioEqualizerManager {
     }
 
     @Synchronized
+    fun setVolumeNormalizationEnabled(enabled: Boolean) {
+        volumeNormalizationEnabled = enabled
+        runCatching {
+            loudnessEnhancer?.setTargetGain(if (enabled) 240 else 0)
+            loudnessEnhancer?.enabled = enabled
+        }
+    }
+
+    @Synchronized
     fun release() {
         releaseInternal()
         _state.value = EqualizerState(available = false)
@@ -73,6 +91,8 @@ object AudioEqualizerManager {
     private fun releaseInternal() {
         runCatching { equalizer?.release() }
         equalizer = null
+        runCatching { loudnessEnhancer?.release() }
+        loudnessEnhancer = null
         attachedSessionId = -1
         preampLinearGain = 1.0f
     }

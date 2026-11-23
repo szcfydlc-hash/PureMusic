@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,8 +56,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,6 +78,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.rounded.FolderCopy
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.OfflineBolt
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.foundation.layout.widthIn
@@ -104,6 +109,8 @@ import androidx.compose.ui.unit.sp
 import com.puremusic.player.data.model.AppAccentColor
 import com.puremusic.player.data.model.AppFontStyle
 import com.puremusic.player.data.model.KaraokeLyricMode
+import com.puremusic.player.data.model.LyricTranslationEngine
+import com.puremusic.player.data.model.TranslationSettings
 import com.puremusic.player.data.model.AppFontWeight
 import com.puremusic.player.data.model.BackgroundStyle
 import com.puremusic.player.data.model.LayoutDensity
@@ -142,6 +149,7 @@ fun SettingsScreen(
     fontSlantDegrees: Float,
     playbackSpeed: Float,
     fadeInSeconds: Int,
+    volumeNormalizationEnabled: Boolean = false,
     hapticEnabled: Boolean = true,
     carModeEnabled: Boolean = false,
     keepScreenOn: Boolean,
@@ -165,8 +173,14 @@ fun SettingsScreen(
     onChangeFontSlantDegrees: (Float) -> Unit,
     karaokeLyricMode: KaraokeLyricMode = KaraokeLyricMode.SMART,
     onSelectKaraokeLyricMode: (KaraokeLyricMode) -> Unit = {},
+    translationSettings: TranslationSettings = TranslationSettings(),
+    offlineModelsReady: Boolean = false,
+    isDownloadingOfflineModels: Boolean = false,
+    onUpdateTranslationSettings: (TranslationSettings) -> Unit = {},
+    onPredownloadOfflineModels: () -> Unit = {},
     onSelectPlaybackSpeed: (Float) -> Unit,
     onSelectFadeInSeconds: (Int) -> Unit,
+    onToggleVolumeNormalization: (Boolean) -> Unit = {},
     onToggleHaptic: (Boolean) -> Unit = {},
     onToggleCarMode: (Boolean) -> Unit = {},
     onToggleKeepScreenOn: (Boolean) -> Unit,
@@ -1030,6 +1044,252 @@ fun SettingsScreen(
                 }
             }
 
+            // Card 4.5: 歌词翻译（离线模型 + 在线接口自由切换）
+            var showCustomApiDialog by remember { mutableStateOf(false) }
+            BookSettingsCard(
+                cardBg = cardBg,
+                outlineColor = outlineColor,
+                radius = cardRadius,
+                liquidGlassEnabled = liquidGlassEnabled,
+            ) {
+                Text(
+                    text = "歌词翻译",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "点击播放页「译」键时使用的翻译引擎",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 2-Segment Engine Selector
+                val trackShape = RoundedCornerShape(20.dp)
+                val pillShape = RoundedCornerShape(17.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                        .clip(trackShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+                        .border(0.75.dp, outlineColor, trackShape)
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    LyricTranslationEngine.entries.forEach { eng ->
+                        val sel = eng == translationSettings.engine
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .then(
+                                    if (sel) {
+                                        Modifier
+                                            .clip(pillShape)
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .border(0.5.dp, outlineColor.copy(alpha = 0.75f), pillShape)
+                                    } else {
+                                        Modifier.clip(pillShape)
+                                    },
+                                )
+                                .clickable {
+                                    onUpdateTranslationSettings(translationSettings.copy(engine = eng))
+                                },
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = if (eng == LyricTranslationEngine.OFFLINE_MLKIT) {
+                                    Icons.Rounded.OfflineBolt
+                                } else {
+                                    Icons.Rounded.Language
+                                },
+                                contentDescription = null,
+                                tint = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp),
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = eng.shortLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium,
+                                color = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = outlineColor.copy(alpha = 0.65f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Row 1: Offline ML Kit Language Pack status & Pre-download
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = "离线语言包（英 / 日 / 韩 → 中文）",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (offlineModelsReady) {
+                                "本地模型已就绪，离线可直接使用"
+                            } else {
+                                "约 30MB · 首次翻译自动下载，之后完全离线"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    val btnShape = RoundedCornerShape(16.dp)
+                    Box(
+                        modifier = Modifier
+                            .clip(btnShape)
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.75f), btnShape)
+                            .clickable(enabled = !isDownloadingOfflineModels) { onPredownloadOfflineModels() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = when {
+                                isDownloadingOfflineModels -> "下载中..."
+                                offlineModelsReady -> "已就绪"
+                                else -> "预下载"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = outlineColor.copy(alpha = 0.65f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Row 2: Online API Configuration (Public Free MyMemory vs Custom OpenAI-Compatible API)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { showCustomApiDialog = true }
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(
+                            text = "自定义在线 API（选填）",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (translationSettings.customApiKey.isNotBlank()) {
+                                "已配置自定义 Key · 模型：${translationSettings.customModel}"
+                            } else {
+                                "当前：公开免费接口（MyMemory） · 点击可自填 Key"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = "配置在线 API",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            if (showCustomApiDialog) {
+                var baseUrlDraft by remember(translationSettings) { mutableStateOf(translationSettings.customBaseUrl) }
+                var apiKeyDraft by remember(translationSettings) { mutableStateOf(translationSettings.customApiKey) }
+                var modelDraft by remember(translationSettings) { mutableStateOf(translationSettings.customModel) }
+                AlertDialog(
+                    onDismissRequest = { showCustomApiDialog = false },
+                    title = { Text("自定义在线翻译 API", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "留空 API Key 时默认使用公开免费的 MyMemory 翻译接口；填入 Key 后将使用 OpenAI 兼容接口。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedTextField(
+                                value = baseUrlDraft,
+                                onValueChange = { baseUrlDraft = it },
+                                label = { Text("接口地址（默认 OpenAI）") },
+                                placeholder = { Text("https://api.openai.com/v1") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = apiKeyDraft,
+                                onValueChange = { apiKeyDraft = it },
+                                label = { Text("API Key（留空用免费公开接口）") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = modelDraft,
+                                onValueChange = { modelDraft = it },
+                                label = { Text("模型名称") },
+                                placeholder = { Text("gpt-4o-mini") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                onUpdateTranslationSettings(
+                                    translationSettings.copy(
+                                        customBaseUrl = baseUrlDraft.trim(),
+                                        customApiKey = apiKeyDraft.trim(),
+                                        customModel = modelDraft.trim().ifBlank { "gpt-4o-mini" },
+                                    ),
+                                )
+                                showCustomApiDialog = false
+                            },
+                        ) {
+                            Text("保存", fontWeight = FontWeight.SemiBold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                onUpdateTranslationSettings(
+                                    translationSettings.copy(
+                                        customBaseUrl = "",
+                                        customApiKey = "",
+                                        customModel = "gpt-4o-mini",
+                                    ),
+                                )
+                                showCustomApiDialog = false
+                            },
+                        ) {
+                            Text("恢复免费接口")
+                        }
+                    },
+                )
+            }
+
                     }
                 }
                 item(key = "sec_library") {
@@ -1216,11 +1476,88 @@ fun SettingsScreen(
                     onClick = { showSpeedDialog = true },
                 )
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
-                SettingsListRow(
-                    label = "切歌交叉淡化 (Crossfade)",
-                    value = if (fadeInSeconds <= 0) "关闭" else "${fadeInSeconds} 秒",
-                    onClick = { showFadeInDialog = true },
-                )
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                            Text(
+                                text = "切歌平滑过渡 (Crossfade)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                text = "切歌时自动淡入淡出，消除突兀断层",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (fadeInSeconds > 0) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = if (fadeInSeconds <= 0) "关闭" else "${fadeInSeconds} 秒",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (fadeInSeconds > 0) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("关闭", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Slider(
+                            value = fadeInSeconds.toFloat().coerceIn(0f, 6f),
+                            onValueChange = { onSelectFadeInSeconds(it.roundToInt().coerceIn(0, 6)) },
+                            valueRange = 0f..6f,
+                            steps = 5,
+                            modifier = Modifier.weight(1f).height(32.dp),
+                        )
+                        Text("6 秒", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = "智能音量平衡",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "自动均衡不同专辑的响度差异，避免忽大忽小",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = volumeNormalizationEnabled,
+                        onCheckedChange = onToggleVolumeNormalization,
+                        colors = switchColors,
+                    )
+                }
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Row(
                     modifier = Modifier

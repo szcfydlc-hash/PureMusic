@@ -248,3 +248,15 @@ enum class SpectrumStyle(val label: String) {
     DOT_MATRIX("点阵峰标"),
     INK_MOUNTAIN("水墨声山"),
 }
+
+enum class LyricTranslationEngine(val label: String, val shortLabel: String, val desc: String) {
+    OFFLINE_MLKIT("离线模型 (ML Kit)", "离线模型", "端侧本地翻译 · 零流量"),
+    ONLINE_API("在线接口", "在线接口", "公开免费 / 自定义 Key"),
+}
+
+data class TranslationSettings(
+    val engine: LyricTranslationEngine = LyricTranslationEngine.OFFLINE_MLKIT,
+    val customBaseUrl: String = "",
+    val customApiKey: String = "",
+    val customModel: String = "gpt-4o-mini",
+)

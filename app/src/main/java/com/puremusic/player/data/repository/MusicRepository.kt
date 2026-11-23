@@ -288,29 +288,53 @@ class MusicRepository(private val context: Context) {
             ?.replace(Regex("""^\(\d+\)\s*"""), "")
             ?.trim()
             .orEmpty()
-        if (cleaned.isBlank() || cleaned.equals("<unknown>", ignoreCase = true) || cleaned.equals("unknown", ignoreCase = true)) {
+        if (cleaned.length <= 1) return ""
+        val lower = cleaned.lowercase()
+        if (lower == "<unknown>" || lower == "unknown" || lower == "other" || lower == "misc" || lower == "none" || lower.all { it.isDigit() }) {
             return ""
         }
-        val firstToken = cleaned.split("/", ";", ",", "、").firstOrNull()?.trim().orEmpty()
-        if (firstToken.isBlank()) return ""
-        val lower = firstToken.lowercase()
         return when {
-            lower.contains("pop") || lower.contains("流行") -> "流行"
-            lower.contains("jazz") || lower.contains("爵士") -> "爵士"
-            lower.contains("rock") || lower.contains("摇滚") -> "摇滚"
-            lower.contains("folk") || lower.contains("acoustic") || lower.contains("民谣") -> "民谣"
-            lower.contains("electronic") || lower.contains("edm") || lower.contains("trip-hop") ||
-                lower.contains("trip hop") || lower.contains("ambient") || lower.contains("house") ||
-                lower.contains("techno") || lower.contains("电子") -> "电子"
-            lower.contains("classical") || lower.contains("orchestra") || lower.contains("古典") -> "古典"
-            lower.contains("hip-hop") || lower.contains("hip hop") || lower.contains("rap") || lower.contains("说唱") -> "说唱"
-            lower.contains("r&b") || lower.contains("rnb") || lower.contains("soul") || lower.contains("节奏布鲁斯") -> "R&B"
-            lower.contains("soundtrack") || lower.contains("ost") || lower.contains("score") || lower.contains("原声") -> "原声"
+            lower.contains("singer") || lower.contains("songwriter") || lower.contains("folk") ||
+                lower.contains("acoustic") || lower.contains("民谣") -> "民谣"
+            lower.contains("electronic") || lower.contains("electronica") || lower.contains("edm") ||
+                lower.contains("trip-hop") || lower.contains("trip hop") || lower.contains("downtempo") ||
+                lower.contains("house") || lower.contains("techno") || lower.contains("trance") ||
+                lower.contains("dubstep") || lower.contains("drum & bass") || lower.contains("chillwave") ||
+                lower.contains("lo-fi") || lower.contains("lofi") || lower.contains("synth") ||
+                lower.contains("电子") -> "电子"
+            lower.contains("new age") || lower.contains("ambient") || lower.contains("easy listening") ||
+                lower.contains("instrumental") || lower.contains("lounge") || lower.contains("chillout") ||
+                lower.contains("piano") || lower.contains("world") || lower.contains("meditation") ||
+                lower.contains("轻音乐") || lower.contains("纯音乐") || lower.contains("器乐") ||
+                lower.contains("新世纪") -> "轻音乐"
+            lower.contains("indie") || lower.contains("alternative") || lower.contains("shoegaze") ||
+                lower.contains("dream pop") || lower.contains("post-rock") || lower.contains("britpop") ||
+                lower.contains("独立") || lower.contains("另类") -> "独立"
+            lower.contains("soundtrack") || lower.contains("ost") || lower.contains("score") ||
+                lower.contains("film") || lower.contains("movie") || lower.contains("game") ||
+                lower.contains("anime") || lower.contains("原声") || lower.contains("影视") ||
+                lower.contains("动漫") || lower.contains("游戏") -> "原声"
+            lower.contains("jazz") || lower.contains("swing") || lower.contains("bossa") ||
+                lower.contains("fusion") || lower.contains("爵士") -> "爵士"
             lower.contains("metal") || lower.contains("金属") -> "金属"
-            lower.contains("blues") || lower.contains("蓝调") -> "蓝调"
-            lower.contains("country") || lower.contains("乡村") -> "乡村"
-            lower.contains("indie") || lower.contains("alternative") || lower.contains("独立") -> "独立"
-            else -> firstToken.take(10)
+            lower.contains("rock") || lower.contains("punk") || lower.contains("grunge") ||
+                lower.contains("摇滚") -> "摇滚"
+            lower.contains("classical") || lower.contains("orchestra") || lower.contains("symphony") ||
+                lower.contains("opera") || lower.contains("baroque") || lower.contains("chamber") ||
+                lower.contains("古典") || lower.contains("交响") -> "古典"
+            lower.contains("hip-hop") || lower.contains("hip hop") || lower.contains("hiphop") ||
+                lower.contains("rap") || lower.contains("trap") || lower.contains("说唱") ||
+                lower.contains("嘻哈") -> "说唱"
+            lower.contains("r&b") || lower.contains("rnb") || lower.contains("soul") ||
+                lower.contains("funk") || lower.contains("节奏布鲁斯") || lower.contains("灵魂") -> "R&B"
+            lower.contains("blues") || lower.contains("蓝调") || lower.contains("布鲁斯") -> "蓝调"
+            lower.contains("country") || lower.contains("americana") || lower.contains("bluegrass") ||
+                lower.contains("乡村") -> "乡村"
+            lower.contains("pop") || lower.contains("top 40") || lower.contains("top40") ||
+                lower.contains("dance") || lower.contains("vocal") || lower.contains("ballad") ||
+                lower.contains("adult contemporary") || lower.contains("流行") || lower.contains("华语") ||
+                lower.contains("国语") || lower.contains("粤语") -> "流行"
+            else -> ""
         }
     }
 }

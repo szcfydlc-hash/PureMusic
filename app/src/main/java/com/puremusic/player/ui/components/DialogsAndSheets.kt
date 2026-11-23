@@ -973,7 +973,7 @@ fun LyricsBottomSheet(
 fun SongInfoDialog(
     song: Song,
     hasCustomMetadata: Boolean,
-    onSaveMetadata: (title: String, artist: String, album: String) -> Unit,
+    onSaveMetadata: (title: String, artist: String, album: String, genre: String) -> Unit,
     onRestoreMetadata: () -> Unit,
     onReplaceCover: () -> Unit,
     onDismiss: () -> Unit,
@@ -981,6 +981,10 @@ fun SongInfoDialog(
     var title by remember(song.id, song.title) { mutableStateOf(song.title) }
     var artist by remember(song.id, song.artist) { mutableStateOf(song.artist) }
     var album by remember(song.id, song.album) { mutableStateOf(song.album) }
+    var genre by remember(song.id, song.genre) { mutableStateOf(song.genre) }
+    val standardGenres = remember {
+        listOf("流行", "民谣", "摇滚", "爵士", "电子", "独立", "轻音乐", "古典", "说唱", "R&B", "原声", "金属", "蓝调", "乡村")
+    }
 
     val formatExt = song.filePath
         .substringAfterLast('.', "")
@@ -1054,6 +1058,69 @@ fun SongInfoDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "音乐流派",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = if (genre.isNotBlank()) "已选：$genre（再点取消）" else "手动归类",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    standardGenres.chunked(3).forEach { rowGenres ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            rowGenres.forEach { g ->
+                                val selected = genre == g
+                                val chipShape = RoundedCornerShape(15.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(30.dp)
+                                        .clip(chipShape)
+                                        .background(
+                                            if (selected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.background,
+                                        )
+                                        .then(
+                                            if (selected) Modifier
+                                            else Modifier.border(0.75.dp, outlineColor, chipShape),
+                                        )
+                                        .clickable { genre = if (selected) "" else g },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = g,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                        color = if (selected) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                                        },
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                            repeat(3 - rowGenres.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
 
                 Text(
@@ -1087,7 +1154,7 @@ fun SongInfoDialog(
             TextButton(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onSaveMetadata(title, artist, album)
+                        onSaveMetadata(title, artist, album, genre)
                         onDismiss()
                     }
                 },
