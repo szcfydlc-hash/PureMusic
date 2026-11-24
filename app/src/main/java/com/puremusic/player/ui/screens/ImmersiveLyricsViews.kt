@@ -685,8 +685,6 @@ private fun VinylStudyImmersiveView(
  * swipe-to-skip & tap-to-play/pause gestures, refined typography + 60fps live PCM spectrum scrubber.
  */
 @Composable
-
-@Composable
 private fun rememberMattePaperGrain(): androidx.compose.ui.graphics.ImageBitmap {
     return remember {
         val w = 96
@@ -707,6 +705,7 @@ private fun rememberMattePaperGrain(): androidx.compose.ui.graphics.ImageBitmap 
     }
 }
 
+@Composable
 private fun SpatialGalleryImmersiveView(
     song: Song,
     allSongs: List<Song>,
@@ -1042,7 +1041,7 @@ private fun SpatialGalleryImmersiveView(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .width(spineW)
+                                            .width(0.dp)
                                             .fillMaxSize()
                                             .background(
                                                 Brush.horizontalGradient(
