@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -2043,53 +2045,205 @@ private fun <T> OptionPickerDialog(
     onDismiss: () -> Unit,
     previewFontStyle: ((T) -> Pair<FontFamily, FontStyle>)? = null,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-        shape = RoundedCornerShape(12.dp),
-        title = { Text(title, fontWeight = FontWeight.SemiBold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                options.forEach { (value, label) ->
-                    val isSelected = value == selected
-                    val customFont = previewFontStyle?.invoke(value)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                            )
-                            .clickable { onSelect(value) }
-                            .padding(vertical = 6.dp, horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = isSelected,
-                            onClick = { onSelect(value) },
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = label,
-                            style = if (customFont != null) {
-                                MaterialTheme.typography.bodyMedium.copy(
-                                    fontFamily = customFont.first,
-                                    fontStyle = customFont.second,
-                                )
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 324.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 12.dp,
+            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.24f)),
+        ) {
+            Column(
+                modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 10.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                val pairCount = (options.size / 2) * 2
+                val pairedOptions = options.take(pairCount)
+                val trailingOption = if (options.size % 2 == 1) options.last() else null
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    pairedOptions.chunked(2).forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            rowItems.forEach { (value, label) ->
+                                val isSelected = value == selected
+                                val customFont = previewFontStyle?.invoke(value)
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(44.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable { onSelect(value) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                                    },
+                                    border = BorderStroke(
+                                        width = if (isSelected) 1.2.dp else 0.7.dp,
+                                        color = if (isSelected) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
+                                        },
+                                    ),
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center,
+                                    ) {
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(5.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.primary),
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                        }
+                                        Text(
+                                            text = label,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            style = if (customFont != null) {
+                                                MaterialTheme.typography.bodyMedium.copy(
+                                                    fontSize = 14.sp,
+                                                    fontFamily = customFont.first,
+                                                    fontStyle = customFont.second,
+                                                )
+                                            } else {
+                                                MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                                            },
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = if (isSelected) {
+                                                MaterialTheme.colorScheme.onSurface
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (trailingOption != null) {
+                        val (value, label) = trailingOption
+                        val isSelected = value == selected
+                        val customFont = previewFontStyle?.invoke(value)
+                        val isCustomItem = label.contains("自定义")
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onSelect(value) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
                             } else {
-                                MaterialTheme.typography.bodyMedium
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
                             },
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            border = BorderStroke(
+                                width = if (isSelected) 1.2.dp else 0.7.dp,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
+                                },
+                            ),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (isCustomItem) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Folder,
+                                        contentDescription = null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                } else if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(5.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(
+                                    text = label,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = if (customFont != null) {
+                                        MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 14.sp,
+                                            fontFamily = customFont.first,
+                                            fontStyle = customFont.second,
+                                        )
+                                    } else {
+                                        MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+                                    },
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                                    },
+                                )
+                                Spacer(modifier = Modifier.weight(1f))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            text = "取消",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        },
-    )
+        }
+    }
 }

@@ -83,6 +83,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.Bitmap
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
@@ -682,6 +685,28 @@ private fun VinylStudyImmersiveView(
  * swipe-to-skip & tap-to-play/pause gestures, refined typography + 60fps live PCM spectrum scrubber.
  */
 @Composable
+
+@Composable
+private fun rememberMattePaperGrain(): androidx.compose.ui.graphics.ImageBitmap {
+    return remember {
+        val w = 96
+        val h = 96
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        var seed = 0x5A17C3B1
+        val pixels = IntArray(w * h)
+        for (i in pixels.indices) {
+            seed = seed * 1664525 + 1013904223
+            val v = (seed ushr 24) and 0xFF
+            // Subtle warm-neutral fine paper grain speckle
+            val lum = if (v > 128) 248 else 24
+            val alpha = ((v and 0x1F) + 8).coerceIn(6, 36)
+            pixels[i] = (alpha shl 24) or (lum shl 16) or (lum shl 8) or lum
+        }
+        bmp.setPixels(pixels, 0, w, 0, 0, w, h)
+        bmp.asImageBitmap()
+    }
+}
+
 private fun SpatialGalleryImmersiveView(
     song: Song,
     allSongs: List<Song>,
@@ -875,6 +900,7 @@ private fun SpatialGalleryImmersiveView(
                             scaleY = tapScale.value
                         },
                 ) {
+                    val matteGrain = rememberMattePaperGrain()
                     for (depth in (stackSongs.lastIndex downTo 0)) {
                         val itemSong = stackSongs[depth]
                         val isFront = depth == 0
@@ -884,15 +910,12 @@ private fun SpatialGalleryImmersiveView(
                         val yShift = baseY
                         val rotY = if (isFront) dynamicRotY else 15f
                         val sleeveAlpha = (1f - depth * 0.09f).coerceAtLeast(0.56f)
-                        val spineW = if (isFront) 11.dp else 9.dp
-                        val topRimH = if (isFront) 3.6.dp else 2.8.dp
-                        val vinylPeekW = if (isFront) 22.dp else 14.dp
-
-                        // Unified 3D plane per sleeve anchored at vertical center (0f, 0.50f)
+                        // Pure architectural album sleeve: NO left metallic spine, NO peeking half-vinyl,
+                        // crisp thin white hairline border + subtle satin-matte frosted paper tactile texture
                         Column(
                             modifier = Modifier
                                 .offset(x = xShift, y = yShift)
-                                .width(frontSize + vinylPeekW)
+                                .width(frontSize)
                                 .graphicsLayer {
                                     transformOrigin = TransformOrigin(0.0f, 0.50f)
                                     scaleX = p
@@ -904,200 +927,73 @@ private fun SpatialGalleryImmersiveView(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .width(frontSize + vinylPeekW)
+                                    .width(frontSize)
                                     .height(frontSize),
                             ) {
-                                // Sculptural 180g grooved black vinyl LP peeking cleanly on hero + receding sleeves (0..3)
-                                if (depth in 0..3) {
-                                    Canvas(
-                                        modifier = Modifier
-                                            .align(Alignment.CenterEnd)
-                                            .size(frontSize * if (isFront) 0.90f else 0.84f),
-                                    ) {
-                                        val r = size.minDimension * 0.5f
-                                        val c = Offset(size.width * 0.5f, size.height * 0.5f)
-                                        drawCircle(
-                                            brush = Brush.radialGradient(
-                                                0.0f to Color(0xFF070708),
-                                                0.64f to Color(0xFF141416),
-                                                0.84f to Color(0xFF27282B),
-                                                0.95f to Color(0xFF161618),
-                                                1.0f to Color(0xFF09090B),
-                                                center = c,
-                                                radius = r,
-                                            ),
-                                            radius = r,
-                                            center = c,
-                                        )
-                                        // Satin conical vinyl sheen on hero disc
-                                        if (isFront) {
-                                            drawCircle(
-                                                brush = Brush.sweepGradient(
-                                                    0.00f to Color.Transparent,
-                                                    0.78f to Color.White.copy(alpha = 0.04f),
-                                                    0.88f to Color.White.copy(alpha = 0.24f),
-                                                    0.96f to Color.White.copy(alpha = 0.05f),
-                                                    1.00f to Color.Transparent,
-                                                    center = c,
-                                                ),
-                                                radius = r * 0.96f,
-                                                center = c,
-                                            )
-                                        }
-                                        val grooveCount = if (isFront) 14 else 6
-                                        for (g in 1..grooveCount) {
-                                            val frac = 0.56f + (g.toFloat() / grooveCount) * 0.39f
-                                            drawCircle(
-                                                color = Color.White.copy(alpha = if (isFront && g % 3 == 0) 0.11f else 0.055f),
-                                                radius = r * frac,
-                                                center = c,
-                                                style = Stroke(width = 0.7f),
-                                            )
-                                        }
-                                        drawCircle(
-                                            color = Color.White.copy(alpha = if (isFront) 0.18f else 0.08f),
-                                            radius = r - 0.8f,
-                                            center = c,
-                                            style = Stroke(width = 1.0f),
-                                        )
-                                    }
-                                }
-
-                                // Soft cast shadow thrown by hero sleeve onto the second album behind it
-                                if (isFront) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.CenterStart)
-                                            .offset(x = frontSize - 2.dp)
-                                            .width(18.dp)
-                                            .height(frontSize)
-                                            .background(
-                                                Brush.horizontalGradient(
-                                                    0.0f to Color.Black.copy(alpha = 0.62f),
-                                                    0.45f to Color.Black.copy(alpha = 0.22f),
-                                                    1.0f to Color.Transparent,
-                                                ),
-                                            ),
-                                    )
-                                }
-
-                                // Heavyweight sculpted hardcover vinyl jacket
+                                // Clean frameless-spine album sleeve with crisp thin white hairline border
                                 Box(
                                     modifier = Modifier
-                                        .align(Alignment.CenterStart)
-                                        .size(frontSize)
+                                        .fillMaxSize()
                                         .shadow(
-                                            elevation = if (isFront) 36.dp else 18.dp,
+                                            elevation = if (isFront) 32.dp else 16.dp,
                                             shape = RoundedCornerShape(3.dp),
                                             ambientColor = Color.Black,
                                             spotColor = Color.Black,
                                         )
                                         .clip(RoundedCornerShape(3.dp))
-                                        .background(Color(0xFF1A1918)),
+                                        .background(Color(0xFF141312))
+                                        .border(
+                                            width = if (isFront) 0.9.dp else 0.7.dp,
+                                            color = Color.White.copy(alpha = if (isFront) 0.76f else 0.44f),
+                                            shape = RoundedCornerShape(3.dp),
+                                        ),
                                 ) {
-                                    Row(modifier = Modifier.fillMaxSize()) {
-                                        // Sculpted Matte-Anodized Dark Titanium Bookbinding Spine with recessed hinge crease
+                                    AlbumArtwork(
+                                        uri = itemSong.albumArtUri,
+                                        contentDescription = itemSong.album,
+                                        modifier = Modifier.fillMaxSize(),
+                                        cornerRadius = 0.dp,
+                                        iconSize = if (isFront) 54.dp else 34.dp,
+                                    )
+
+                                    // Delicate satin-matte frosted paper micro-grain texture overlay
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        drawImage(
+                                            image = matteGrain,
+                                            dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)),
+                                            alpha = if (isFront) 0.52f else 0.34f,
+                                        )
+                                    }
+
+                                    if (isFront) {
+                                        // Soft top-left satin-matte studio sheen + gentle archival edge depth
                                         Box(
                                             modifier = Modifier
-                                                .width(spineW)
+                                                .fillMaxSize()
+                                                .background(
+                                                    Brush.linearGradient(
+                                                        0.00f to Color(0xFFFFFDF8).copy(alpha = 0.14f),
+                                                        0.28f to Color.White.copy(alpha = 0.045f),
+                                                        0.56f to Color.Transparent,
+                                                        0.86f to Color.Black.copy(alpha = 0.10f),
+                                                        1.00f to Color.Black.copy(alpha = 0.22f),
+                                                    ),
+                                                ),
+                                        )
+                                    } else {
+                                        // Progressive gallery depth shadow cast from the sleeve ahead
+                                        val depthDark = (0.20f + depth * 0.13f).coerceAtMost(0.72f)
+                                        Box(
+                                            modifier = Modifier
                                                 .fillMaxSize()
                                                 .background(
                                                     Brush.horizontalGradient(
-                                                        0.00f to Color(0xFF5A5956),
-                                                        0.14f to Color(0xFF8C8A85),
-                                                        0.36f to Color(0xFF454441),
-                                                        0.72f to Color(0xFF262523),
-                                                        0.86f to Color(0xFF0E0D0D),
-                                                        0.93f to Color(0xFF52504D),
-                                                        1.00f to Color(0xFF0A0A0A),
+                                                        0.0f to Color.Black.copy(alpha = (depthDark + 0.36f).coerceAtMost(0.88f)),
+                                                        0.46f to Color.Black.copy(alpha = depthDark + 0.10f),
+                                                        1.0f to Color.Black.copy(alpha = depthDark),
                                                     ),
                                                 ),
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(
-                                                        Brush.verticalGradient(
-                                                            0.0f to Color(0xFFF6F2EA).copy(alpha = if (isFront) 0.30f else 0.16f),
-                                                            0.24f to Color.Transparent,
-                                                            0.78f to Color.Black.copy(alpha = 0.28f),
-                                                            1.0f to Color.Black.copy(alpha = 0.52f),
-                                                        ),
-                                                    ),
-                                            )
-                                        }
-
-                                        // Hardcover face + precision metallic top bevel + overhead gallery spotlight sheen
-                                        Column(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxSize(),
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(topRimH)
-                                                    .background(
-                                                        Brush.verticalGradient(
-                                                            0.0f to Color(0xFF96938D),
-                                                            0.38f to Color(0xFF474542),
-                                                            1.0f to Color(0xFF131211),
-                                                        ),
-                                                    ),
-                                            )
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .fillMaxWidth()
-                                                    .background(Color(0xFF111010))
-                                                    .padding(if (isFront) 1.0.dp else 1.2.dp)
-                                                    .border(
-                                                        0.5.dp,
-                                                        Color.White.copy(alpha = if (isFront) 0.22f else 0.08f),
-                                                        RectangleShape,
-                                                    ),
-                                            ) {
-                                                AlbumArtwork(
-                                                    uri = itemSong.albumArtUri,
-                                                    contentDescription = itemSong.album,
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    cornerRadius = 0.dp,
-                                                    iconSize = if (isFront) 54.dp else 34.dp,
-                                                )
-
-                                                if (isFront) {
-                                                    // Diagonal overhead museum spotlight sheen + subtle bottom-right edge vignette
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxSize()
-                                                            .background(
-                                                                Brush.linearGradient(
-                                                                    0.00f to Color(0xFFFFFDF8).copy(alpha = 0.16f),
-                                                                    0.24f to Color.White.copy(alpha = 0.04f),
-                                                                    0.52f to Color.Transparent,
-                                                                    0.84f to Color.Black.copy(alpha = 0.12f),
-                                                                    1.00f to Color.Black.copy(alpha = 0.28f),
-                                                                ),
-                                                            ),
-                                                    )
-                                                } else {
-                                                    // Progressive gallery depth shadow cast from the sleeve ahead
-                                                    val depthDark = (0.24f + depth * 0.14f).coerceAtMost(0.76f)
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxSize()
-                                                            .background(
-                                                                Brush.horizontalGradient(
-                                                                    0.0f to Color.Black.copy(alpha = (depthDark + 0.38f).coerceAtMost(0.90f)),
-                                                                    0.46f to Color.Black.copy(alpha = depthDark + 0.14f),
-                                                                    1.0f to Color.Black.copy(alpha = depthDark),
-                                                                ),
-                                                            ),
-                                                    )
-                                                }
-                                            }
-                                        }
+                                        )
                                     }
                                 }
                             }

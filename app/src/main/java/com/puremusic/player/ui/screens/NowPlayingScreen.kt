@@ -120,6 +120,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import kotlin.math.roundToInt
+import kotlin.math.abs
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -329,6 +337,9 @@ fun NowPlayingScreen(
         if (carModeEnabled) {
             MinimalistCarModeView(
                 song = song,
+                allSongs = allSongs,
+                dynamicAccent = animatedAccent,
+                dynamicGlow = animatedGlow,
                 playerState = playerState,
                 durationMs = durationMs,
                 activeLyricText = activeLyric?.primaryText.orEmpty(),
@@ -2373,6 +2384,9 @@ private fun AudioSpecStamp(
 @Composable
 private fun MinimalistCarModeView(
     song: Song,
+    allSongs: List<Song>,
+    dynamicAccent: Color,
+    dynamicGlow: Color,
     playerState: PlayerUiState,
     durationMs: Long,
     activeLyricText: String,
@@ -2385,6 +2399,7 @@ private fun MinimalistCarModeView(
 ) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
+    val scope = rememberCoroutineScope()
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     DisposableEffect(isDarkTheme) {
         val window = (view.context as? Activity)?.window
@@ -2396,24 +2411,327 @@ private fun MinimalistCarModeView(
             controller?.isAppearanceLightNavigationBars = !isDarkTheme
         }
     }
-    val bgColor = Color(0xFF121214)
-    val creamInk = Color(0xFFF5F1E8)
-    val cinnabar = Color(0xFFC83E2B)
-    val mutedInk = Color(0xFFA69F95)
+
+    // Dynamic color extracted dark automotive espresso/obsidian atmosphere (zero night glare)
+    val bgTop by animateColorAsState(
+        targetValue = lerp(Color(0xFF171311), dynamicAccent, 0.34f),
+        animationSpec = tween(600),
+        label = "carBgTop",
+    )
+    val bgMid by animateColorAsState(
+        targetValue = lerp(Color(0xFF0E0C0B), dynamicAccent, 0.18f),
+        animationSpec = tween(600),
+        label = "carBgMid",
+    )
+    val bgBottom = Color(0xFF070606)
+    val creamInk = Color(0xFFF6F2EA)
+    val mutedInk = lerp(Color(0xFFAFA89D), dynamicGlow, 0.22f)
+    val champagneGold = lerp(Color(0xFFE7C794), dynamicGlow, 0.42f)
+    val playAccent by animateColorAsState(
+        targetValue = lerp(Color(0xFFC24329), dynamicAccent, 0.32f),
+        animationSpec = tween(500),
+        label = "carPlayAccent",
+    )
+
+    // Neighbor songs for flanking sleeves on the vinyl shelf
+    val prevSong = remember(song.id, allSongs) {
+        if (allSongs.size <= 1) null
+        else {
+            val idx = allSongs.indexOfFirst { it.id == song.id }
+            if (idx >= 0) allSongs[(idx - 1 + allSongs.size) % allSongs.size] else null
+        }
+    }
+    val nextSong = remember(song.id, allSongs) {
+        if (allSongs.size <= 1) null
+        else {
+            val idx = allSongs.indexOfFirst { it.id == song.id }
+            if (idx >= 0) allSongs[(idx + 1) % allSongs.size] else null
+        }
+    }
+
+    // Serene 14 deg/s real-dt vinyl rotation when playing
+    var vinylAngle by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(playerState.isPlaying) {
+        var lastNanos = 0L
+        while (playerState.isPlaying) {
+            withFrameNanos { nanos ->
+                val dt = if (lastNanos == 0L) 0f else ((nanos - lastNanos) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                lastNanos = nanos
+                vinylAngle = (vinylAngle + dt * 14f) % 360f
+            }
+        }
+    }
+
+    val shelfDragX = remember { Animatable(0f) }
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgColor)
+            .background(
+                Brush.verticalGradient(
+                    0.0f to bgTop,
+                    0.52f to bgMid,
+                    1.0f to bgBottom,
+                ),
+            )
             .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = 22.dp, vertical = 12.dp),
+            .navigationBarsPadding(),
     ) {
         val carMaxWidth = maxWidth
         val carMaxHeight = maxHeight
         val isWide = carMaxWidth > carMaxHeight
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Top bar: "车机模式" badge + "退出" pill
+
+        // Soft dynamic-color overhead ambient glow behind the vinyl shelf
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(
+                brush = Brush.radialGradient(
+                    0.0f to dynamicGlow.copy(alpha = 0.28f),
+                    0.46f to dynamicAccent.copy(alpha = 0.14f),
+                    0.82f to Color.Transparent,
+                    center = Offset(size.width * (if (isWide) 0.26f else 0.50f), size.height * (if (isWide) 0.48f else 0.34f)),
+                    radius = size.maxDimension * 0.56f,
+                ),
+            )
+        }
+
+        @Composable
+        fun CarVinylRecordShelf(
+            coverSize: Dp,
+            modifier: Modifier = Modifier,
+        ) {
+            val vinylSize = coverSize * 0.88f
+            val vinylPeek = coverSize * 0.30f
+            Box(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .height(coverSize + 36.dp)
+                    .pointerInput(song.id) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onHorizontalDrag = { _, dragAmount ->
+                                totalDrag += dragAmount
+                                scope.launch { shelfDragX.snapTo((totalDrag * 0.42f).coerceIn(-96f, 96f)) }
+                            },
+                            onDragEnd = {
+                                if (abs(totalDrag) > 68f) {
+                                    if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (totalDrag < 0f) onSkipNext() else onSkipPrevious()
+                                }
+                                scope.launch { shelfDragX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
+                            },
+                            onDragCancel = {
+                                scope.launch { shelfDragX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
+                            },
+                        )
+                    },
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                // Dark anodized back-rail lip behind the leaning sleeves
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .padding(bottom = 14.dp)
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                0.0f to Color(0xFF23201E).copy(alpha = 0.90f),
+                                1.0f to Color(0xFF0E0C0B),
+                            ),
+                        )
+                        .border(0.6.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
+                )
+
+                // Flanking recessed Previous sleeve leaning softly on the left of the shelf
+                if (prevSong != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 10.dp, bottom = 14.dp)
+                            .size(coverSize * 0.72f)
+                            .graphicsLayer {
+                                rotationZ = -7.5f
+                                alpha = 0.44f
+                                translationX = shelfDragX.value * 0.35f
+                            }
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(0.6.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(8.dp)),
+                    ) {
+                        AlbumArtwork(
+                            uri = prevSong.albumArtUri,
+                            contentDescription = prevSong.album,
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadius = 8.dp,
+                            iconSize = 26.dp,
+                        )
+                    }
+                }
+
+                // Flanking recessed Next sleeve leaning softly on the right of the shelf
+                if (nextSong != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 10.dp, bottom = 14.dp)
+                            .size(coverSize * 0.72f)
+                            .graphicsLayer {
+                                rotationZ = 7.5f
+                                alpha = 0.40f
+                                translationX = shelfDragX.value * 0.35f
+                            }
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(0.6.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp)),
+                    ) {
+                        AlbumArtwork(
+                            uri = nextSong.albumArtUri,
+                            contentDescription = nextSong.album,
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadius = 8.dp,
+                            iconSize = 26.dp,
+                        )
+                    }
+                }
+
+                // Hero Front Sleeve + Peeking Spinning 180g Black Vinyl resting on the walnut shelf
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 14.dp)
+                        .offset { IntOffset(shelfDragX.value.roundToInt(), 0) }
+                        .width(coverSize + vinylPeek)
+                        .height(coverSize),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    // Warm dynamic-color ambient halo behind peeking vinyl
+                    Canvas(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(vinylSize * 1.18f),
+                    ) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0.0f to dynamicGlow.copy(alpha = 0.36f),
+                                0.56f to dynamicAccent.copy(alpha = 0.16f),
+                                1.0f to Color.Transparent,
+                            ),
+                        )
+                    }
+
+                    // 180g matte-black vinyl disc peeking smoothly from right edge of the sleeve
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(vinylSize),
+                    ) {
+                        // Rotating grooves
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { rotationZ = vinylAngle },
+                        ) {
+                            val r = size.minDimension * 0.5f
+                            val c = Offset(size.width * 0.5f, size.height * 0.5f)
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    0.0f to Color(0xFF0A0A0B),
+                                    0.65f to Color(0xFF141416),
+                                    0.88f to Color(0xFF212124),
+                                    1.0f to Color(0xFF0A0A0C),
+                                    center = c,
+                                    radius = r,
+                                ),
+                                radius = r,
+                                center = c,
+                            )
+                            for (g in 1..16) {
+                                val frac = 0.42f + (g / 16f) * 0.52f
+                                drawCircle(
+                                    color = Color.White.copy(alpha = if (g % 3 == 0) 0.10f else 0.045f),
+                                    radius = r * frac,
+                                    center = c,
+                                    style = Stroke(width = 0.8f),
+                                )
+                            }
+                            drawCircle(
+                                color = Color.White.copy(alpha = 0.18f),
+                                radius = r - 0.8f,
+                                center = c,
+                                style = Stroke(width = 1.0f),
+                            )
+                        }
+                        // Stationary studio anisotropic highlight sheen across the spinning vinyl
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val r = size.minDimension * 0.5f
+                            val c = Offset(size.width * 0.5f, size.height * 0.5f)
+                            drawCircle(
+                                brush = Brush.sweepGradient(
+                                    0.00f to Color.Transparent,
+                                    0.72f to Color.White.copy(alpha = 0.03f),
+                                    0.84f to Color.White.copy(alpha = 0.22f),
+                                    0.94f to Color.White.copy(alpha = 0.04f),
+                                    1.00f to Color.Transparent,
+                                    center = c,
+                                ),
+                                radius = r * 0.96f,
+                                center = c,
+                            )
+                        }
+                    }
+
+                    // Hero front album sleeve
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .size(coverSize)
+                            .shadow(24.dp, RoundedCornerShape(10.dp), ambientColor = Color.Black, spotColor = Color.Black)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(0.8.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(10.dp)),
+                    ) {
+                        AlbumArtwork(
+                            uri = song.albumArtUri,
+                            contentDescription = song.album,
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadius = 10.dp,
+                            iconSize = 46.dp,
+                        )
+                    }
+                }
+
+                // Sculpted Dark Walnut Vinyl Display Shelf Ledge (front surface + top rim light + shadow)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.95f)
+                        .align(Alignment.BottomCenter),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    // Warm walnut top bevel + woodgrain ledge
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(14.dp)
+                            .shadow(14.dp, RoundedCornerShape(5.dp), ambientColor = Color.Black, spotColor = Color.Black)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    0.00f to Color(0xFF6B523F),
+                                    0.22f to Color(0xFF4F3B2C),
+                                    0.64f to Color(0xFF33251B),
+                                    1.00f to Color(0xFF1A120D),
+                                ),
+                            )
+                            .border(0.6.dp, champagneGold.copy(alpha = 0.24f), RoundedCornerShape(5.dp)),
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+        ) {
+            // Top bar: "车机模式 · 唱片架" frosted badge + "退出" capsule
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -2421,23 +2739,25 @@ private fun MinimalistCarModeView(
             ) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(Color.White.copy(alpha = 0.08f))
-                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                        .border(0.6.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                 ) {
                     Text(
-                        text = "车机模式",
+                        text = "车机模式 · 唱片架",
                         style = MaterialTheme.typography.labelMedium,
-                        color = mutedInk,
+                        color = creamInk.copy(alpha = 0.80f),
                         fontWeight = FontWeight.Medium,
                     )
                 }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, creamInk.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+                        .background(Color.White.copy(alpha = 0.09f))
+                        .border(0.9.dp, creamInk.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
                         .clickable(onClick = onExitCarMode)
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(horizontal = 18.dp, vertical = 6.dp),
                 ) {
                     Text(
                         text = "退出",
@@ -2448,7 +2768,83 @@ private fun MinimalistCarModeView(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            @Composable
+            fun CarTransportButtons() {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Frosted dark glass Previous button
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    0.0f to Color.White.copy(alpha = 0.16f),
+                                    1.0f to Color.White.copy(alpha = 0.07f),
+                                ),
+                            )
+                            .border(0.9.dp, Color.White.copy(alpha = 0.22f), CircleShape)
+                            .clickable {
+                                if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSkipPrevious()
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.SkipPrevious, contentDescription = "上一首", tint = creamInk, modifier = Modifier.size(32.dp))
+                    }
+
+                    // Sculpted luminous dynamic-terracotta Play/Pause button
+                    Box(
+                        modifier = Modifier
+                            .size(84.dp)
+                            .shadow(20.dp, CircleShape, ambientColor = playAccent, spotColor = playAccent)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    0.0f to lerp(playAccent, Color.White, 0.16f),
+                                    0.72f to playAccent,
+                                    1.0f to lerp(playAccent, Color.Black, 0.24f),
+                                ),
+                            )
+                            .border(1.1.dp, champagneGold.copy(alpha = 0.42f), CircleShape)
+                            .clickable(onClick = onTogglePlayPause),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                            tint = Color.White,
+                            modifier = Modifier.size(44.dp),
+                        )
+                    }
+
+                    // Frosted dark glass Next button
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    0.0f to Color.White.copy(alpha = 0.16f),
+                                    1.0f to Color.White.copy(alpha = 0.07f),
+                                ),
+                            )
+                            .border(0.9.dp, Color.White.copy(alpha = 0.22f), CircleShape)
+                            .clickable {
+                                if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSkipNext()
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.SkipNext, contentDescription = "下一首", tint = creamInk, modifier = Modifier.size(32.dp))
+                    }
+                }
+            }
 
             if (isWide) {
                 Row(
@@ -2456,29 +2852,20 @@ private fun MinimalistCarModeView(
                         .weight(1f)
                         .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     Box(
                         modifier = Modifier
-                            .weight(0.38f)
+                            .weight(0.46f)
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        val artSize = min(carMaxWidth * 0.34f, carMaxHeight * 0.72f)
-                        AlbumArtwork(
-                            uri = song.albumArtUri,
-                            contentDescription = song.album,
-                            modifier = Modifier
-                                .size(artSize)
-                                .shadow(18.dp, RoundedCornerShape(16.dp), ambientColor = Color.Black),
-                            cornerRadius = 16.dp,
-                            iconSize = 48.dp,
-                        )
+                        CarVinylRecordShelf(coverSize = min(carMaxWidth * 0.28f, carMaxHeight * 0.62f))
                     }
 
                     Column(
                         modifier = Modifier
-                            .weight(0.62f)
+                            .weight(0.54f)
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.SpaceEvenly,
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2502,11 +2889,11 @@ private fun MinimalistCarModeView(
                                 textAlign = TextAlign.Center,
                             )
                             if (activeLyricText.isNotBlank()) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
                                 Text(
                                     text = activeLyricText,
-                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                                    color = cinnabar,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                                    color = champagneGold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     textAlign = TextAlign.Center,
@@ -2518,60 +2905,21 @@ private fun MinimalistCarModeView(
                             ThinSeekBar(
                                 positionMs = playerState.positionMs,
                                 durationMs = durationMs,
-                                activeLineColor = creamInk,
-                                accentColor = cinnabar,
-                                trackColor = Color.White.copy(alpha = 0.22f),
+                                activeLineColor = champagneGold,
+                                accentColor = creamInk,
+                                trackColor = Color.White.copy(alpha = 0.20f),
                                 onSeekTo = onSeekTo,
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text(formatDuration(playerState.positionMs), style = MaterialTheme.typography.labelMedium, color = mutedInk)
+                                Text(formatDuration(playerState.positionMs), style = MaterialTheme.typography.labelMedium, color = champagneGold.copy(alpha = 0.85f))
                                 Text(formatDuration(playerState.durationMs), style = MaterialTheme.typography.labelMedium, color = mutedInk)
                             }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            FilledIconButton(
-                                onClick = {
-                                    if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onSkipPrevious()
-                                },
-                                shape = CircleShape,
-                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = creamInk, contentColor = bgColor),
-                                modifier = Modifier.size(62.dp),
-                            ) {
-                                Icon(Icons.Rounded.SkipPrevious, contentDescription = "上一首", modifier = Modifier.size(32.dp))
-                            }
-                            FilledIconButton(
-                                onClick = onTogglePlayPause,
-                                shape = CircleShape,
-                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = cinnabar, contentColor = Color.White),
-                                modifier = Modifier.size(84.dp),
-                            ) {
-                                Icon(
-                                    imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                    contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                                    modifier = Modifier.size(44.dp),
-                                )
-                            }
-                            FilledIconButton(
-                                onClick = {
-                                    if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onSkipNext()
-                                },
-                                shape = CircleShape,
-                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = creamInk, contentColor = bgColor),
-                                modifier = Modifier.size(62.dp),
-                            ) {
-                                Icon(Icons.Rounded.SkipNext, contentDescription = "下一首", modifier = Modifier.size(32.dp))
-                            }
-                        }
+                        CarTransportButtons()
                     }
                 }
             } else {
@@ -2582,16 +2930,9 @@ private fun MinimalistCarModeView(
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AlbumArtwork(
-                        uri = song.albumArtUri,
-                        contentDescription = song.album,
-                        modifier = Modifier
-                            .size(min(carMaxWidth * 0.62f, carMaxHeight * 0.34f))
-                            .shadow(18.dp, RoundedCornerShape(16.dp)),
-                        cornerRadius = 16.dp,
-                        iconSize = 48.dp,
-                    )
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CarVinylRecordShelf(coverSize = min(carMaxWidth * 0.54f, carMaxHeight * 0.30f))
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 8.dp)) {
                         Text(
                             text = song.title,
                             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
@@ -2609,74 +2950,37 @@ private fun MinimalistCarModeView(
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (activeLyricText.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = activeLyricText,
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = cinnabar,
-                                maxLines = 2,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                                color = champagneGold,
+                                maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 textAlign = TextAlign.Center,
                             )
                         }
                     }
+
                     Column(modifier = Modifier.fillMaxWidth()) {
                         ThinSeekBar(
                             positionMs = playerState.positionMs,
                             durationMs = durationMs,
-                            activeLineColor = creamInk,
-                            accentColor = cinnabar,
-                            trackColor = Color.White.copy(alpha = 0.22f),
+                            activeLineColor = champagneGold,
+                            accentColor = creamInk,
+                            trackColor = Color.White.copy(alpha = 0.20f),
                             onSeekTo = onSeekTo,
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Text(formatDuration(playerState.positionMs), style = MaterialTheme.typography.labelMedium, color = mutedInk)
+                            Text(formatDuration(playerState.positionMs), style = MaterialTheme.typography.labelMedium, color = champagneGold.copy(alpha = 0.85f))
                             Text(formatDuration(playerState.durationMs), style = MaterialTheme.typography.labelMedium, color = mutedInk)
                         }
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        FilledIconButton(
-                            onClick = {
-                                if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSkipPrevious()
-                            },
-                            shape = CircleShape,
-                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = creamInk, contentColor = bgColor),
-                            modifier = Modifier.size(66.dp),
-                        ) {
-                            Icon(Icons.Rounded.SkipPrevious, contentDescription = "上一首", modifier = Modifier.size(34.dp))
-                        }
-                        FilledIconButton(
-                            onClick = onTogglePlayPause,
-                            shape = CircleShape,
-                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = cinnabar, contentColor = Color.White),
-                            modifier = Modifier.size(88.dp),
-                        ) {
-                            Icon(
-                                imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                                modifier = Modifier.size(46.dp),
-                            )
-                        }
-                        FilledIconButton(
-                            onClick = {
-                                if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSkipNext()
-                            },
-                            shape = CircleShape,
-                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = creamInk, contentColor = bgColor),
-                            modifier = Modifier.size(66.dp),
-                        ) {
-                            Icon(Icons.Rounded.SkipNext, contentDescription = "下一首", modifier = Modifier.size(34.dp))
-                        }
-                    }
+
+                    CarTransportButtons()
                 }
             }
         }
