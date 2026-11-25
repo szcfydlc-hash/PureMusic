@@ -1326,6 +1326,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         )
         val isLosslessTrack = currentSong?.filePath?.substringAfterLast('.', "")
             ?.lowercase(Locale.US) in setOf("flac", "wav", "alac", "ape", "dsd", "aiff")
+        val libSongs = allSongs.value
+        val curIdxInLib = if (currentSong != null) libSongs.indexOfFirst { it.id == currentSong.id } else -1
+        val prevArt = if (curIdxInLib >= 0 && libSongs.size > 1) libSongs[(curIdxInLib - 1 + libSongs.size) % libSongs.size].albumArtUri else null
+        val nextArt = if (curIdxInLib >= 0 && libSongs.size > 1) libSongs[(curIdxInLib + 1) % libSongs.size].albumArtUri else null
         PureMusicWidgetProvider.pushState(
             context = getApplication(),
             title = currentSong?.title,
@@ -1333,6 +1337,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             isPlaying = controller.isPlaying,
             artUri = currentSong?.albumArtUri,
             isLossless = isLosslessTrack,
+            prevArtUri = prevArt,
+            nextArtUri = nextArt,
         )
         refreshLyricsIfNeeded(currentSong)
         if (currentSong != null) {

@@ -15,7 +15,7 @@
         android:id="@+id/widget_art"
         android:layout_width="136dp"
         android:layout_height="136dp"
-        android:contentDescription="拉丝铝黑胶唱盘与黄铜唱臂"
+        android:contentDescription="暖瓷黑胶唱盘与极简唱臂"
         android:scaleType="fitCenter"
         android:src="@mipmap/ic_launcher_round" />
 
@@ -34,7 +34,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="简约音乐"
-            android:textColor="#F7F2E8"
+            android:textColor="#1A1918"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -46,7 +46,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="点击打开本地曲库"
-            android:textColor="#CFC2B0"
+            android:textColor="#6B665E"
             android:textSize="12sp" />
 
         <TextView
@@ -60,7 +60,7 @@
             android:paddingTop="1.5dp"
             android:paddingBottom="1.5dp"
             android:text="FLAC · Hi-Res"
-            android:textColor="#2A1F14"
+            android:textColor="#2A2826"
             android:textSize="9.5sp"
             android:textStyle="bold" />
 
@@ -87,7 +87,7 @@
                 android:padding="6dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_widget_prev"
-                android:tint="#EDE3D4" />
+                android:tint="#2C2A27" />
 
             <ImageButton
                 android:id="@+id/widget_play_pause"
@@ -100,7 +100,7 @@
                 android:padding="9dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_widget_play"
-                android:tint="#FAF7F2" />
+                android:tint="#FAF8F4" />
 
             <ImageButton
                 android:id="@+id/widget_next"
@@ -111,7 +111,7 @@
                 android:padding="6dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_widget_next"
-                android:tint="#EDE3D4" />
+                android:tint="#2C2A27" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

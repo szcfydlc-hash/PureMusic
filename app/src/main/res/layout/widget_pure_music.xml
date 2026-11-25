@@ -6,8 +6,8 @@
     android:background="@android:color/transparent"
     android:gravity="bottom|center_horizontal"
     android:orientation="vertical"
-    android:paddingStart="6dp"
-    android:paddingEnd="6dp"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
     android:paddingTop="2dp"
     android:paddingBottom="4dp">
 
@@ -16,8 +16,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:contentDescription="胡桃木黑胶唱片架"
-        android:scaleType="fitCenter"
+        android:contentDescription="暖瓷黑胶唱片架"
+        android:scaleType="fitXY"
         android:src="@mipmap/ic_launcher_round" />
 
     <LinearLayout
@@ -26,78 +26,67 @@
         android:background="@drawable/widget_walnut_shelf_bar"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="8dp">
+        android:paddingStart="14dp"
+        android:paddingEnd="10dp">
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/widget_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_marginEnd="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="简约音乐"
+            android:textColor="#1A1918"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/widget_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="简约音乐"
-                android:textColor="#F6F2EA"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
+        <TextView
+            android:id="@+id/widget_artist"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/widget_artist"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="PureMusic"
-                android:textColor="#C4B6A4"
-                android:textSize="11.5sp" />
-
-            <TextView
-                android:id="@+id/widget_badge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="gone"
-                android:text="Hi-Res" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/widget_badge"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
         <ImageButton
             android:id="@+id/widget_prev"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:background="@android:color/transparent"
             android:contentDescription="上一首"
             android:padding="6dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_widget_prev"
-            android:tint="#EDE3D4" />
+            android:tint="#3D3A36" />
 
         <ImageButton
             android:id="@+id/widget_play_pause"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
             android:background="@android:color/transparent"
             android:contentDescription="播放或暂停"
             android:padding="5dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_widget_play"
-            android:tint="#F6F2EA" />
+            android:tint="#1A1918" />
 
         <ImageButton
             android:id="@+id/widget_next"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:background="@android:color/transparent"
             android:contentDescription="下一首"
             android:padding="6dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_widget_next"
-            android:tint="#EDE3D4" />
+            android:tint="#3D3A36" />
     </LinearLayout>
 </LinearLayout>

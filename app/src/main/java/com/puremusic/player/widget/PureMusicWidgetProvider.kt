@@ -72,6 +72,8 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
         @Volatile internal var cachedArtist: String? = null
         @Volatile internal var cachedIsPlaying: Boolean = false
         @Volatile internal var cachedArtUri: Uri? = null
+        @Volatile internal var cachedPrevArtUri: Uri? = null
+        @Volatile internal var cachedNextArtUri: Uri? = null
         @Volatile internal var cachedIsLossless: Boolean = false
 
         fun pushState(
@@ -81,11 +83,15 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
             isPlaying: Boolean,
             artUri: Uri? = null,
             isLossless: Boolean = false,
+            prevArtUri: Uri? = null,
+            nextArtUri: Uri? = null,
         ) {
-            cachedTitle = title
-            cachedArtist = artist
+            if (!title.isNullOrBlank()) cachedTitle = title
+            if (!artist.isNullOrBlank()) cachedArtist = artist
             cachedIsPlaying = isPlaying
-            cachedArtUri = artUri
+            if (artUri != null) cachedArtUri = artUri
+            if (prevArtUri != null) cachedPrevArtUri = prevArtUri
+            if (nextArtUri != null) cachedNextArtUri = nextArtUri
             cachedIsLossless = isLossless
 
             val manager = AppWidgetManager.getInstance(context)
@@ -100,7 +106,7 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
                     title = title,
                     artist = artist,
                     isPlaying = isPlaying,
-                    artUri = artUri,
+                    artUri = cachedArtUri,
                     isLossless = isLossless,
                 )
             }
@@ -116,7 +122,7 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
                     title = title,
                     artist = artist,
                     isPlaying = isPlaying,
-                    artUri = artUri,
+                    artUri = cachedArtUri,
                     isLossless = isLossless,
                 )
             }
@@ -149,9 +155,16 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
 
             appWidgetIds.forEach { widgetId ->
                 val views = RemoteViews(context.packageName, layoutRes)
-                views.setTextViewText(R.id.widget_title, title?.takeIf { it.isNotBlank() } ?: "简约音乐")
-                views.setTextViewText(R.id.widget_artist, artist?.takeIf { it.isNotBlank() } ?: "PureMusic")
-                views.setViewVisibility(R.id.widget_badge, if (isLossless) View.VISIBLE else View.GONE)
+                val safeTitle = title?.takeIf { it.isNotBlank() } ?: "简约音乐"
+                val safeArtist = artist?.takeIf { it.isNotBlank() } ?: "PureMusic"
+                if (highRes) {
+                    views.setTextViewText(R.id.widget_title, safeTitle)
+                    views.setTextViewText(R.id.widget_artist, safeArtist)
+                    views.setViewVisibility(R.id.widget_badge, if (isLossless) View.VISIBLE else View.GONE)
+                } else {
+                    views.setTextViewText(R.id.widget_title, "$safeTitle · $safeArtist")
+                    views.setViewVisibility(R.id.widget_badge, View.GONE)
+                }
                 views.setImageViewBitmap(R.id.widget_art, artworkBitmap)
                 views.setImageViewResource(
                     R.id.widget_play_pause,
@@ -181,27 +194,39 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
             val railRect = RectF(18f, railTop, w - 18f, h.toFloat())
             paint.shader = LinearGradient(
                 0f, railTop, 0f, h.toFloat(),
-                intArrayOf(Color.parseColor("#543D2E"), Color.parseColor("#35251B"), Color.parseColor("#211710")),
+                intArrayOf(Color.parseColor("#ECE7DE"), Color.parseColor("#DFD9CE"), Color.parseColor("#D1C9BC")),
                 null, Shader.TileMode.CLAMP,
             )
             canvas.drawRoundRect(railRect, 14f, 14f, paint)
             paint.shader = null
 
-            // 2. Flanking recessed neighbor sleeves resting gently on the left & right of the shelf
-            val sideSize = 216f
-            val sideTop = h - sideSize - 4f
-            val leftSleeve = RectF(46f, sideTop, 46f + sideSize, h.toFloat())
-            val rightSleeve = RectF(w - 46f - sideSize, sideTop, w - 46f, h.toFloat())
+            // 2. Flanking recessed neighbor sleeves using REAL previous & next album covers (softly dimmed)
+            val sideInt = 216
+            val sideTop = (h - sideInt - 2).toFloat()
+            val leftX = 36f
+            val rightX = w - 36f - sideInt
+            val leftSleeve = RectF(leftX, sideTop, leftX + sideInt, sideTop + sideInt)
+            val rightSleeve = RectF(rightX, sideTop, rightX + sideInt, sideTop + sideInt)
 
-            paint.color = Color.argb(215, 118, 112, 104)
+            val prevRaw = (cachedPrevArtUri ?: uri)?.let { loadRawBitmap(context, it, sideInt) }
+            val nextRaw = (cachedNextArtUri ?: uri)?.let { loadRawBitmap(context, it, sideInt) }
+            val prevBmp = roundedCoverBitmap(prevRaw, sideInt, 12f)
+            val nextBmp = roundedCoverBitmap(nextRaw, sideInt, 12f)
+            canvas.drawBitmap(prevBmp, leftX, sideTop, null)
+            canvas.drawBitmap(nextBmp, rightX, sideTop, null)
+            prevBmp.recycle()
+            nextBmp.recycle()
+
+            // Soft recessed shadow veil so flanking real covers sit gracefully behind hero sleeve
+            paint.color = Color.argb(95, 26, 25, 24)
             canvas.drawRoundRect(leftSleeve, 12f, 12f, paint)
-            paint.color = Color.argb(185, 102, 98, 92)
+            paint.color = Color.argb(108, 26, 25, 24)
             canvas.drawRoundRect(rightSleeve, 12f, 12f, paint)
-            // Subtle dim scrim & rim on flanking sleeves
+
             val rimP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE
                 strokeWidth = 1.6f
-                color = Color.argb(55, 255, 248, 236)
+                color = Color.argb(65, 255, 248, 236)
             }
             canvas.drawRoundRect(leftSleeve, 12f, 12f, rimP)
             canvas.drawRoundRect(rightSleeve, 12f, 12f, rimP)
@@ -247,10 +272,10 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
             paint.shader = LinearGradient(
                 0f, 0f, size.toFloat(), size.toFloat(),
                 intArrayOf(
-                    Color.parseColor("#E2DBD0"),
-                    Color.parseColor("#C7BEB0"),
-                    Color.parseColor("#B3A899"),
-                    Color.parseColor("#D6CEC1"),
+                    Color.parseColor("#F5F2EC"),
+                    Color.parseColor("#EAE5DC"),
+                    Color.parseColor("#DFD9CE"),
+                    Color.parseColor("#EFECE5"),
                 ),
                 null, Shader.TileMode.CLAMP,
             )
@@ -271,7 +296,7 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
             val wellR = size * 0.405f
             paint.shader = RadialGradient(
                 cx, cy, wellR,
-                intArrayOf(Color.parseColor("#181615"), Color.parseColor("#2B2724"), Color.parseColor("#8D8579")),
+                intArrayOf(Color.parseColor("#161618"), Color.parseColor("#29292C"), Color.parseColor("#BAB3A8")),
                 floatArrayOf(0.84f, 0.94f, 1.0f),
                 Shader.TileMode.CLAMP,
             )
@@ -312,32 +337,32 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
                 strokeWidth = 7.5f
                 shader = LinearGradient(
                     pivotX, pivotY, headX, headY,
-                    intArrayOf(Color.parseColor("#E3C898"), Color.parseColor("#A68755"), Color.parseColor("#D9BC89")),
+                    intArrayOf(Color.parseColor("#DFDDD9"), Color.parseColor("#9A9893"), Color.parseColor("#CFCDC8")),
                     null, Shader.TileMode.CLAMP,
                 )
             }
             canvas.drawPath(armPath, armPaint)
 
             // Pivot counterweight & gimbal base
-            paint.color = Color.parseColor("#6D5639")
+            paint.color = Color.parseColor("#54524E")
             canvas.drawCircle(pivotX, pivotY, 20f, paint)
             paint.shader = RadialGradient(
                 pivotX - 4f, pivotY - 4f, 18f,
-                intArrayOf(Color.parseColor("#F1DAB0"), Color.parseColor("#9C7E4E")),
+                intArrayOf(Color.parseColor("#ECEAE6"), Color.parseColor("#9E9C97")),
                 null, Shader.TileMode.CLAMP,
             )
             canvas.drawCircle(pivotX, pivotY, 15f, paint)
             paint.shader = null
-            paint.color = Color.parseColor("#3A2E1E")
+            paint.color = Color.parseColor("#252422")
             canvas.drawCircle(pivotX, pivotY, 5f, paint)
 
             // Cartridge headshell angled onto groove
             canvas.save()
             canvas.translate(headX, headY)
             canvas.rotate(42f)
-            paint.color = Color.parseColor("#8D7144")
+            paint.color = Color.parseColor("#2C2B29")
             canvas.drawRoundRect(RectF(-10f, -15f, 10f, 15f), 4f, 4f, paint)
-            paint.color = Color.parseColor("#EBD2A4")
+            paint.color = Color.parseColor("#DAD8D3")
             canvas.drawRoundRect(RectF(-6f, -10f, 6f, 6f), 2f, 2f, paint)
             canvas.restore()
 
@@ -405,13 +430,13 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
                 canvas.drawBitmap(circleBmp, cx - labelR, cy - labelR, null)
                 circleBmp.recycle()
             } else {
-                paint.color = Color.parseColor("#B83B28")
+                paint.color = Color.parseColor("#353330")
                 canvas.drawCircle(cx, cy, labelR, paint)
             }
             // Center spindle hole
             paint.color = Color.parseColor("#181615")
             canvas.drawCircle(cx, cy, radius * 0.055f, paint)
-            paint.color = Color.parseColor("#D8BE8C")
+            paint.color = Color.parseColor("#DCDAD5")
             canvas.drawCircle(cx, cy, radius * 0.025f, paint)
         }
 

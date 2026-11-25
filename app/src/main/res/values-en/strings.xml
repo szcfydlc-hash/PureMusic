@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">PureMusic</string>
-    <string name="widget_label_4x1">PureMusic (4×1)</string>
-    <string name="widget_label_4x2">PureMusic Vinyl (4×2)</string>
+    <string name="widget_label_4x1">PureMusic · Ceramic Record Shelf (4×2)</string>
+    <string name="widget_label_4x2">PureMusic · Mini Vinyl Turntable (4×2)</string>
 </resources>
