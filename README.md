@@ -43,7 +43,20 @@
 
 | 竖屏黑胶与唱片墙 | 自适应动感歌词 | 横屏 / 平板双栏 | 极简曲库与批量多选 |
 | --- | --- | --- | --- |
-| `![Vinyl](screenshots/vinyl.png)` | `![Lyrics](screenshots/lyrics.png)` | `![Tablet](screenshots/tablet.png)` | `![Library](screenshots/library.png)` |
+<img width="896" height="1200" alt="image" src="https://github.com/user-attachments/assets/44b200cb-079b-4818-ad7e-401e5379eeeb" />
+<img width="896" height="1200" alt="image" src="https://github.com/user-attachments/assets/c5b135cf-a339-476f-8488-f70b53d3154d" />
+<img width="896" height="1200" alt="image" src="https://github.com/user-attachments/assets/f8d65414-9223-48de-b62a-24e7978c4703" />
+<img width="896" height="1200" alt="image" src="https://github.com/user-attachments/assets/bd47ef24-5974-408b-8636-036faabea8f9" />
+<img width="896" height="1200" alt="image" src="https://github.com/user-attachments/assets/d7b66a8b-490a-4e87-a9a7-5ff5ea10fdfc" />
+<img width="896" height="1200" alt="image" src="https://github.com/user-attachments/assets/8e9a6456-65be-486e-a1ec-49b9eb32b457" />
+
+<img width="768" height="1376" alt="image" src="https://github.com/user-attachments/assets/42db6b95-fdc8-4315-a426-f3483a82600e" />
+
+
+
+
+
+
 
 ## 下载与安装
 
