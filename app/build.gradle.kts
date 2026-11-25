@@ -12,8 +12,8 @@ android {
         applicationId = "com.puremusic.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 112
-        versionName = "1.22"
+        versionCode = 113
+        versionName = "1.23"
 
         ndk {
             abiFilters += listOf("arm64-v8a")

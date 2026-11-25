@@ -369,19 +369,20 @@ private fun VinylStudyImmersiveView(
     onAdjustLyricOffset: (Long) -> Unit,
     onResetLyricOffset: () -> Unit,
 ) {
+    val studyTuner = LocalImmersiveTuner.current
     val studyBgTop by animateColorAsState(
-        targetValue = lerp(Color(0xFF1B2328), dynamicAccent, 0.44f),
-        animationSpec = tween(durationMillis = 550),
+        targetValue = lerp(Color(0xFF141618), dynamicAccent, 0.56f * studyTuner.moodStrength),
+        animationSpec = tween(durationMillis = 420),
         label = "studyBgTop",
     )
     val studyBgMid by animateColorAsState(
-        targetValue = lerp(Color(0xFF12181C), dynamicAccent, 0.28f),
-        animationSpec = tween(durationMillis = 550),
+        targetValue = lerp(Color(0xFF0E1012), dynamicAccent, 0.36f * studyTuner.moodStrength),
+        animationSpec = tween(durationMillis = 420),
         label = "studyBgMid",
     )
     val studyBgBottom by animateColorAsState(
-        targetValue = lerp(Color(0xFF0A0F12), dynamicAccent, 0.14f),
-        animationSpec = tween(durationMillis = 550),
+        targetValue = lerp(Color(0xFF090A0C), dynamicAccent, 0.18f * studyTuner.moodStrength),
+        animationSpec = tween(durationMillis = 420),
         label = "studyBgBottom",
     )
     val inkPrimary = if (isDarkTheme) Color(0xFFF4F7F9) else Color(0xFF1E1B18)
@@ -418,8 +419,8 @@ private fun VinylStudyImmersiveView(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawRect(
                     brush = Brush.radialGradient(
-                        0.0f to dynamicGlow.copy(alpha = 0.26f),
-                        0.46f to dynamicGlow.copy(alpha = 0.10f),
+                        0.0f to dynamicGlow.copy(alpha = 0.32f * studyTuner.moodStrength),
+                        0.46f to dynamicGlow.copy(alpha = 0.14f * studyTuner.moodStrength),
                         1.0f to Color.Transparent,
                         center = Offset(size.width * 0.54f, size.height * 0.26f),
                         radius = size.minDimension * 0.64f,
@@ -1196,14 +1197,15 @@ private fun VinylLightfieldImmersiveView(
     onAdjustLyricOffset: (Long) -> Unit,
     onResetLyricOffset: () -> Unit,
 ) {
+    val lfTuner = LocalImmersiveTuner.current
     val bgTop by animateColorAsState(
-        targetValue = lerp(Color(0xFF1A1612), dynamicAccent, 0.30f),
-        animationSpec = tween(550),
+        targetValue = lerp(Color(0xFF121110), dynamicAccent, 0.54f * lfTuner.moodStrength),
+        animationSpec = tween(420),
         label = "lightfieldBgTop",
     )
     val bgMid by animateColorAsState(
-        targetValue = lerp(Color(0xFF14110E), dynamicAccent, 0.18f),
-        animationSpec = tween(550),
+        targetValue = lerp(Color(0xFF0D0C0B), dynamicAccent, 0.34f * lfTuner.moodStrength),
+        animationSpec = tween(420),
         label = "lightfieldBgMid",
     )
     val bgBottom = Color(0xFF0C0A09)
@@ -1237,6 +1239,18 @@ private fun VinylLightfieldImmersiveView(
         val stageW = maxWidth
         val stageH = maxHeight
         val discSize = min(stageW * 0.94f, stageH * 0.43f)
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(
+                brush = Brush.radialGradient(
+                    0.0f to dynamicGlow.copy(alpha = 0.34f * lfTuner.moodStrength),
+                    0.48f to dynamicAccent.copy(alpha = 0.15f * lfTuner.moodStrength),
+                    0.85f to Color.Transparent,
+                    center = Offset(size.width * 0.32f, size.height * 0.24f),
+                    radius = size.maxDimension * 0.58f,
+                ),
+            )
+        }
 
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.padding(horizontal = 24.dp)) {
@@ -1721,52 +1735,78 @@ fun LiveSpectrumWaveformSeekBar(
 
                     SpectrumStyle.HARMONIC_STRINGS -> {
                         val midY = totalH / 2f
-                        val pts = 72
+                        val pts = 84
                         // Center reference hairline
                         drawLine(
-                            color = unplayedColor.copy(alpha = 0.35f),
+                            color = unplayedColor.copy(alpha = 0.32f),
                             start = Offset(0f, midY),
                             end = Offset(totalW, midY),
                             strokeWidth = 0.8f,
                         )
 
-                        val bassEnergy = animatedLevels[barCount / 2]
-                        val midEnergy = animatedLevels[barCount / 3]
-                        val highEnergy = animatedLevels[(barCount * 3) / 4]
-                        val maxAmp = totalH * 0.47f
+                        fun sampleFreqBand(u: Float): Float {
+                            val clamped = u.coerceIn(0f, 1f)
+                            val fIdx = clamped * (barCount - 1)
+                            val i0 = fIdx.toInt().coerceIn(0, barCount - 1)
+                            val i1 = (i0 + 1).coerceAtMost(barCount - 1)
+                            val frac = fIdx - i0
+                            val st = frac * frac * (3f - 2f * frac)
+                            return animatedLevels[i0] + (animatedLevels[i1] - animatedLevels[i0]) * st
+                        }
 
+                        val maxAmp = totalH * 0.48f
                         var primaryAtPlayheadY = midY
+                        // 3 Acoustic Strings mapped to real Bass/Fundamental, Mid/Vocal, and High/Air FFT bands
                         val stringSpecs = listOf(
-                            Triple(0.0f, 2.2f, playedColor),
-                            Triple(1.35f, 1.5f, Color(0xFFD8B888)),
-                            Triple(2.6f, 1.2f, needleColor.copy(alpha = 0.85f)),
+                            Triple(0.0f, 2.1f, playedColor),
+                            Triple(1.45f, 1.4f, Color(0xFFD8B888)),
+                            Triple(2.85f, 1.05f, needleColor.copy(alpha = 0.82f)),
                         )
-                        val amps = listOf(
-                            (0.30f + bassEnergy * 0.88f).coerceAtMost(1f) * maxAmp,
-                            (0.24f + midEnergy * 0.78f).coerceAtMost(1f) * maxAmp,
-                            (0.18f + highEnergy * 0.66f).coerceAtMost(1f) * maxAmp,
-                        )
-                        val freqs = listOf(2.4f, 3.2f, 4.1f)
 
                         for (sIdx in 0..2) {
                             val path = Path()
                             val phaseShift = stringSpecs[sIdx].first
                             val strokeW = stringSpecs[sIdx].second
                             val col = stringSpecs[sIdx].third
-                            val amp = if (isPlaying) amps[sIdx] else maxAmp * (0.16f - sIdx * 0.04f)
-                            val freq = freqs[sIdx]
+                            var prevX = 0f
+                            var prevY = midY
 
                             for (p in 0..pts) {
                                 val t = p.toFloat() / pts
                                 val x = t * totalW
-                                // Pin both ends cleanly to 0 amplitude like real acoustic strings
                                 val pinWindow = sin(t * Math.PI).toFloat()
-                                val y = midY + sin(t * freq * Math.PI.toFloat() * 2f + wavePhase * (1f + sIdx * 0.25f) + phaseShift) * amp * pinWindow
-                                if (p == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                                val localAmp = if (isPlaying) {
+                                    // Map each string to its true real-time FFT spectrum region along x
+                                    val bandEnergy = when (sIdx) {
+                                        0 -> sampleFreqBand(t * 0.55f)                 // Low-Mid / Bass body
+                                        1 -> sampleFreqBand(0.20f + t * 0.55f)         // Mid / Vocal & Piano
+                                        else -> sampleFreqBand(0.45f + t * 0.55f)      // High / Hi-hat & Air
+                                    }
+                                    val contrast = Math.pow(bandEnergy.toDouble(), 1.15).toFloat()
+                                    val weight = when (sIdx) { 0 -> 1.00f; 1 -> 0.84f; else -> 0.68f }
+                                    (0.05f + contrast * 0.95f) * maxAmp * weight
+                                } else {
+                                    maxAmp * (0.14f - sIdx * 0.035f)
+                                }
+                                // True harmonic standing-wave carrier modulated by local real-time frequency energy
+                                val carrier = when (sIdx) {
+                                    0 -> sin(t * 13.5f + wavePhase * 1.05f + phaseShift)
+                                    1 -> sin(t * 19.5f - wavePhase * 1.30f + phaseShift)
+                                    else -> sin(t * 27.0f + wavePhase * 1.75f + phaseShift)
+                                }
+                                val y = midY + carrier * localAmp * pinWindow
+                                if (p == 0) {
+                                    path.moveTo(x, y)
+                                } else {
+                                    path.quadraticTo(prevX, prevY, (prevX + x) * 0.5f, (prevY + y) * 0.5f)
+                                }
+                                prevX = x
+                                prevY = y
                                 if (sIdx == 0 && abs(x - playheadX) <= (totalW / pts)) {
                                     primaryAtPlayheadY = y
                                 }
                             }
+                            path.lineTo(prevX, prevY)
                             clipRect(left = 0f, top = 0f, right = playheadX, bottom = totalH) {
                                 if (sIdx == 0) {
                                     drawPath(path, color = col.copy(alpha = 0.22f), style = Stroke(width = 6f, cap = StrokeCap.Round))
@@ -1965,6 +2005,14 @@ data class ImmersiveTunerState(
     val onUpdateVinylRpm: (Int) -> Unit = {},
 )
 
+
+private val CREDIT_META_REGEX = Regex(
+    """^(作词|作曲|编曲|制作人|混音|母带|录音|词|曲|发行|演唱|出品|Lyricist|Composer|Producer|Arranged|Mixed|Mastered)\s*[:：]""",
+    RegexOption.IGNORE_CASE,
+)
+
+private fun isLyricCreditMetadata(line: String): Boolean = CREDIT_META_REGEX.containsMatchIn(line.trim())
+
 val LocalImmersiveTuner = androidx.compose.runtime.compositionLocalOf { ImmersiveTunerState() }
 
 @Composable
@@ -2020,13 +2068,23 @@ private fun ImmersiveTopBar(
             Spacer(modifier = Modifier.width(1.dp))
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val pillBg = if (isDarkSurface) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.04f)
+            val pillBorder = inkColor.copy(alpha = 0.24f)
+            val goldAccent = Color(0xFFE4C68D)
+
+            // 1) '译' unified 30dp capsule
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(0.8.dp, inkColor.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(15.dp))
+                    .background(pillBg)
+                    .border(0.75.dp, pillBorder, RoundedCornerShape(15.dp))
                     .clickable(enabled = !isTranslatingLyrics, onClick = onTranslateLyrics)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .padding(horizontal = 11.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 if (isTranslatingLyrics) {
@@ -2039,71 +2097,183 @@ private fun ImmersiveTopBar(
                     Text(
                         text = "译",
                         style = MaterialTheme.typography.labelSmall,
-                        color = inkColor.copy(alpha = 0.85f),
+                        color = inkColor.copy(alpha = 0.88f),
+                        fontWeight = FontWeight.Medium,
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
-
-            // Quick Dynamic Color & Matte Cover Tuner (Desktop-parity)
+            // 2) '微调' unified 30dp circle + Dark Obsidian Champagne-Gold Dropdown (matches Menu style 1:1!)
             Box {
-                IconButton(onClick = { tuneExpanded = true }, modifier = Modifier.size(32.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(if (tuneExpanded) goldAccent.copy(alpha = 0.16f) else pillBg)
+                        .border(0.75.dp, if (tuneExpanded) goldAccent.copy(alpha = 0.85f) else pillBorder, CircleShape)
+                        .clickable { tuneExpanded = true },
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(
                         imageVector = Icons.Rounded.Tune,
                         contentDescription = "氛围与质感调节",
-                        tint = if (tuneExpanded) MaterialTheme.colorScheme.primary else inkColor.copy(alpha = 0.84f),
-                        modifier = Modifier.size(18.dp),
+                        tint = if (tuneExpanded) goldAccent else inkColor.copy(alpha = 0.88f),
+                        modifier = Modifier.size(15.dp),
                     )
                 }
-                DropdownMenu(
-                    expanded = tuneExpanded,
-                    onDismissRequest = { tuneExpanded = false },
-                    modifier = Modifier
-                        .width(248.dp)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+
+                MaterialTheme(
+                    colorScheme = MaterialTheme.colorScheme.copy(
+                        surface = Color(0xF0181715),
+                        surfaceContainer = Color(0xF0181715),
+                    ),
                 ) {
-                    Text(
-                        text = "动态取色氛围强度  ${(tuner.moodStrength * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Slider(
-                        value = tuner.moodStrength.coerceIn(0f, 1f),
-                        onValueChange = tuner.onUpdateMoodStrength,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                    DropdownMenu(
+                        expanded = tuneExpanded,
+                        onDismissRequest = { tuneExpanded = false },
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = Color(0xF0181715),
+                        tonalElevation = 0.dp,
+                        shadowElevation = 12.dp,
+                        border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.14f)),
+                        modifier = Modifier.width(256.dp),
                     ) {
-                        Text("封面亚光磨砂质感", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-                        Switch(checked = tuner.matteCover, onCheckedChange = tuner.onToggleMatteCover)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("黑胶转速", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf(33, 45, 78).forEach { rpm ->
-                                val active = tuner.vinylRpm == rpm
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            // Header: 动态取色氛围强度 + %
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "动态取色氛围强度",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color(0xFFD6CEC2),
+                                )
+                                Text(
+                                    text = "${(tuner.moodStrength * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = goldAccent,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+
+                            // Custom sleek 3dp champagne-gold hairline slider (no chunky red Material Slider!)
+                            var sliderW by remember { mutableFloatStateOf(1f) }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(24.dp)
+                                    .onSizeChanged { sliderW = it.width.toFloat().coerceAtLeast(1f) }
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { off ->
+                                            tuner.onUpdateMoodStrength((off.x / sliderW).coerceIn(0f, 1f))
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectHorizontalDragGestures { change, _ ->
+                                            change.consume()
+                                            tuner.onUpdateMoodStrength((change.position.x / sliderW).coerceIn(0f, 1f))
+                                        }
+                                    },
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                Canvas(modifier = Modifier.fillMaxWidth().height(16.dp)) {
+                                    val cy = size.height / 2f
+                                    val frac = tuner.moodStrength.coerceIn(0f, 1f)
+                                    val thumbX = (size.width * frac).coerceIn(6.dp.toPx(), size.width - 6.dp.toPx())
+                                    drawLine(
+                                        color = Color.White.copy(alpha = 0.16f),
+                                        start = Offset(0f, cy),
+                                        end = Offset(size.width, cy),
+                                        strokeWidth = 3.dp.toPx(),
+                                        cap = StrokeCap.Round,
+                                    )
+                                    drawLine(
+                                        color = goldAccent,
+                                        start = Offset(0f, cy),
+                                        end = Offset(thumbX, cy),
+                                        strokeWidth = 3.dp.toPx(),
+                                        cap = StrokeCap.Round,
+                                    )
+                                    drawCircle(
+                                        color = goldAccent.copy(alpha = 0.28f),
+                                        radius = 9.dp.toPx(),
+                                        center = Offset(thumbX, cy),
+                                    )
+                                    drawCircle(
+                                        color = goldAccent,
+                                        radius = 5.5.dp.toPx(),
+                                        center = Offset(thumbX, cy),
+                                    )
+                                }
+                            }
+
+                            // 3 Quick Presets: 极简 0% / 柔和 60% / 浓郁 100%
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                listOf(0.0f to "极简 0%", 0.60f to "柔和 60%", 1.0f to "浓郁 100%").forEach { (presetVal, label) ->
+                                    val isCur = abs(tuner.moodStrength - presetVal) < 0.06f
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isCur) goldAccent.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f))
+                                            .border(
+                                                width = if (isCur) 0.9.dp else 0.6.dp,
+                                                color = if (isCur) goldAccent else Color.White.copy(alpha = 0.16f),
+                                                shape = RoundedCornerShape(10.dp),
+                                            )
+                                            .clickable { tuner.onUpdateMoodStrength(presetVal) }
+                                            .padding(vertical = 6.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.sp,
+                                            color = if (isCur) goldAccent else Color(0xFFAFA79B),
+                                            fontWeight = if (isCur) FontWeight.SemiBold else FontWeight.Normal,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(thickness = 0.5.dp, color = Color.White.copy(alpha = 0.10f))
+
+                            // Matte Frosted Cover toggle (slim champagne-gold pill switch)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "封面亚光磨砂质感",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFFF2ECE1),
+                                )
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                                        .clickable { tuner.onUpdateVinylRpm(rpm) }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        .width(38.dp)
+                                        .height(20.dp)
+                                        .clip(CircleShape)
+                                        .background(if (tuner.matteCover) goldAccent else Color.White.copy(alpha = 0.18f))
+                                        .clickable { tuner.onToggleMatteCover(!tuner.matteCover) }
+                                        .padding(2.dp),
+                                    contentAlignment = if (tuner.matteCover) Alignment.CenterEnd else Alignment.CenterStart,
                                 ) {
-                                    Text(
-                                        text = "$rpm",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.SemiBold,
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF181715)),
                                     )
                                 }
                             }
@@ -2112,15 +2282,22 @@ private fun ImmersiveTopBar(
                 }
             }
 
-            Spacer(modifier = Modifier.width(2.dp))
-
+            // 3) '···' unified 30dp circle
             Box {
-                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(if (menuExpanded) goldAccent.copy(alpha = 0.16f) else pillBg)
+                        .border(0.75.dp, if (menuExpanded) goldAccent.copy(alpha = 0.85f) else pillBorder, CircleShape)
+                        .clickable { menuExpanded = true },
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(
                         imageVector = Icons.Rounded.MoreHoriz,
                         contentDescription = "切换沉浸场景与歌词设置",
-                        tint = inkColor.copy(alpha = 0.88f),
-                        modifier = Modifier.size(22.dp),
+                        tint = if (menuExpanded) goldAccent else inkColor.copy(alpha = 0.88f),
+                        modifier = Modifier.size(16.dp),
                     )
                 }
                 if (menuExpanded) {
@@ -2333,6 +2510,9 @@ private fun ThreeSlotAutoFitLyricsStage(
 
         val line1Text = prevPair?.first.orEmpty()
         val line2Text = curPair.first
+        val isCreditLine = isLyricCreditMetadata(line2Text)
+        val effectiveActiveColor = if (isCreditLine) secondaryColor.copy(alpha = 0.82f) else activeColor
+        val effectiveActiveWeight = if (isCreditLine) FontWeight.Normal else activeWeight
         val hasTranslation = !curPair.second.isNullOrBlank()
         val line3Text = if (hasTranslation) curPair.second.orEmpty() else nextPair?.first.orEmpty()
 
@@ -2393,7 +2573,7 @@ private fun ThreeSlotAutoFitLyricsStage(
                                 fontFamily = lyricFamily,
                                 fontStyle = lyricStyleItalic,
                                 fontSize = candidate.sp,
-                                fontWeight = activeWeight,
+                                fontWeight = effectiveActiveWeight,
                                 lineHeight = (candidate * 1.32f).sp,
                                 textAlign = textAlign,
                             ),
@@ -2423,11 +2603,11 @@ private fun ThreeSlotAutoFitLyricsStage(
                             fontFamily = lyricFamily,
                             fontStyle = lyricStyleItalic,
                             fontSize = fittedFontSp.sp,
-                            fontWeight = activeWeight,
+                            fontWeight = effectiveActiveWeight,
                             lineHeight = (fittedFontSp * 1.32f).sp,
                             textAlign = textAlign,
                         ),
-                        color = activeColor,
+                        color = effectiveActiveColor,
                         textAlign = textAlign,
                     )
                 } else {
@@ -2462,7 +2642,7 @@ private fun ThreeSlotAutoFitLyricsStage(
                             fontFamily = lyricFamily,
                             fontStyle = lyricStyleItalic,
                             fontSize = fittedFontSp.sp,
-                            fontWeight = activeWeight,
+                            fontWeight = effectiveActiveWeight,
                             lineHeight = (fittedFontSp * 1.32f).sp,
                             textAlign = textAlign,
                         ),
