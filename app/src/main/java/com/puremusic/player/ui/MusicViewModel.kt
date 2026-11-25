@@ -272,6 +272,48 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = false,
     )
 
+    val immersiveMoodStrength: StateFlow<Float> = playlistRepository.immersiveMoodStrengthFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 0.85f,
+    )
+
+    val immersiveMatteCover: StateFlow<Boolean> = playlistRepository.immersiveMatteCoverFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
+    val immersiveVinylRpm: StateFlow<Int> = playlistRepository.immersiveVinylRpmFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 33,
+    )
+
+    val gaplessEnabled: StateFlow<Boolean> = playlistRepository.gaplessEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
+    val replayGainEnabled: StateFlow<Boolean> = playlistRepository.replayGainEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
+    val perDeviceEqEnabled: StateFlow<Boolean> = playlistRepository.perDeviceEqEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
+    val cueSupportEnabled: StateFlow<Boolean> = playlistRepository.cueSupportEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
     val carModeEnabled: StateFlow<Boolean> = playlistRepository.carModeEnabledFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -921,6 +963,43 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         AudioEqualizerManager.setVolumeNormalizationEnabled(enabled)
         viewModelScope.launch { playlistRepository.setVolumeNormalization(enabled) }
     }
+
+    fun setImmersiveMoodStrength(strength: Float) {
+        viewModelScope.launch { playlistRepository.setImmersiveMoodStrength(strength) }
+    }
+
+    fun setImmersiveMatteCover(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setImmersiveMatteCover(enabled) }
+    }
+
+    fun setImmersiveVinylRpm(rpm: Int) {
+        viewModelScope.launch { playlistRepository.setImmersiveVinylRpm(rpm) }
+    }
+
+    fun setGaplessEnabled(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setGaplessEnabled(enabled) }
+    }
+
+    fun setReplayGainEnabled(enabled: Boolean) {
+        AudioEqualizerManager.setVolumeNormalizationEnabled(enabled || volumeNormalizationEnabled.value)
+        viewModelScope.launch { playlistRepository.setReplayGainEnabled(enabled) }
+    }
+
+    fun setPerDeviceEqEnabled(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setPerDeviceEqEnabled(enabled) }
+    }
+
+    fun setCueSupportEnabled(enabled: Boolean) {
+        viewModelScope.launch { playlistRepository.setCueSupportEnabled(enabled) }
+    }
+
+    suspend fun exportBackupJson(): String = playlistRepository.exportAllToJson(allSongs.value)
+
+    suspend fun importBackupJson(jsonText: String): Int = playlistRepository.importAllFromJson(jsonText, allSongs.value)
+
+    suspend fun exportM3u8(): String = playlistRepository.exportFavoritesAndPlaylistsToM3u8(allSongs.value)
+
+    suspend fun importM3u8(name: String, m3uText: String): Int = playlistRepository.importPlaylistFromM3u8(name, m3uText, allSongs.value)
 
     fun setCarModeEnabled(enabled: Boolean) {
         viewModelScope.launch { playlistRepository.setCarModeEnabled(enabled) }

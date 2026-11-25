@@ -1838,20 +1838,32 @@ private fun ArtistsTabContent(
                     .padding(horizontal = 18.dp, vertical = (LocalLayoutDensity.current.rowVerticalPaddingDp + 3).dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val artistCoverUri = artist.songs.firstOrNull()?.albumArtUri
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .size(46.dp)
+                        .shadow(2.dp, RoundedCornerShape(10.dp), ambientColor = Color.Black.copy(alpha = 0.14f))
+                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(0.75.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp)),
+                        .border(0.65.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.72f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
+                    if (artistCoverUri != null) {
+                        AlbumArtwork(
+                            uri = artistCoverUri,
+                            contentDescription = artist.name,
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadius = 10.dp,
+                            iconSize = 20.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {

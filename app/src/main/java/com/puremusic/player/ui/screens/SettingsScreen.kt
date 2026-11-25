@@ -150,6 +150,10 @@ fun SettingsScreen(
     playbackSpeed: Float,
     fadeInSeconds: Int,
     volumeNormalizationEnabled: Boolean = false,
+    gaplessEnabled: Boolean = true,
+    replayGainEnabled: Boolean = true,
+    perDeviceEqEnabled: Boolean = true,
+    cueSupportEnabled: Boolean = true,
     hapticEnabled: Boolean = true,
     carModeEnabled: Boolean = false,
     keepScreenOn: Boolean,
@@ -178,6 +182,14 @@ fun SettingsScreen(
     onSelectPlaybackSpeed: (Float) -> Unit,
     onSelectFadeInSeconds: (Int) -> Unit,
     onToggleVolumeNormalization: (Boolean) -> Unit = {},
+    onToggleGapless: (Boolean) -> Unit = {},
+    onToggleReplayGain: (Boolean) -> Unit = {},
+    onTogglePerDeviceEq: (Boolean) -> Unit = {},
+    onToggleCueSupport: (Boolean) -> Unit = {},
+    onExportM3u8: () -> Unit = {},
+    onImportM3u8: () -> Unit = {},
+    onExportBackupJson: () -> Unit = {},
+    onImportBackupJson: () -> Unit = {},
     onToggleHaptic: (Boolean) -> Unit = {},
     onToggleCarMode: (Boolean) -> Unit = {},
     onToggleKeepScreenOn: (Boolean) -> Unit,
@@ -1313,6 +1325,34 @@ fun SettingsScreen(
                     value = "已启用 $enabledCount / ${allFolders.size}",
                     onClick = { showFolderManagerDialog = true },
                 )
+                            SettingsDivider()
+                            SettingsActionRow(
+                                title = "导出 M3U8 歌单（互通 Windows 版）",
+                                subtitle = "生成标准 .m3u8 播放列表，可直接导入电脑端",
+                                value = "导出",
+                                onClick = onExportM3u8,
+                            )
+                            SettingsDivider()
+                            SettingsActionRow(
+                                title = "导入 M3U8 歌单",
+                                subtitle = "从本地 .m3u8 文件自动匹配曲库并生成歌单",
+                                value = "导入",
+                                onClick = onImportM3u8,
+                            )
+                            SettingsDivider()
+                            SettingsActionRow(
+                                title = "一键全量备份（JSON）",
+                                subtitle = "备份我喜欢的音乐与全部自建歌单",
+                                value = "备份",
+                                onClick = onExportBackupJson,
+                            )
+                            SettingsDivider()
+                            SettingsActionRow(
+                                title = "从备份恢复（JSON）",
+                                subtitle = "换机或重装后一键恢复珍藏与歌单",
+                                value = "恢复",
+                                onClick = onImportBackupJson,
+                            )
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 SettingsListRow(
                     label = "导出歌单与收藏备份",
@@ -1443,6 +1483,34 @@ fun SettingsScreen(
                         colors = switchColors,
                     )
                 }
+                            SettingsDivider()
+                            SettingsToggleRow(
+                                title = "无缝播放（Gapless）",
+                                subtitle = "Live 演唱会与古典专辑曲目间 0ms 无缝衔接",
+                                checked = gaplessEnabled,
+                                onCheckedChange = onToggleGapless,
+                            )
+                            SettingsDivider()
+                            SettingsToggleRow(
+                                title = "ReplayGain 标签响度均衡",
+                                subtitle = "读取 FLAC / MP3 内嵌响度标签自动平衡音量",
+                                checked = replayGainEnabled,
+                                onCheckedChange = onToggleReplayGain,
+                            )
+                            SettingsDivider()
+                            SettingsToggleRow(
+                                title = "按输出设备自动记忆 EQ",
+                                subtitle = "蓝牙耳机、有线耳机与扬声器分别保存均衡器预设",
+                                checked = perDeviceEqEnabled,
+                                onCheckedChange = onTogglePerDeviceEq,
+                            )
+                            SettingsDivider()
+                            SettingsToggleRow(
+                                title = "自动解析 CUE 整轨分轨",
+                                subtitle = "支持整轨无损 FLAC / WAV 搭配 .cue 分曲播放",
+                                checked = cueSupportEnabled,
+                                onCheckedChange = onToggleCueSupport,
+                            )
                 HorizontalDivider(thickness = 0.6.dp, color = outlineColor)
                 Row(
                     modifier = Modifier
@@ -2245,5 +2313,76 @@ private fun <T> OptionPickerDialog(
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun SettingsDivider() {
+    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+}
+
+@Composable
+private fun SettingsActionRow(
+    title: String,
+    subtitle: String,
+    value: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(text = subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(text = subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+            ),
+        )
     }
 }

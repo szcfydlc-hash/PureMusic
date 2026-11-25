@@ -3,19 +3,19 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_bg_archival"
+    android:background="@drawable/widget_walnut_turntable_plinth"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="12dp"
+    android:paddingStart="10dp"
     android:paddingEnd="14dp"
     android:paddingTop="10dp"
     android:paddingBottom="10dp">
 
     <ImageView
         android:id="@+id/widget_art"
-        android:layout_width="148dp"
-        android:layout_height="108dp"
-        android:contentDescription="专辑封套与完整黑胶唱片"
+        android:layout_width="136dp"
+        android:layout_height="136dp"
+        android:contentDescription="拉丝铝黑胶唱盘与黄铜唱臂"
         android:scaleType="fitCenter"
         android:src="@mipmap/ic_launcher_round" />
 
@@ -34,87 +34,84 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="简约音乐"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="17sp"
+            android:textColor="#F7F2E8"
+            android:textSize="16sp"
             android:textStyle="bold" />
 
+        <TextView
+            android:id="@+id/widget_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="点击打开本地曲库"
+            android:textColor="#CFC2B0"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/widget_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/widget_badge_brass"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="1.5dp"
+            android:paddingBottom="1.5dp"
+            android:text="FLAC · Hi-Res"
+            android:textColor="#2A1F14"
+            android:textSize="9.5sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="2.5dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/widget_progress_filament"
+            android:contentDescription="@null" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/widget_artist"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="0"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:maxWidth="128dp"
-                android:text="点击打开本地曲库"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/widget_badge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/widget_sq_badge"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:paddingTop="1dp"
-                android:paddingBottom="1dp"
-                android:text="SQ"
-                android:textColor="#0D9488"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="10dp"
             android:gravity="center_vertical|start"
             android:orientation="horizontal">
 
             <ImageButton
                 android:id="@+id/widget_prev"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@android:color/transparent"
                 android:contentDescription="上一首"
-                android:padding="7dp"
+                android:padding="6dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_widget_prev"
-                android:tint="@color/widget_icon_tint" />
+                android:tint="#EDE3D4" />
 
             <ImageButton
                 android:id="@+id/widget_play_pause"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_marginStart="10dp"
                 android:layout_marginEnd="10dp"
-                android:background="@drawable/widget_btn_play_cinnabar"
+                android:background="@drawable/widget_play_cinnabar"
                 android:contentDescription="播放或暂停"
-                android:padding="11dp"
+                android:padding="9dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_widget_play"
-                android:tint="#FFFFFF" />
+                android:tint="#FAF7F2" />
 
             <ImageButton
                 android:id="@+id/widget_next"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@android:color/transparent"
                 android:contentDescription="下一首"
-                android:padding="7dp"
+                android:padding="6dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_widget_next"
-                android:tint="@color/widget_icon_tint" />
+                android:tint="#EDE3D4" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

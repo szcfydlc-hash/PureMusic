@@ -45,6 +45,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -1794,7 +1799,12 @@ fun BatchSongPickerSheet(
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    var selectedIds by remember(initialSelectedIds) { mutableStateOf(initialSelectedIds) }
+    // O(1) SnapshotStateMap avoids copying the entire Set & recomposing every row on each tap
+    val selectedMap = remember(initialSelectedIds) {
+        mutableStateMapOf<Long, Boolean>().apply {
+            initialSelectedIds.forEach { put(it, true) }
+        }
+    }
     val filtered = remember(allSongs, query) {
         val q = query.trim().lowercase(Locale.getDefault())
         if (q.isEmpty()) {
@@ -1809,9 +1819,17 @@ fun BatchSongPickerSheet(
     }
     val outlineColor = MaterialTheme.colorScheme.outline
     val boxShape = RoundedCornerShape(8.dp)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Consume residual scroll so ModalBottomSheet never steals vertical flings from the LazyColumn
+    val blockSheetDrag = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset = available
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.background,
         tonalElevation = 0.dp,
         dragHandle = { BottomSheetDefaults.DragHandle(color = outlineColor) },
@@ -1835,14 +1853,14 @@ fun BatchSongPickerSheet(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "已选 ${selectedIds.size} 首歌曲",
+                        text = "已选 ${selectedMap.size} 首歌曲",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
-                if (selectedIds.isNotEmpty()) {
-                    TextButton(onClick = { selectedIds = emptySet() }) {
+                if (selectedMap.isNotEmpty()) {
+                    TextButton(onClick = { selectedMap.clear() }) {
                         Text("清空已选", style = MaterialTheme.typography.labelMedium)
                     }
                 }
@@ -1895,15 +1913,20 @@ fun BatchSongPickerSheet(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 180.dp, max = 360.dp),
+                    .heightIn(min = 220.dp, max = 460.dp)
+                    .nestedScroll(blockSheetDrag),
             ) {
-                itemsIndexed(filtered, key = { _, song -> song.id }) { _, song ->
-                    val checked = song.id in selectedIds
+                itemsIndexed(
+                    items = filtered,
+                    key = { _, song -> song.id },
+                    contentType = { _, _ -> "picker_song" },
+                ) { _, song ->
+                    val checked = selectedMap[song.id] == true
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                selectedIds = if (checked) selectedIds - song.id else selectedIds + song.id
+                                if (checked) selectedMap.remove(song.id) else selectedMap[song.id] = true
                             }
                             .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1911,7 +1934,7 @@ fun BatchSongPickerSheet(
                         Checkbox(
                             checked = checked,
                             onCheckedChange = {
-                                selectedIds = if (checked) selectedIds - song.id else selectedIds + song.id
+                                if (checked) selectedMap.remove(song.id) else selectedMap[song.id] = true
                             },
                         )
                         AlbumArtwork(
@@ -1954,15 +1977,14 @@ fun BatchSongPickerSheet(
                     .clip(boxShape)
                     .background(MaterialTheme.colorScheme.primary)
                     .clickable {
-                        // Preserve original order for existing songs, append newly added in library order
-                        val ordered = allSongs.filter { it.id in selectedIds }.map { it.id }
+                        val ordered = allSongs.filter { selectedMap[it.id] == true }.map { it.id }
                         onSave(ordered)
                         onDismiss()
                     },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "保存更改 (${selectedIds.size} 首)",
+                    text = "保存更改 (${selectedMap.size} 首)",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.SemiBold,

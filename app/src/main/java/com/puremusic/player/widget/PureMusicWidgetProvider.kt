@@ -10,12 +10,16 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import android.graphics.RadialGradient
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.SweepGradient
 import android.net.Uri
 import android.view.View
@@ -85,12 +89,12 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
             cachedIsLossless = isLossless
 
             val manager = AppWidgetManager.getInstance(context)
-            val compactIds = manager.getAppWidgetIds(ComponentName(context, PureMusicWidgetProvider::class.java))
-            if (compactIds.isNotEmpty()) {
+            val shelfIds = manager.getAppWidgetIds(ComponentName(context, PureMusicWidgetProvider::class.java))
+            if (shelfIds.isNotEmpty()) {
                 updateWidgetsForLayout(
                     context = context,
                     manager = manager,
-                    appWidgetIds = compactIds,
+                    appWidgetIds = shelfIds,
                     layoutRes = R.layout.widget_pure_music,
                     highRes = false,
                     title = title,
@@ -101,12 +105,12 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
                 )
             }
 
-            val largeIds = manager.getAppWidgetIds(ComponentName(context, PureMusicWidgetLargeProvider::class.java))
-            if (largeIds.isNotEmpty()) {
+            val turntableIds = manager.getAppWidgetIds(ComponentName(context, PureMusicWidgetLargeProvider::class.java))
+            if (turntableIds.isNotEmpty()) {
                 updateWidgetsForLayout(
                     context = context,
                     manager = manager,
-                    appWidgetIds = largeIds,
+                    appWidgetIds = turntableIds,
                     layoutRes = R.layout.widget_pure_music_4x2,
                     highRes = true,
                     title = title,
@@ -137,14 +141,18 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
                 Intent(context, MainActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            val turntableBitmap = renderTurntableWidgetBitmap(context, artUri, highRes)
+            val artworkBitmap = if (highRes) {
+                renderTurntableDeckBitmap(context, artUri)
+            } else {
+                renderWalnutVinylShelfBitmap(context, artUri)
+            }
 
             appWidgetIds.forEach { widgetId ->
                 val views = RemoteViews(context.packageName, layoutRes)
                 views.setTextViewText(R.id.widget_title, title?.takeIf { it.isNotBlank() } ?: "简约音乐")
-                views.setTextViewText(R.id.widget_artist, artist?.takeIf { it.isNotBlank() } ?: "点击打开本地曲库")
+                views.setTextViewText(R.id.widget_artist, artist?.takeIf { it.isNotBlank() } ?: "PureMusic")
                 views.setViewVisibility(R.id.widget_badge, if (isLossless) View.VISIBLE else View.GONE)
-                views.setImageViewBitmap(R.id.widget_art, turntableBitmap)
+                views.setImageViewBitmap(R.id.widget_art, artworkBitmap)
                 views.setImageViewResource(
                     R.id.widget_play_pause,
                     if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
@@ -157,75 +165,261 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        private fun renderTurntableWidgetBitmap(context: Context, uri: Uri?, highRes: Boolean): Bitmap {
-            // Safe unclipped canvas geometry: discCx + discRadius + margin <= w
-            val w = if (highRes) 420 else 236
-            val h = if (highRes) 308 else 176
-            val sleeveSize = if (highRes) 280 else 160
-            val sleeveLeft = if (highRes) 10f else 6f
-            val sleeveTop = (h - sleeveSize) / 2f
-            val discRadius = if (highRes) 128f else 72f
-            val discCx = sleeveLeft + sleeveSize * (if (highRes) 0.95f else 0.92f)
-            val discCy = h / 2f
-            val cornerRadius = if (highRes) 24f else 14f
-
+        /**
+         * Style 1: Floating Walnut Vinyl Shelf Desk Ornament (transparent wallpaper background,
+         * dark walnut back-rail, recessed flanking neighbor sleeves, hero cover & peeking 180g black vinyl).
+         */
+        private fun renderWalnutVinylShelfBitmap(context: Context, uri: Uri?): Bitmap {
+            val w = 720
+            val h = 290
             val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(out)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-            // 1. Draw complete unclipped glossy black vinyl disc peeking out from the right
-            paint.color = Color.parseColor("#0B0B0D")
-            canvas.drawCircle(discCx, discCy, discRadius, paint)
+            // 1. Dark walnut back-rail behind the sleeves
+            val railTop = h * 0.56f
+            val railRect = RectF(18f, railTop, w - 18f, h.toFloat())
+            paint.shader = LinearGradient(
+                0f, railTop, 0f, h.toFloat(),
+                intArrayOf(Color.parseColor("#543D2E"), Color.parseColor("#35251B"), Color.parseColor("#211710")),
+                null, Shader.TileMode.CLAMP,
+            )
+            canvas.drawRoundRect(railRect, 14f, 14f, paint)
+            paint.shader = null
 
+            // 2. Flanking recessed neighbor sleeves resting gently on the left & right of the shelf
+            val sideSize = 216f
+            val sideTop = h - sideSize - 4f
+            val leftSleeve = RectF(46f, sideTop, 46f + sideSize, h.toFloat())
+            val rightSleeve = RectF(w - 46f - sideSize, sideTop, w - 46f, h.toFloat())
+
+            paint.color = Color.argb(215, 118, 112, 104)
+            canvas.drawRoundRect(leftSleeve, 12f, 12f, paint)
+            paint.color = Color.argb(185, 102, 98, 92)
+            canvas.drawRoundRect(rightSleeve, 12f, 12f, paint)
+            // Subtle dim scrim & rim on flanking sleeves
+            val rimP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 1.6f
+                color = Color.argb(55, 255, 248, 236)
+            }
+            canvas.drawRoundRect(leftSleeve, 12f, 12f, rimP)
+            canvas.drawRoundRect(rightSleeve, 12f, 12f, rimP)
+
+            // 3. Peeking glossy 180g matte-black vinyl disc behind the right edge of hero sleeve
+            val heroSize = 272
+            val heroLeft = (w - heroSize) / 2f - 28f
+            val heroTop = (h - heroSize).toFloat()
+            val discR = heroSize * 0.45f
+            val discCx = heroLeft + heroSize * 0.94f
+            val discCy = heroTop + heroSize * 0.50f
+            drawGroovedVinylDisc(canvas, discCx, discCy, discR, centerCover = null)
+
+            // 4. Soft cast shadow from hero sleeve onto vinyl & back rail
+            paint.color = Color.argb(95, 0, 0, 0)
+            canvas.drawRoundRect(RectF(heroLeft + 10f, heroTop + 6f, heroLeft + heroSize + 10f, heroTop + heroSize + 4f), 14f, 14f, paint)
+
+            // 5. Crisp hero album sleeve standing prominently in center of the shelf
+            val rawCover = uri?.let { loadRawBitmap(context, it, heroSize) }
+            val coverBmp = roundedCoverBitmap(rawCover, heroSize, 14f)
+            canvas.drawBitmap(coverBmp, heroLeft, heroTop, null)
+            coverBmp.recycle()
+
+            // Crisp thin ivory edge highlight on hero sleeve
+            rimP.color = Color.argb(80, 255, 250, 240)
+            canvas.drawRoundRect(RectF(heroLeft, heroTop, heroLeft + heroSize, heroTop + heroSize), 14f, 14f, rimP)
+
+            return out
+        }
+
+        /**
+         * Style 2: Miniature Brushed Champagne-Aluminum Turntable Deck + 180g Grooved Vinyl
+         * (with current album cover clipped cleanly onto center label) + Precision Brushed-Brass Tonearm.
+         */
+        private fun renderTurntableDeckBitmap(context: Context, uri: Uri?): Bitmap {
+            val size = 360
+            val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(out)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+            // 1. Brushed Champagne-Aluminum recessed square turntable plate
+            val plateRect = RectF(6f, 6f, size - 6f, size - 6f)
+            paint.shader = LinearGradient(
+                0f, 0f, size.toFloat(), size.toFloat(),
+                intArrayOf(
+                    Color.parseColor("#E2DBD0"),
+                    Color.parseColor("#C7BEB0"),
+                    Color.parseColor("#B3A899"),
+                    Color.parseColor("#D6CEC1"),
+                ),
+                null, Shader.TileMode.CLAMP,
+            )
+            canvas.drawRoundRect(plateRect, 26f, 26f, paint)
+            paint.shader = null
+
+            // Subtle machined inner bevel on aluminum plate
+            val bevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 2.4f
+                color = Color.argb(120, 255, 252, 245)
+            }
+            canvas.drawRoundRect(plateRect, 26f, 26f, bevelPaint)
+
+            // 2. Sculpted recessed dark platter well
+            val cx = size * 0.47f
+            val cy = size * 0.52f
+            val wellR = size * 0.405f
+            paint.shader = RadialGradient(
+                cx, cy, wellR,
+                intArrayOf(Color.parseColor("#181615"), Color.parseColor("#2B2724"), Color.parseColor("#8D8579")),
+                floatArrayOf(0.84f, 0.94f, 1.0f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(cx, cy, wellR, paint)
+            paint.shader = null
+
+            // 3. 180g matte-black grooved vinyl disc with current album cover on center label
+            val rawCover = uri?.let { loadRawBitmap(context, it, 160) }
+            drawGroovedVinylDisc(canvas, cx, cy, wellR * 0.93f, centerCover = rawCover)
+            rawCover?.recycle()
+
+            // 4. Precision miniature brushed-brass tonearm resting delicately on the vinyl groove
+            val pivotX = size * 0.855f
+            val pivotY = size * 0.175f
+            val headX = size * 0.695f
+            val headY = size * 0.695f
+
+            // Tonearm shadow
+            val armShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeCap = Paint.Cap.ROUND
+                strokeWidth = 9f
+                color = Color.argb(75, 0, 0, 0)
+            }
+            val armPath = Path().apply {
+                moveTo(pivotX, pivotY)
+                quadTo(size * 0.84f, size * 0.50f, headX, headY)
+            }
+            canvas.save()
+            canvas.translate(4f, 6f)
+            canvas.drawPath(armPath, armShadow)
+            canvas.restore()
+
+            // Brushed-brass tonearm tube
+            val armPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeCap = Paint.Cap.ROUND
+                strokeWidth = 7.5f
+                shader = LinearGradient(
+                    pivotX, pivotY, headX, headY,
+                    intArrayOf(Color.parseColor("#E3C898"), Color.parseColor("#A68755"), Color.parseColor("#D9BC89")),
+                    null, Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawPath(armPath, armPaint)
+
+            // Pivot counterweight & gimbal base
+            paint.color = Color.parseColor("#6D5639")
+            canvas.drawCircle(pivotX, pivotY, 20f, paint)
+            paint.shader = RadialGradient(
+                pivotX - 4f, pivotY - 4f, 18f,
+                intArrayOf(Color.parseColor("#F1DAB0"), Color.parseColor("#9C7E4E")),
+                null, Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(pivotX, pivotY, 15f, paint)
+            paint.shader = null
+            paint.color = Color.parseColor("#3A2E1E")
+            canvas.drawCircle(pivotX, pivotY, 5f, paint)
+
+            // Cartridge headshell angled onto groove
+            canvas.save()
+            canvas.translate(headX, headY)
+            canvas.rotate(42f)
+            paint.color = Color.parseColor("#8D7144")
+            canvas.drawRoundRect(RectF(-10f, -15f, 10f, 15f), 4f, 4f, paint)
+            paint.color = Color.parseColor("#EBD2A4")
+            canvas.drawRoundRect(RectF(-6f, -10f, 6f, 6f), 2f, 2f, paint)
+            canvas.restore()
+
+            return out
+        }
+
+        private fun drawGroovedVinylDisc(
+            canvas: Canvas,
+            cx: Float,
+            cy: Float,
+            radius: Float,
+            centerCover: Bitmap?,
+        ) {
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            paint.color = Color.parseColor("#0D0D0F")
+            canvas.drawCircle(cx, cy, radius, paint)
+
+            // Anisotropic studio light sheen
             val sweepPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             val sweep = SweepGradient(
-                discCx,
-                discCy,
+                cx, cy,
                 intArrayOf(
                     Color.TRANSPARENT,
-                    Color.argb(80, 238, 240, 244),
+                    Color.argb(84, 240, 236, 228),
                     Color.TRANSPARENT,
-                    Color.argb(72, 238, 240, 244),
+                    Color.argb(74, 240, 236, 228),
                     Color.TRANSPARENT,
                 ),
                 floatArrayOf(0.0f, 0.14f, 0.30f, 0.64f, 0.85f),
             )
-            val mat = Matrix().apply { postRotate(-25f, discCx, discCy) }
+            val mat = Matrix().apply { postRotate(-26f, cx, cy) }
             sweep.setLocalMatrix(mat)
             sweepPaint.shader = sweep
-            canvas.drawCircle(discCx, discCy, discRadius * 0.96f, sweepPaint)
+            canvas.drawCircle(cx, cy, radius * 0.97f, sweepPaint)
 
+            // Micro-grooves
             val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE
-                strokeWidth = if (highRes) 1.4f else 1.0f
+                strokeWidth = 1.2f
             }
-            val grooveSteps = if (highRes) 24 else 16
-            for (i in 0..grooveSteps) {
-                val frac = 0.42f + (i.toFloat() / grooveSteps) * 0.52f
-                val r = discRadius * frac
-                groovePaint.color = if (i % 2 == 0) Color.argb(32, 255, 255, 255) else Color.argb(82, 0, 0, 0)
-                canvas.drawCircle(discCx, discCy, r, groovePaint)
+            for (i in 0..24) {
+                val frac = 0.40f + (i / 24f) * 0.54f
+                groovePaint.color = if (i % 2 == 0) Color.argb(30, 255, 250, 240) else Color.argb(85, 0, 0, 0)
+                canvas.drawCircle(cx, cy, radius * frac, groovePaint)
             }
 
-            // Subtle vinyl center label ring & outer rim highlight
+            // Outer rim highlight
             val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE
-                strokeWidth = if (highRes) 1.5f else 1.0f
-                color = Color.argb(45, 255, 255, 255)
+                strokeWidth = 1.6f
+                color = Color.argb(52, 255, 248, 236)
             }
-            canvas.drawCircle(discCx, discCy, discRadius - 1f, rimPaint)
+            canvas.drawCircle(cx, cy, radius - 1f, rimPaint)
 
-            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#C83E2B") }
-            canvas.drawCircle(discCx, discCy, discRadius * 0.28f, labelPaint)
-            labelPaint.color = Color.parseColor("#18181B")
-            canvas.drawCircle(discCx, discCy, discRadius * 0.06f, labelPaint)
+            // Center label (album cover if supplied, else warm cinnabar label)
+            val labelR = radius * 0.33f
+            if (centerCover != null) {
+                val labelSize = (labelR * 2f).toInt().coerceAtLeast(16)
+                val circleBmp = Bitmap.createBitmap(labelSize, labelSize, Bitmap.Config.ARGB_8888)
+                val cCanvas = Canvas(circleBmp)
+                val cPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+                cCanvas.drawCircle(labelSize / 2f, labelSize / 2f, labelSize / 2f, cPaint)
+                cPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+                cCanvas.drawBitmap(centerCover, null, Rect(0, 0, labelSize, labelSize), cPaint)
+                canvas.drawBitmap(circleBmp, cx - labelR, cy - labelR, null)
+                circleBmp.recycle()
+            } else {
+                paint.color = Color.parseColor("#B83B28")
+                canvas.drawCircle(cx, cy, labelR, paint)
+            }
+            // Center spindle hole
+            paint.color = Color.parseColor("#181615")
+            canvas.drawCircle(cx, cy, radius * 0.055f, paint)
+            paint.color = Color.parseColor("#D8BE8C")
+            canvas.drawCircle(cx, cy, radius * 0.025f, paint)
+        }
 
-            // 2. Decode album cover (per-song or fallback dark vinyl sleeve)
-            val rawCover = uri?.let { loadRawBitmap(context, it, sleeveSize) }
-            val coverRounded = Bitmap.createBitmap(sleeveSize, sleeveSize, Bitmap.Config.ARGB_8888)
-            val cCanvas = Canvas(coverRounded)
+        private fun roundedCoverBitmap(rawCover: Bitmap?, size: Int, cornerRadius: Float): Bitmap {
+            val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val cCanvas = Canvas(out)
             val cPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            val rect = Rect(0, 0, sleeveSize, sleeveSize)
+            val rect = Rect(0, 0, size, size)
             val rectF = RectF(rect)
             cCanvas.drawRoundRect(rectF, cornerRadius, cornerRadius, cPaint)
             cPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
@@ -233,30 +427,11 @@ open class PureMusicWidgetProvider : AppWidgetProvider() {
                 cCanvas.drawBitmap(rawCover, null, rect, cPaint)
                 rawCover.recycle()
             } else {
-                val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#24211F") }
-                cCanvas.drawRect(rectF, fallbackPaint)
-                fallbackPaint.color = Color.parseColor("#C83E2B")
-                cCanvas.drawCircle(sleeveSize / 2f, sleeveSize / 2f, sleeveSize * 0.14f, fallbackPaint)
+                val fb = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2A2420") }
+                cCanvas.drawRect(rectF, fb)
+                fb.color = Color.parseColor("#C83E2B")
+                cCanvas.drawCircle(size / 2f, size / 2f, size * 0.14f, fb)
             }
-
-            // Soft drop shadow behind sleeve edge over the vinyl disc
-            val shadowOffset = if (highRes) 8f else 5f
-            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(72, 0, 0, 0)
-            }
-            canvas.drawRoundRect(
-                RectF(
-                    sleeveLeft + shadowOffset,
-                    sleeveTop + 3f,
-                    sleeveLeft + sleeveSize + shadowOffset * 0.7f,
-                    sleeveTop + sleeveSize + 3f,
-                ),
-                cornerRadius,
-                cornerRadius,
-                shadowPaint,
-            )
-            canvas.drawBitmap(coverRounded, sleeveLeft, sleeveTop, null)
-            coverRounded.recycle()
             return out
         }
 

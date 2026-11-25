@@ -69,6 +69,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import android.provider.OpenableColumns
 import com.puremusic.player.ui.components.SingleTrackRepeatDialog
 import android.widget.Toast
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -198,6 +200,79 @@ private fun PureMusicApp(
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val fadeInSeconds by viewModel.fadeInSeconds.collectAsStateWithLifecycle()
     val volumeNormalizationEnabled by viewModel.volumeNormalizationEnabled.collectAsStateWithLifecycle()
+    val immersiveMoodStrength by viewModel.immersiveMoodStrength.collectAsStateWithLifecycle()
+    val immersiveMatteCover by viewModel.immersiveMatteCover.collectAsStateWithLifecycle()
+    val immersiveVinylRpm by viewModel.immersiveVinylRpm.collectAsStateWithLifecycle()
+    val gaplessEnabled by viewModel.gaplessEnabled.collectAsStateWithLifecycle()
+    val replayGainEnabled by viewModel.replayGainEnabled.collectAsStateWithLifecycle()
+    val perDeviceEqEnabled by viewModel.perDeviceEqEnabled.collectAsStateWithLifecycle()
+    val cueSupportEnabled by viewModel.cueSupportEnabled.collectAsStateWithLifecycle()
+    val v120Scope = rememberCoroutineScope()
+
+    val exportM3u8Launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("audio/x-mpegurl"),
+    ) { uri ->
+        if (uri != null) {
+            v120Scope.launch {
+                runCatching {
+                    val content = viewModel.exportM3u8()
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray(Charsets.UTF_8)) }
+                }.onSuccess {
+                    Toast.makeText(context, "M3U8 歌单导出成功，可直接在 Windows 版导入", Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(context, "导出失败：${it.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    val importM3u8Launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            v120Scope.launch {
+                runCatching {
+                    val text = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                    viewModel.importM3u8("导入 M3U8 歌单", text)
+                }.onSuccess { count ->
+                    Toast.makeText(context, if (count > 0) "已成功导入 $count 首曲目到新歌单" else "未匹配到本地曲库中的歌曲", Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(context, "导入失败：${it.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    val exportV120JsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) {
+            v120Scope.launch {
+                runCatching {
+                    val json = viewModel.exportBackupJson()
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                }.onSuccess {
+                    Toast.makeText(context, "全量备份已保存（含我喜欢与全部自建歌单）", Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(context, "备份失败：${it.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    val importV120JsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            v120Scope.launch {
+                runCatching {
+                    val text = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                    viewModel.importBackupJson(text)
+                }.onSuccess { count ->
+                    Toast.makeText(context, if (count > 0) "已成功恢复 $count 条珍藏与歌单记录" else "备份文件中未匹配到本地歌曲", Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(context, "恢复失败：${it.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
     val carModeEnabled by viewModel.carModeEnabled.collectAsStateWithLifecycle()
 
@@ -524,6 +599,18 @@ private fun PureMusicApp(
                         playbackSpeed = playbackSpeed,
                         fadeInSeconds = fadeInSeconds,
                         volumeNormalizationEnabled = volumeNormalizationEnabled,
+                    gaplessEnabled = gaplessEnabled,
+                    replayGainEnabled = replayGainEnabled,
+                    perDeviceEqEnabled = perDeviceEqEnabled,
+                    cueSupportEnabled = cueSupportEnabled,
+                    onToggleGapless = viewModel::setGaplessEnabled,
+                    onToggleReplayGain = viewModel::setReplayGainEnabled,
+                    onTogglePerDeviceEq = viewModel::setPerDeviceEqEnabled,
+                    onToggleCueSupport = viewModel::setCueSupportEnabled,
+                    onExportM3u8 = { exportM3u8Launcher.launch("PureMusic_Playlists.m3u8") },
+                    onImportM3u8 = { importM3u8Launcher.launch(arrayOf("*/*")) },
+                    onExportBackupJson = { exportV120JsonLauncher.launch("PureMusic_Backup_v1.20.json") },
+                    onImportBackupJson = { importV120JsonLauncher.launch(arrayOf("application/json", "*/*")) },
                         hapticEnabled = hapticEnabled,
                         carModeEnabled = carModeEnabled,
                         keepScreenOn = keepScreenOn,
@@ -691,6 +778,16 @@ private fun PureMusicApp(
                 ) + fadeOut(tween(180)),
             ) {
                 val currentSong = playerState.currentSong
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.puremusic.player.ui.screens.LocalImmersiveTuner provides com.puremusic.player.ui.screens.ImmersiveTunerState(
+                        moodStrength = immersiveMoodStrength,
+                        matteCover = immersiveMatteCover,
+                        vinylRpm = immersiveVinylRpm,
+                        onUpdateMoodStrength = viewModel::setImmersiveMoodStrength,
+                        onToggleMatteCover = viewModel::setImmersiveMatteCover,
+                        onUpdateVinylRpm = viewModel::setImmersiveVinylRpm,
+                    ),
+                ) {
                 NowPlayingScreen(
                     playerState = playerState,
                     allSongs = allSongs,
@@ -739,6 +836,7 @@ private fun PureMusicApp(
                     onAdjustLyricOffset = viewModel::adjustCurrentLyricOffset,
                     onResetLyricOffset = viewModel::resetCurrentLyricOffset,
                 )
+                }
             }
 
             AnimatedVisibility(

@@ -38,6 +38,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Slider
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.MoreHoriz
@@ -740,13 +743,14 @@ private fun SpatialGalleryImmersiveView(
     onAdjustLyricOffset: (Long) -> Unit,
     onResetLyricOffset: () -> Unit,
 ) {
+    val tuner = LocalImmersiveTuner.current
     val bgTop by animateColorAsState(
-        targetValue = lerp(Color(0xFF14181C), dynamicAccent, 0.36f),
+        targetValue = lerp(Color(0xFF14181C), dynamicAccent, 0.42f * tuner.moodStrength),
         animationSpec = tween(550),
         label = "galleryBgTop",
     )
     val bgMid by animateColorAsState(
-        targetValue = lerp(Color(0xFF0D1114), dynamicAccent, 0.20f),
+        targetValue = lerp(Color(0xFF0D1114), dynamicAccent, 0.24f * tuner.moodStrength),
         animationSpec = tween(550),
         label = "galleryBgMid",
     )
@@ -796,7 +800,7 @@ private fun SpatialGalleryImmersiveView(
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawRect(
                 brush = Brush.radialGradient(
-                    0.0f to dynamicGlow.copy(alpha = 0.28f),
+                    0.0f to dynamicGlow.copy(alpha = 0.32f * tuner.moodStrength),
                     0.42f to dynamicAccent.copy(alpha = 0.14f),
                     0.78f to dynamicAccent.copy(alpha = 0.04f),
                     1.0f to Color.Transparent,
@@ -960,7 +964,7 @@ private fun SpatialGalleryImmersiveView(
                                         drawImage(
                                             image = matteGrain,
                                             dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)),
-                                            alpha = if (isFront) 0.52f else 0.34f,
+                                            alpha = if (!tuner.matteCover) 0f else if (isFront) 0.52f else 0.34f,
                                         )
                                     }
 
@@ -1951,6 +1955,18 @@ fun LiveSpectrumWaveformSeekBar(
     }
 }
 
+
+data class ImmersiveTunerState(
+    val moodStrength: Float = 0.85f,
+    val matteCover: Boolean = true,
+    val vinylRpm: Int = 33,
+    val onUpdateMoodStrength: (Float) -> Unit = {},
+    val onToggleMatteCover: (Boolean) -> Unit = {},
+    val onUpdateVinylRpm: (Int) -> Unit = {},
+)
+
+val LocalImmersiveTuner = androidx.compose.runtime.compositionLocalOf { ImmersiveTunerState() }
+
 @Composable
 private fun ImmersiveTopBar(
     title: String,
@@ -1967,8 +1983,16 @@ private fun ImmersiveTopBar(
     onOpenLyricsSearch: () -> Unit,
     onOpenCoverSearch: () -> Unit,
     onOpenFullLyricsSheet: () -> Unit,
+    moodStrength: Float = 0.85f,
+    matteCover: Boolean = true,
+    vinylRpm: Int = 33,
+    onUpdateMoodStrength: (Float) -> Unit = {},
+    onToggleMatteCover: (Boolean) -> Unit = {},
+    onUpdateVinylRpm: (Int) -> Unit = {},
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var tuneExpanded by remember { mutableStateOf(false) }
+    val tuner = LocalImmersiveTuner.current
 
     Row(
         modifier = Modifier
@@ -2020,7 +2044,75 @@ private fun ImmersiveTopBar(
                 }
             }
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Quick Dynamic Color & Matte Cover Tuner (Desktop-parity)
+            Box {
+                IconButton(onClick = { tuneExpanded = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Tune,
+                        contentDescription = "氛围与质感调节",
+                        tint = if (tuneExpanded) MaterialTheme.colorScheme.primary else inkColor.copy(alpha = 0.84f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = tuneExpanded,
+                    onDismissRequest = { tuneExpanded = false },
+                    modifier = Modifier
+                        .width(248.dp)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        text = "动态取色氛围强度  ${(tuner.moodStrength * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Slider(
+                        value = tuner.moodStrength.coerceIn(0f, 1f),
+                        onValueChange = tuner.onUpdateMoodStrength,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("封面亚光磨砂质感", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                        Switch(checked = tuner.matteCover, onCheckedChange = tuner.onToggleMatteCover)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("黑胶转速", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(33, 45, 78).forEach { rpm ->
+                                val active = tuner.vinylRpm == rpm
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable { tuner.onUpdateVinylRpm(rpm) }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                ) {
+                                    Text(
+                                        text = "$rpm",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(2.dp))
 
             Box {
                 IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {

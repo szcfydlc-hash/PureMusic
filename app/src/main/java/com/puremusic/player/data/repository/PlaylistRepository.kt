@@ -71,6 +71,13 @@ class PlaylistRepository(private val context: Context) {
         val FADE_IN_SECONDS = intPreferencesKey("fade_in_seconds")
         val HAPTIC_ENABLED = booleanPreferencesKey("haptic_enabled")
         val VOLUME_NORMALIZATION = booleanPreferencesKey("volume_normalization")
+        val IMMERSIVE_MOOD_STRENGTH = floatPreferencesKey("immersive_mood_strength")
+        val IMMERSIVE_MATTE_COVER = booleanPreferencesKey("immersive_matte_cover")
+        val IMMERSIVE_VINYL_RPM = intPreferencesKey("immersive_vinyl_rpm")
+        val GAPLESS_ENABLED = booleanPreferencesKey("gapless_enabled")
+        val REPLAYGAIN_ENABLED = booleanPreferencesKey("replaygain_enabled")
+        val PER_DEVICE_EQ = booleanPreferencesKey("per_device_eq")
+        val CUE_SUPPORT = booleanPreferencesKey("cue_support")
         val CAR_MODE_ENABLED = booleanPreferencesKey("car_mode_enabled")
         val IMMERSION_STYLE = stringPreferencesKey("immersion_style")
         val SPECTRUM_STYLE = stringPreferencesKey("spectrum_style")
@@ -207,6 +214,34 @@ class PlaylistRepository(private val context: Context) {
 
     val volumeNormalizationFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
         prefs[Keys.VOLUME_NORMALIZATION] ?: false
+    }
+
+    val immersiveMoodStrengthFlow: Flow<Float> = context.pureMusicDataStore.data.map { prefs ->
+        (prefs[Keys.IMMERSIVE_MOOD_STRENGTH] ?: 0.85f).coerceIn(0f, 1f)
+    }
+
+    val immersiveMatteCoverFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.IMMERSIVE_MATTE_COVER] ?: true
+    }
+
+    val immersiveVinylRpmFlow: Flow<Int> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.IMMERSIVE_VINYL_RPM] ?: 33
+    }
+
+    val gaplessEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.GAPLESS_ENABLED] ?: true
+    }
+
+    val replayGainEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.REPLAYGAIN_ENABLED] ?: true
+    }
+
+    val perDeviceEqEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.PER_DEVICE_EQ] ?: true
+    }
+
+    val cueSupportEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
+        prefs[Keys.CUE_SUPPORT] ?: true
     }
 
     val carModeEnabledFlow: Flow<Boolean> = context.pureMusicDataStore.data.map { prefs ->
@@ -471,6 +506,156 @@ class PlaylistRepository(private val context: Context) {
         context.pureMusicDataStore.edit { prefs ->
             prefs[Keys.VOLUME_NORMALIZATION] = enabled
         }
+    }
+
+    suspend fun setImmersiveMoodStrength(strength: Float) {
+        context.pureMusicDataStore.edit { it[Keys.IMMERSIVE_MOOD_STRENGTH] = strength.coerceIn(0f, 1f) }
+    }
+
+    suspend fun setImmersiveMatteCover(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.IMMERSIVE_MATTE_COVER] = enabled }
+    }
+
+    suspend fun setImmersiveVinylRpm(rpm: Int) {
+        val safe = if (rpm in setOf(33, 45, 78)) rpm else 33
+        context.pureMusicDataStore.edit { it[Keys.IMMERSIVE_VINYL_RPM] = safe }
+    }
+
+    suspend fun setGaplessEnabled(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.GAPLESS_ENABLED] = enabled }
+    }
+
+    suspend fun setReplayGainEnabled(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.REPLAYGAIN_ENABLED] = enabled }
+    }
+
+    suspend fun setPerDeviceEqEnabled(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.PER_DEVICE_EQ] = enabled }
+    }
+
+    suspend fun setCueSupportEnabled(enabled: Boolean) {
+        context.pureMusicDataStore.edit { it[Keys.CUE_SUPPORT] = enabled }
+    }
+
+    suspend fun exportAllToJson(allSongs: List<com.puremusic.player.data.model.Song>): String {
+        val byId = allSongs.associateBy { it.id }
+        val favIds = favoriteIdsFlow.first()
+        val pls = playlistsFlow.first()
+        val root = JSONObject()
+        root.put("app", "PureMusic")
+        root.put("version", "1.20")
+        val favArr = JSONArray()
+        favIds.forEach { id ->
+            byId[id]?.let { s ->
+                favArr.put(JSONObject().apply {
+                    put("id", s.id)
+                    put("title", s.title)
+                    put("artist", s.artist)
+                    put("dataPath", s.filePath)
+                })
+            }
+        }
+        root.put("favorites", favArr)
+        val plArr = JSONArray()
+        pls.forEach { pl ->
+            val items = JSONArray()
+            pl.songIds.forEach { id ->
+                byId[id]?.let { s ->
+                    items.put(JSONObject().apply {
+                        put("id", s.id)
+                        put("title", s.title)
+                        put("artist", s.artist)
+                        put("dataPath", s.filePath)
+                    })
+                }
+            }
+            plArr.put(JSONObject().apply {
+                put("id", pl.id)
+                put("name", pl.name)
+                put("tracks", items)
+            })
+        }
+        root.put("playlists", plArr)
+        return root.toString(2)
+    }
+
+    suspend fun importAllFromJson(jsonText: String, allSongs: List<com.puremusic.player.data.model.Song>): Int {
+        val obj = JSONObject(jsonText)
+        val byPath = allSongs.associateBy { it.filePath.lowercase() }
+        val byKey = allSongs.associateBy { "${it.title.trim().lowercase()}|${it.artist.trim().lowercase()}" }
+        fun matchSong(item: JSONObject): Long? {
+            val p = item.optString("dataPath", "").lowercase()
+            if (p.isNotBlank()) byPath[p]?.let { return it.id }
+            val k = "${item.optString("title", "").trim().lowercase()}|${item.optString("artist", "").trim().lowercase()}"
+            return byKey[k]?.id
+        }
+        var restored = 0
+        val favArr = obj.optJSONArray("favorites")
+        if (favArr != null && favArr.length() > 0) {
+            val ids = mutableSetOf<Long>()
+            for (i in 0 until favArr.length()) {
+                matchSong(favArr.getJSONObject(i))?.let { ids.add(it); restored++ }
+            }
+            if (ids.isNotEmpty()) setFavoriteSongIds(favoriteIdsFlow.first() + ids)
+        }
+        val plArr = obj.optJSONArray("playlists")
+        if (plArr != null) {
+            for (i in 0 until plArr.length()) {
+                val po = plArr.getJSONObject(i)
+                val name = po.optString("name", "").trim().ifBlank { "导入歌单 ${i + 1}" }
+                val tracks = po.optJSONArray("tracks") ?: continue
+                val ids = mutableListOf<Long>()
+                for (j in 0 until tracks.length()) {
+                    matchSong(tracks.getJSONObject(j))?.let { ids.add(it); restored++ }
+                }
+                if (ids.isNotEmpty()) createPlaylist(name, ids)
+            }
+        }
+        return restored
+    }
+
+    suspend fun exportFavoritesAndPlaylistsToM3u8(allSongs: List<com.puremusic.player.data.model.Song>): String {
+        val byId = allSongs.associateBy { it.id }
+        val favIds = favoriteIdsFlow.first()
+        val pls = playlistsFlow.first()
+        val sb = StringBuilder()
+        sb.appendLine("#EXTM3U")
+        val ordered = LinkedHashSet<Long>()
+        ordered.addAll(favIds)
+        pls.forEach { ordered.addAll(it.songIds) }
+        ordered.forEach { id ->
+            val s = byId[id] ?: return@forEach
+            val sec = (s.durationMs / 1000L).coerceAtLeast(0L)
+            sb.appendLine("#EXTINF:$sec,${s.artist} - ${s.title}")
+            sb.appendLine(s.filePath.ifBlank { "${s.title}.flac" })
+        }
+        return sb.toString()
+    }
+
+    suspend fun importPlaylistFromM3u8(playlistName: String, m3uText: String, allSongs: List<com.puremusic.player.data.model.Song>): Int {
+        val byPath = allSongs.associateBy { it.filePath.lowercase() }
+        val byFileName = allSongs.associateBy { java.io.File(it.filePath).name.lowercase() }
+        val byTitle = allSongs.associateBy { it.title.trim().lowercase() }
+        val matched = mutableListOf<Long>()
+        var pendingTitle: String? = null
+        m3uText.lineSequence().forEach { raw ->
+            val line = raw.trim()
+            if (line.isEmpty()) return@forEach
+            if (line.startsWith("#EXTINF:", ignoreCase = true)) {
+                val afterComma = line.substringAfter(",", "").trim()
+                pendingTitle = if (afterComma.contains(" - ")) afterComma.substringAfter(" - ").trim() else afterComma
+            } else if (!line.startsWith("#")) {
+                val clean = line.replace("\\", "/")
+                val fn = clean.substringAfterLast("/").lowercase()
+                val id = byPath[line.lowercase()]?.id
+                    ?: byFileName[fn]?.id
+                    ?: pendingTitle?.lowercase()?.let { byTitle[it]?.id }
+                if (id != null && id !in matched) matched.add(id)
+                pendingTitle = null
+            }
+        }
+        if (matched.isNotEmpty()) createPlaylist(playlistName.ifBlank { "导入 M3U8 歌单" }, matched)
+        return matched.size
     }
 
     suspend fun updateTranslationSettings(settings: TranslationSettings) {
