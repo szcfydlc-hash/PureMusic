@@ -247,7 +247,7 @@ private fun PureMusicApp(
         if (uri != null) {
             v120Scope.launch {
                 runCatching {
-                    val json = viewModel.exportBackupJson()
+                    val json = viewModel.exportV120BackupJson()
                     context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
                 }.onSuccess {
                     Toast.makeText(context, "全量备份已保存（含我喜欢与全部自建歌单）", Toast.LENGTH_SHORT).show()
@@ -264,7 +264,7 @@ private fun PureMusicApp(
             v120Scope.launch {
                 runCatching {
                     val text = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-                    viewModel.importBackupJson(text)
+                    viewModel.importV120BackupJson(text)
                 }.onSuccess { count ->
                     Toast.makeText(context, if (count > 0) "已成功恢复 $count 条珍藏与歌单记录" else "备份文件中未匹配到本地歌曲", Toast.LENGTH_SHORT).show()
                 }.onFailure {

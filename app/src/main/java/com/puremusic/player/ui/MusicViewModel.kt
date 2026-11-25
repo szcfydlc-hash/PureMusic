@@ -993,9 +993,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.setCueSupportEnabled(enabled) }
     }
 
-    suspend fun exportBackupJson(): String = playlistRepository.exportAllToJson(allSongs.value)
+    suspend fun exportV120BackupJson(): String = playlistRepository.exportAllToJson(allSongs.value)
 
-    suspend fun importBackupJson(jsonText: String): Int = playlistRepository.importAllFromJson(jsonText, allSongs.value)
+    suspend fun importV120BackupJson(jsonText: String): Int = playlistRepository.importAllFromJson(jsonText, allSongs.value)
 
     suspend fun exportM3u8(): String = playlistRepository.exportFavoritesAndPlaylistsToM3u8(allSongs.value)
 

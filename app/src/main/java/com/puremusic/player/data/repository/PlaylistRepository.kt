@@ -539,7 +539,7 @@ class PlaylistRepository(private val context: Context) {
 
     suspend fun exportAllToJson(allSongs: List<com.puremusic.player.data.model.Song>): String {
         val byId = allSongs.associateBy { it.id }
-        val favIds = favoriteIdsFlow.first()
+        val favIds = favoriteSongIdsFlow.first()
         val pls = playlistsFlow.first()
         val root = JSONObject()
         root.put("app", "PureMusic")
@@ -596,7 +596,7 @@ class PlaylistRepository(private val context: Context) {
             for (i in 0 until favArr.length()) {
                 matchSong(favArr.getJSONObject(i))?.let { ids.add(it); restored++ }
             }
-            if (ids.isNotEmpty()) setFavoriteSongIds(favoriteIdsFlow.first() + ids)
+            if (ids.isNotEmpty()) setFavoriteSongIds(favoriteSongIdsFlow.first() + ids)
         }
         val plArr = obj.optJSONArray("playlists")
         if (plArr != null) {
@@ -616,7 +616,7 @@ class PlaylistRepository(private val context: Context) {
 
     suspend fun exportFavoritesAndPlaylistsToM3u8(allSongs: List<com.puremusic.player.data.model.Song>): String {
         val byId = allSongs.associateBy { it.id }
-        val favIds = favoriteIdsFlow.first()
+        val favIds = favoriteSongIdsFlow.first()
         val pls = playlistsFlow.first()
         val sb = StringBuilder()
         sb.appendLine("#EXTM3U")
