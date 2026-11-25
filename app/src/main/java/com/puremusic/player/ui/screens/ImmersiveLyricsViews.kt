@@ -70,6 +70,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,6 +87,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.asImageBitmap
 import android.graphics.Bitmap
@@ -2410,15 +2415,36 @@ private fun rememberSmoothLyricPosMs(
     anchorPosMs: Long,
     isPlaying: Boolean,
 ): Long {
-    var smoothMs by remember(anchorPosMs) { mutableLongStateOf(anchorPosMs) }
-    LaunchedEffect(anchorPosMs, isPlaying) {
-        smoothMs = anchorPosMs
-        if (!isPlaying) return@LaunchedEffect
-        val baseElapsed = android.os.SystemClock.elapsedRealtime()
-        while (AudioSpectrumBus.isVisualizerActive) {
-            withFrameNanos {
-                val delta = (android.os.SystemClock.elapsedRealtime() - baseElapsed).coerceIn(0L, 1200L)
-                smoothMs = anchorPosMs + delta
+    var smoothMs by remember { mutableLongStateOf(anchorPosMs) }
+    val latestAnchor by rememberUpdatedState(anchorPosMs)
+    val latestAnchorRealtime = remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
+
+    LaunchedEffect(anchorPosMs) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        latestAnchorRealtime.longValue = now
+        // Snap immediately on seek/track switch (> 550ms jump), otherwise let phase-locked loop slew smoothly
+        if (abs(anchorPosMs - smoothMs) > 550L || !isPlaying) {
+            smoothMs = anchorPosMs
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) {
+            smoothMs = latestAnchor
+            return@LaunchedEffect
+        }
+        var lastNanos = 0L
+        while (true) {
+            withFrameNanos { nanos ->
+                val dtMs = if (lastNanos == 0L) 16f else ((nanos - lastNanos) / 1_000_000f).coerceIn(0f, 50f)
+                lastNanos = nanos
+                val expected = latestAnchor + (android.os.SystemClock.elapsedRealtime() - latestAnchorRealtime.longValue).coerceIn(0L, 1500L)
+                val drift = expected - smoothMs
+                smoothMs = when {
+                    abs(drift) > 550L -> expected
+                    drift > 0L -> (smoothMs + dtMs + drift * 0.12f).toLong()
+                    else -> (smoothMs + dtMs * 0.85f).toLong().coerceAtMost(expected + 40L)
+                }
             }
         }
     }
@@ -2596,58 +2622,129 @@ private fun ThreeSlotAutoFitLyricsStage(
                     KaraokeLyricMode.SMART -> true
                 }
 
-                if (!enableKaraoke) {
-                    Text(
-                        text = line2Text,
-                        style = TextStyle(
-                            fontFamily = lyricFamily,
-                            fontStyle = lyricStyleItalic,
-                            fontSize = fittedFontSp.sp,
-                            fontWeight = effectiveActiveWeight,
-                            lineHeight = (fittedFontSp * 1.32f).sp,
+                AnimatedContent(
+                    targetState = Triple(activeIdx, line2Text, fittedFontSp),
+                    transitionSpec = {
+                        (slideInVertically(tween(340, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(300))) togetherWith
+                            (slideOutVertically(tween(220, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(180)))
+                    },
+                    label = "lyricLineGlide",
+                ) { (targetIdx, targetText, targetSp) ->
+                    val targetLine = lyrics.getOrNull(targetIdx) ?: activeLine
+                    val targetNextStart = lyrics.getOrNull(targetIdx + 1)?.timeMs ?: (targetLine.timeMs + 4200L)
+                    val targetCredit = isLyricCreditMetadata(targetText)
+                    val targetFinalSp = if (targetCredit) minOf(targetSp, 14) else targetSp
+                    val targetColor = if (targetCredit) secondaryColor.copy(alpha = 0.82f) else activeColor
+                    val targetWeight = if (targetCredit) FontWeight.Normal else activeWeight
+
+                    if (!enableKaraoke || targetCredit) {
+                        Text(
+                            text = targetText,
+                            style = TextStyle(
+                                fontFamily = lyricFamily,
+                                fontStyle = lyricStyleItalic,
+                                fontSize = targetFinalSp.sp,
+                                fontWeight = targetWeight,
+                                lineHeight = (targetFinalSp * 1.32f).sp,
+                                textAlign = textAlign,
+                            ),
+                            color = targetColor,
                             textAlign = textAlign,
-                        ),
-                        color = effectiveActiveColor,
-                        textAlign = textAlign,
-                    )
-                } else {
-                    val smoothPosMs = rememberSmoothLyricPosMs(positionMs, isPlaying)
-                    val words = remember(activeLine.timeMs, line2Text, activeLine.words, nextLineStart) {
-                        if (activeLine.words.isNotEmpty()) activeLine.words
-                        else synthesizeSmartWords(line2Text, activeLine.timeMs, nextLineStart)
-                    }
-                    val unsungColor = activeColor.copy(alpha = 0.30f)
-                    val glowShadow = remember(activeColor) {
-                        Shadow(color = activeColor.copy(alpha = 0.28f), offset = Offset(0f, 0f), blurRadius = 10f)
-                    }
-                    val annotated = buildAnnotatedString {
-                        words.forEach { w ->
-                            val spanDur = (w.endMs - w.startMs).coerceAtLeast(40L).toFloat()
-                            val p = ((smoothPosMs - w.startMs) / spanDur).coerceIn(0f, 1f)
-                            val col = lerp(unsungColor, activeColor, p)
-                            val isActiveWord = p in 0.05f..0.95f
-                            withStyle(
-                                SpanStyle(
-                                    color = col,
-                                    shadow = if (isActiveWord) glowShadow else null,
-                                ),
-                            ) {
-                                append(w.text)
+                        )
+                    } else {
+                        val smoothPosMs = rememberSmoothLyricPosMs(positionMs, isPlaying)
+                        val words = remember(targetLine.timeMs, targetText, targetLine.words, targetNextStart) {
+                            if (targetLine.words.isNotEmpty()) targetLine.words
+                            else synthesizeSmartWords(targetText, targetLine.timeMs, targetNextStart)
+                        }
+                        // Compute exact continuous character-level fractional progress (0f..targetText.length)
+                        val exactCharPos = run {
+                            if (words.isEmpty()) targetText.length.toFloat()
+                            else {
+                                var charCursor = 0
+                                var result = 0f
+                                var found = false
+                                for (w in words) {
+                                    val len = w.text.length.coerceAtLeast(1)
+                                    if (smoothPosMs < w.startMs) {
+                                        result = charCursor.toFloat()
+                                        found = true
+                                        break
+                                    } else if (smoothPosMs <= w.endMs) {
+                                        val rawT = ((smoothPosMs - w.startMs).toFloat() / (w.endMs - w.startMs).coerceAtLeast(40L).toFloat()).coerceIn(0f, 1f)
+                                        // Smooth S-curve easing inside each syllable for organic human vocal pacing
+                                        val easedT = rawT * rawT * (3f - 2f * rawT)
+                                        result = charCursor + easedT * len
+                                        found = true
+                                        break
+                                    }
+                                    charCursor += len
+                                }
+                                if (found) result else targetText.length.toFloat()
                             }
                         }
-                    }
-                    Text(
-                        text = annotated,
-                        style = TextStyle(
-                            fontFamily = lyricFamily,
-                            fontStyle = lyricStyleItalic,
-                            fontSize = fittedFontSp.sp,
-                            fontWeight = effectiveActiveWeight,
-                            lineHeight = (fittedFontSp * 1.32f).sp,
+
+                        var layoutResult by remember(targetText, targetFinalSp) { mutableStateOf<TextLayoutResult?>(null) }
+                        val unsungColor = targetColor.copy(alpha = 0.28f)
+                        val featherPx = 42f
+
+                        Text(
+                            text = targetText,
+                            style = TextStyle(
+                                fontFamily = lyricFamily,
+                                fontStyle = lyricStyleItalic,
+                                fontSize = targetFinalSp.sp,
+                                fontWeight = targetWeight,
+                                lineHeight = (targetFinalSp * 1.32f).sp,
+                                textAlign = textAlign,
+                            ),
+                            color = targetColor,
                             textAlign = textAlign,
-                        ),
-                        textAlign = textAlign,
-                    )
+                            onTextLayout = { layoutResult = it },
+                            modifier = Modifier
+                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .drawWithContent {
+                                    drawContent()
+                                    val lr = layoutResult
+                                    if (lr != null && targetText.isNotEmpty()) {
+                                        val lineCount = lr.lineCount
+                                        val maxChar = (targetText.length - 1).coerceAtLeast(0)
+                                        for (lineIdx in 0 until lineCount) {
+                                            val lineStartChar = lr.getLineStart(lineIdx)
+                                            val lineEndChar = lr.getLineEnd(lineIdx, visibleEnd = true).coerceAtLeast(lineStartChar)
+                                            val lineTop = lr.getLineTop(lineIdx)
+                                            val lineBottom = lr.getLineBottom(lineIdx)
+                                            val lineLeft = lr.getLineLeft(lineIdx)
+                                            val lineRight = lr.getLineRight(lineIdx)
+
+                                            val sweepX = when {
+                                                exactCharPos <= lineStartChar -> lineLeft - featherPx
+                                                exactCharPos >= lineEndChar -> lineRight + featherPx
+                                                else -> {
+                                                    val cIdx = exactCharPos.toInt().coerceIn(lineStartChar, maxChar)
+                                                    val frac = exactCharPos - cIdx
+                                                    val box = lr.getBoundingBox(cIdx)
+                                                    box.left + (box.right - box.left) * frac
+                                                }
+                                            }
+                                            val gradStart = (sweepX - featherPx * 0.55f).coerceAtLeast(0f)
+                                            val gradEnd = (sweepX + featherPx * 0.45f).coerceAtLeast(gradStart + 1f)
+                                            drawRect(
+                                                brush = Brush.horizontalGradient(
+                                                    0.0f to targetColor,
+                                                    1.0f to unsungColor,
+                                                    startX = gradStart,
+                                                    endX = gradEnd,
+                                                ),
+                                                topLeft = Offset(0f, lineTop),
+                                                size = Size(size.width, (lineBottom - lineTop).coerceAtLeast(1f)),
+                                                blendMode = BlendMode.SrcIn,
+                                            )
+                                        }
+                                    }
+                                },
+                        )
+                    }
                 }
             }
 
